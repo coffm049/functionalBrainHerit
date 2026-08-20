@@ -1,13 +1,22 @@
 # History files
 .Rhistory
 .Rapp.history
+.Rds
+.csv
 
 # Session Data files
 .RData
 .RDataTmp
+.Rds
+.csv
+.tsv
+.txt
+.png
+.html
 
 # User-specific files
 .Ruserdata
+/combined/*
 
 # Example code in package build process
 *-Ex.R
