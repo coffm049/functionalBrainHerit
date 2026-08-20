@@ -44,8 +44,8 @@ rsconnect/
 
 # User-specific & Directory Exclusions
 .Ruserdata
-*/temp/*
-*/archive/*
+temp/
+archive/*
 twinEstResults/*
 /combined/*
 
