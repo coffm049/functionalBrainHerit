@@ -34,7 +34,7 @@ df2 %>%
     reframe(mean(`2.5%` > 0))
 
 
-df <- read_csv("/panfs/jay/groups/31/rando149/coffm049/ABCD/Results/03_heritability/Topography/FCs/pconns.GCTA.FE.3.csv")
+df <- read_csv("/users/4/coffm049/papers/functionalBrainHerit/results/FCs/gordon/pconns.GCTA.FE.3.csv")
 
 txtdensity(na.omit(as.numeric(df$h2)))
 txtdensity(na.omit(as.numeric(df$G)))

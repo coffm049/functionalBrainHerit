@@ -8,18 +8,18 @@ library(mets)
 args = commandArgs(trailingOnly=TRUE)
 iteration = as.numeric(args[2])
 
-pheno <- read_parquet("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/pconns.parquet") %>%
+pheno <- read_parquet("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/pconns.parquet") %>%
   mutate(
       IID = gsub('^(.{4})(.*)$', '\\1_\\2', IID)
   )
 
 # 61776 phenos
 # 117 evenly spaced parallel threads of 528 blocks
-IDs = read_csv("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/FC.files", col_names = c("IID"))
+IDs = read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/FC.files", col_names = c("IID"))
 
 pheno = left_join(pheno, IDs, by = c("IID"))
 
-df <- read_csv("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotypes/Covars2.csv") %>%
+df <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/Covars2.csv") %>%
   # Select the relevant columns
   select(FID, IID, age, female, site_id_l, household.income, high.educ, genetic_zygosity_status_1, rel_ingroup_order) %>% 
   mutate(zyg = case_when(
@@ -52,7 +52,7 @@ for (ph in phenoNames) {
 
 
 results %>%
-    write_csv(paste0("/panfs/jay/groups/31/rando149/coffm049/ABCD/Results/03_heritability/Topography/FCs/gordontwinEsts", "_", 
+    write_csv(paste0("/users/4/coffm049/papers/functionalBrainHerit/results/FCs/gordon/gordontwinEsts", "_", 
     as.character(args[2]), ".csv"))
 
 

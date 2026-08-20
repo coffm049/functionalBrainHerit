@@ -1,13 +1,13 @@
-#!/bin/bash -l        
+#!/bin/bash -l
 #SBATCH --time=0:10:00
 #SBATCH --ntasks=1
 #SBATCH --mem=12g
-#SBATCH --mail-type=ALL  
+#SBATCH --mail-type=ALL
 #SBATCH --mail-user=coffm049@umn.edu
 
-
-module load python3
 cd ~/software/MASH
+source /users/4/coffm049/miniconda3/etc/profile.d/conda.sh
+conda activate MASH
 
-# Estimates on each 
-python -m Estimate --argfile /panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/03_Herit_ests/Topography/SA/newer/GCTA.json
+# Estimates on each
+MASH --argfile /users/4/coffm049/papers/functionalBrainHerit/SA/newer/GCTA_height.json

@@ -4,16 +4,16 @@ library(kableExtra)
 library(arrow)
 
 json_data <- jsonlite::fromJSON("GCTAbigN.json")
-phenojson <- jsonlite::fromJSON("/home/rando149/coffm049/ABCD/Workflow/03_Herit_ests/Topography/FCs/probaConns/temp/GCTA.FE.0.json")
+phenojson <- jsonlite::fromJSON("/users/4/coffm049/papers/functionalBrainHerit/FCs/probaConns/temp/GCTA.FE.0.json")
 pheno <- read_table(json_data$pheno)
-covar <- read_csv("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotypes/Covars2.csv") %>%
+covar <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/Covars2.csv") %>%
   # Select the relevant columns
   select(FID, IID, Age = age, Female= female, Site= site_id_l, `Household income` = household.income, `Higher ed` = high.educ, genetic_zygosity_status_1, `Race/Ethnicity` = race_ethnicity) %>%
   mutate(IID = str_remove(IID, "_"))
 
-gordon <- data.frame("IID" = names(read_parquet("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/data/probaConns/part.0.parquet"))) %>%
+gordon <- data.frame("IID" = names(read_parquet("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/data/probaConns/part.0.parquet"))) %>%
   mutate(gordon = T)
-proba <- read_parquet("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/probaConns.parquet", col_select = "IID") %>%
+proba <- read_parquet("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/probaConns.parquet", col_select = "IID") %>%
   mutate(proba = T)
 
 full_join(gordon, proba) %>%

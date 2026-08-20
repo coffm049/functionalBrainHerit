@@ -3,13 +3,13 @@ library(tidyverse)
 library(mets)
 
 # Load data
-pheno = t(read_parquet("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/data/probaConns/part.0.parquet")) %>%
+pheno = t(read_parquet("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/data/probaConns/part.0.parquet")) %>%
     as.data.frame(.) %>%
     tibble::rownames_to_column(var = "IID") %>%
     mutate(
         IID = gsub('^(.{4})(.*)$', '\\1_\\2', IID)
     )
-df <- read_csv("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotypes/Covars2.csv") %>%
+df <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/Covars2.csv") %>%
   # Select the relevant columns
   select(FID, IID, age, female, site_id_l, household.income, high.educ, genetic_zygosity_status_1, rel_ingroup_order) %>% 
   mutate(zyg = case_when(
@@ -40,7 +40,7 @@ twinlm(value ~ site_id_l + age + female + household.income + high.educ, data = t
 
 df %>%
     select(phenotype, herit) %>%
-    write_csv("/panfs/jay/groups/31/rando149/coffm049/ABCD/Results/03_heritability/Topography/SA/twinEsts.csv")
+    write_csv("/users/4/coffm049/papers/functionalBrainHerit/results/FCs/probaConns/twinEsts.csv")
 
 
 

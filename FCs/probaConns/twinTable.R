@@ -12,13 +12,13 @@ iteration=1
 # 158 evenly spaced parallel threads of 20 blocks
 phenoNames <- paste0("o", (1 + iteration * 20) : ((iteration+ 1) * 20))
 
-pheno <- read_parquet("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/probaConns.parquet") %>%
+pheno <- read_parquet("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/probaConns.parquet") %>%
   mutate(
       IID = gsub('^(.{4})(.*)$', '\\1_\\2', IID)
   ) %>%
   distinct(IID, .keep_all = T) %>%
   select(IID, all_of(phenoNames))
-IDs = read_csv("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/proba.files", col_names = c("IID")) %>%
+IDs = read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/proba.files", col_names = c("IID")) %>%
   mutate(
     IID = basename(IID),
     # grab the 9-20 characers
@@ -26,12 +26,12 @@ IDs = read_csv("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotyp
     # insert a _ 5 position
     IID = paste0(substr(IID, 1, 4), "_", substr(IID, 5, 19))
 ) %>% 
-  left_join(read_table("/panfs/jay/groups/31/rando149/coffm049/ABCD/Results/IDs/IDs.txt", col_names=c("FID", "IID")), by = "IID") %>%
+  left_join(read_table("/projects/standard/rando149/coffm049/ABCD/Results/IDs/IDs.txt", col_names=c("FID", "IID")), by = "IID") %>%
   distinct()
 
 pheno = drop_na(left_join(pheno, IDs, by = c("IID")))
 
-df <- read_csv("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotypes/Covars2.csv") %>%
+df <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/Covars2.csv") %>%
   # Select the relevant columns
   select(FID, IID, Age = age, Female= female, Site= site_id_l, `Household income` = household.income, `Higher ed` = high.educ, genetic_zygosity_status_1, `Race/Ethnicity` = race_ethnicity) %>% 
   mutate(zyg = case_when(

@@ -2,7 +2,7 @@ library(tidyverse)
 
 
 
-fs = dir("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/03_Herit_ests/functionalBrainHerit/FCs/probaConns/twinEstResults", full.names= T, pattern = "*.Rds") %>%
+fs = dir("/users/4/coffm049/papers/functionalBrainHerit/results/FCs/probaConns/twinEstResults", full.names= T, pattern = "*.Rds") %>%
   map_dfr(readRDS, .progress = T) %>%
   select(herit)  %>%
   mutate(

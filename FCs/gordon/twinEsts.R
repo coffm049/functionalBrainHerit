@@ -9,7 +9,7 @@ args = commandArgs(trailingOnly=TRUE)
 iteration = as.numeric(args[2])
 phenoNames <- paste0("o", (1 + iteration * 528) : ((iteration+ 1) * 528))
 
-pheno <- read_parquet("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/pconns.parquet") %>%
+pheno <- read_parquet("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/pconns.parquet") %>%
   mutate(
       IID = gsub('^(.{4})(.*)$', '\\1_\\2', IID)
   ) %>%
@@ -18,14 +18,14 @@ pheno <- read_parquet("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_P
 
 # 61776 phenos
 # 117 evenly spaced parallel threads of 528 blocks
-IDs = read_csv("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/FC.files", col_names = c("IID")) %>%
-  left_join(read_table("~/ABCD/Results/IDs/IDs.txt", col_names=c("FID", "IID")), by = "IID") %>%
+IDs = read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/FC.files", col_names = c("IID")) %>%
+  left_join(read_table("/projects/standard/rando149/coffm049/ABCD/Results/IDs/IDs.txt", col_names=c("FID", "IID")), by = "IID") %>%
   distinct()
 pheno = drop_na(left_join(pheno, IDs, by = c("IID")))
 
 # dim(pheno) 1876 x 61777
 
-df <- read_csv("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotypes/Covars2.csv") %>%
+df <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/Covars2.csv") %>%
   # Select the relevant columns
   select(FID, IID, age, female, site_id_l, household.income, high.educ, anthro_height_calc, genetic_zygosity_status_1) %>% 
   mutate(zyg = case_when(
@@ -44,5 +44,5 @@ df <- read_csv("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotyp
     mutate(herit = map(data, 
     ~summary(twinlm(value ~ site_id_l + age + female + household.income + high.educ, data = as.data.frame(.), DZ = "DZ", zyg = "zyg", id = "FID", type = "ace" ))))
 
-saveRDS(df, paste0("herit_", iteration, ".Rds"))
+saveRDS(df, paste0("/users/4/coffm049/papers/functionalBrainHerit/results/FCs/gordon/herit_", iteration, ".Rds"))
 

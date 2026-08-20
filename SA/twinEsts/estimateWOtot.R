@@ -3,12 +3,12 @@ library(mets)
 library(txtplot)
 
 # Load data
-pheno = read_table("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotypes/allTopoPhenos.csv") %>%
+pheno = read_table("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/allTopoPhenos.csv") %>%
     select(-c(network_surfarea4, network_surfarea6))
 #txtdensity(pheno$network_surfarea1)
 
 
-df <- read_csv("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotypes/Covars2.csv") %>%
+df <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/Covars2.csv") %>%
   # Select the relevant columns
   select(FID, IID, age, female, site_id_l, household.income, high.educ, anthro_height_calc, genetic_zygosity_status_1) %>% 
   mutate(zyg = case_when(
@@ -27,4 +27,4 @@ df <- read_csv("/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/02_Phenotyp
     mutate(herit = map(data, 
     ~summary(twinlm(value ~ site_id_l + age + female + household.income + high.educ, data = as.data.frame(.), DZ = "DZ", zyg = "zyg", id = "FID", type = "ace" )), .progress = TRUE))
 
-saveRDS(df, "/panfs/jay/groups/31/rando149/coffm049/ABCD/Workflow/03_Herit_ests/Topography/SA/twinEsts/herit_wo_total.Rds")
+saveRDS(df, "/users/4/coffm049/papers/functionalBrainHerit/results/SA/twinEsts/herit_wo_total.Rds")

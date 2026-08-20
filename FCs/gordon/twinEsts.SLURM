@@ -13,7 +13,7 @@
 # srun -N 1  --mem=32gb -t 1:00:00 -p interactive --pty bash 
 # 0-117
 
-WORKINGDIRECTORY=~/ABCD/Workflow/03_Herit_ests/Topography/FCs/gordon
+WORKINGDIRECTORY=/users/4/coffm049/papers/functionalBrainHerit/FCs/gordon
 cd $WORKINGDIRECTORY
 module load R/4.4.0-openblas-rocky8
 

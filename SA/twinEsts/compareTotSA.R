@@ -13,8 +13,8 @@ cor(with$h2, wo$h2)
 
 
 # snp
-with <- read_csv("/panfs/jay/groups/31/rando149/coffm049/ABCD/Results/03_heritability/Topography/SA/GCTA")
-wo <- read_csv("/panfs/jay/groups/31/rando149/coffm049/ABCD/Results/03_heritability/Topography/SA/GCTA_wo_total")
+with <- read_csv("/users/4/coffm049/papers/functionalBrainHerit/results/SA/GCTA")
+wo <- read_csv("/users/4/coffm049/papers/functionalBrainHerit/results/SA/GCTA_wo_total")
 
 
 cor(with$h2, wo$h2, use = "pairwise.complete.obs")
