@@ -4,7 +4,7 @@ import pandas as pd
 def Adding_IDs(saIDs, FIDs, SA, output):
     saIDs = pd.read_csv(saIDs, header=None)
     saIDs.columns = ['IID']
-    saIDs['IID'] = saIDs['IID'].str.replace('sub-NDARINV', 'NDAR_INV')
+    saIDs['IID'] = saIDs['IID'].str.replace('sub-NDARINV', 'sub-')
     FIDs = pd.read_csv(FIDs, header=None, sep="\s+")
     FIDs.columns = ["FID", "IID"]
     saIDs = pd.merge(saIDs, FIDs, on="IID", how="left")

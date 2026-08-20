@@ -13,6 +13,6 @@
   "loop_covs": false,
   "random_groups": "abcd_site",
   "Method": "AdjHE",
-  "ids": "/panfs/jay/groups/4/miran045/shared/projects/ABCD_topography/data/Topography/IDs/ABCD_group1IDs.csv",
+  "ids": null,
   "Naive": false
 }

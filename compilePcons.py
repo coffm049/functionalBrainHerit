@@ -16,7 +16,7 @@ def normalize_id(s):
     for prefix in ("sub-", "NDAR_INV", "NDARINV"):
         if s.startswith(prefix):
             s = s[len(prefix):]
-    return s
+    return "sub-" + s
 
 
 def extractPconn(filepath):
