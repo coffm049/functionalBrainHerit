@@ -31,6 +31,9 @@ def main():
     with open(FILES) as f:
         paths = [ln.strip() for ln in f if ln.strip()]
 
+    if not paths:
+        raise SystemExit(f"No files found in {FILES}")
+
     rows = pd.DataFrame({
         "path": paths,
         "IID": [normalize_id(os.path.basename(p).split("_", 1)[0]) for p in paths],
