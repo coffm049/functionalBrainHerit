@@ -3,6 +3,8 @@
 .Rapp.history
 .Rds
 .csv
+*/temp/*
+*/archive/*
 
 # Session Data files
 .RData
