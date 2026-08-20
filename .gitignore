@@ -1,49 +1,18 @@
-# History files
-.Rhistory
-.Rapp.history
-.Rds
-.csv
-*/temp/*
-*/archive/*
-
-# Session Data files
-.RData
-.RDataTmp
-.Rds
-.csv
-.tsv
-.txt
-.png
-.html
-
-# User-specific files
-.Ruserdata
-/combined/*
-
-# Example code in package build process
-*-Ex.R
-
-# Output files from R CMD build
-/*.tar.gz
-
-# Output files from R CMD check
-/*.Rcheck/
-
 # RStudio files
 .Rproj.user/
 
-# produced vignettes
+# Produced vignettes
 vignettes/*.html
 vignettes/*.pdf
 
-# OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
+# OAuth2 token
 .httr-oauth
 
-# knitr and R markdown default cache directories
+# Knitr and R Markdown default cache directories
 *_cache/
 /cache/
 
-# Temporary files created by R markdown
+# Temporary files created by R Markdown
 *.utf8.md
 *.knit.md
 
@@ -53,8 +22,33 @@ vignettes/*.pdf
 # pkgdown site
 docs/
 
-# translation temp files
+# Translation temp files
 po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# History files
+.Rhistory
+.Rapp.history
+
+# Session Data & R Artifacts
+.RData
+.RDataTmp
+*.[rR][dD][sS]
+*.csv
+*.tsv
+*.txt
+*.png
+*.html
+
+# User-specific & Directory Exclusions
+.Ruserdata
+*/temp/*
+*/archive/*
+twinEstResults/*
+/combined/*
+
+# Package build artifacts
+*-Ex.R
+/*.tar.gz
