@@ -5,7 +5,7 @@
   "pheno": "/projects/standard/rando149/coffm049/ABCD/Results/02_Phenotypes/TotalCorticalRepresentation_ByPFN_ABCD.csv",
   "out": "/users/4/coffm049/papers/functionalBrainHerit/results/SA/AdjHE_Naive",
   "npc": [30],
-  "mpheno": ["network_surfarea1", "network_surfarea2", "network_surfarea3", "network_surfarea4", "network_surfarea5", "network_surfarea6", "network_surfarea7", "network_surfarea8", "network_surfarea9", "network_surfarea10", "network_surfarea11", "network_surfarea12", "network_surfarea13", "network_surfarea14", "network_surfarea15", "network_surfarea16", "network_surfarea17"],
+  "mpheno": ["network_surfarea1", "network_surfarea2", "network_surfarea3", "network_surfarea4", "network_surfarea5", "network_surfarea6", "network_surfarea7", "network_surfarea8", "network_surfarea9", "network_surfarea10", "network_surfarea11", "network_surfarea12", "network_surfarea13", "network_surfarea14", "network_surfarea15", "network_surfarea16"],
   "k": 0,
   "std": false,
   "qcovar": ["age"],
