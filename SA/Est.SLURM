@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH --time=1:00:00
 #SBATCH --ntasks=1
-#SBATCH --mem=12g
+#SBATCH --mem=32g
 #SBATCH --job-name=SA_MASH
 #SBATCH --output=/users/4/coffm049/papers/functionalBrainHerit/logs/SA_MASH_%j.out
 #SBATCH --error=/users/4/coffm049/papers/functionalBrainHerit/logs/SA_MASH_%j.err
