@@ -1,30 +1,33 @@
 library(tidyverse)
 library(mets)
-library(txtplot)
 
-# Load data
-pheno = read_table("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/allTopoPhenos.csv") %>%
-    select(-c(network_surfarea4, network_surfarea6))
-#txtdensity(pheno$network_surfarea1)
+# 17 PFN network surface-area phenotypes (current pipeline)
+pheno <- read_csv("/projects/standard/rando149/coffm049/ABCD/Results/02_Phenotypes/TotalCorticalRepresentation_ByPFN_ABCD.csv") %>%
+  select(IID, network_surfarea1:network_surfarea17)
 
+# Attach family ID (IDs.txt has no header)
+IDs <- read_table("/projects/standard/rando149/coffm049/ABCD/Results/IDs/IDs.txt",
+                  col_names = c("FID", "IID"))
+pheno <- left_join(pheno, IDs, by = "IID") %>% distinct()
 
 df <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/Covars2.csv") %>%
-  # Select the relevant columns
-  select(FID, IID, age, female, site_id_l, household.income, high.educ, anthro_height_calc, genetic_zygosity_status_1) %>% 
+  select(FID, IID, age, female, site_id_l, household.income, high.educ, genetic_zygosity_status_1) %>%
   mutate(zyg = case_when(
-    grepl("mono", genetic_zygosity_status_1, ignore.case=T) ~ "MZ",
-    grepl("di", genetic_zygosity_status_1, ignore.case=T) ~ "DZ",
+    grepl("mono", genetic_zygosity_status_1, ignore.case = TRUE) ~ "MZ",
+    grepl("di",   genetic_zygosity_status_1, ignore.case = TRUE) ~ "DZ",
     .default = NA
   )) %>%
-    #anthro_height_calc = as.numeric(anthro_height_calc)) %>% 
-    as.data.frame() %>%
-    select(-genetic_zygosity_status_1) %>%
-    drop_na() %>% 
-    left_join(pheno, by = c("FID", "IID")) %>%
-    drop_na() %>%
-    pivot_longer(cols = c(anthro_height_calc, network_surfarea1:network_surfarea16), names_to = "phenotype") %>%
-    nest(data = -phenotype) %>%
-    mutate(herit = map(data, 
-    ~summary(twinlm(value ~ site_id_l + age + female + household.income + high.educ, data = as.data.frame(.), DZ = "DZ", zyg = "zyg", id = "FID", type = "ace" )), .progress = TRUE))
+  select(-genetic_zygosity_status_1) %>%
+  drop_na() %>%
+  left_join(pheno, by = c("FID", "IID")) %>%
+  drop_na() %>%
+  pivot_longer(cols = network_surfarea1:network_surfarea17, names_to = "phenotype") %>%
+  nest(data = -phenotype) %>%
+  mutate(herit = map(data,
+    ~ summary(twinlm(value ~ site_id_l + age + female + household.income + high.educ,
+                     data = as.data.frame(.), DZ = "DZ", zyg = "zyg", id = "FID", type = "ace")),
+    .progress = TRUE))
 
-saveRDS(df, "/users/4/coffm049/papers/functionalBrainHerit/results/SA/twinEsts/herit_wo_total.Rds")
+out <- "/users/4/coffm049/papers/functionalBrainHerit/results/SA/twinEsts/herit_wo_total.Rds"
+dir.create(dirname(out), recursive = TRUE, showWarnings = FALSE)
+saveRDS(df, out)
