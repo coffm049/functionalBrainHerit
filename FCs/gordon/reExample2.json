@@ -10,7 +10,7 @@
   "std": false,
   "qcovar": ["age", "household_income"],
   "covar_discrete": ["female"],
-  "loop_covs": false,
+  "loop_covars": false,
   "random_groups": "abcd_site",
   "Method": "AdjHE",
   "ids": null,
