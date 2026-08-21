@@ -24,10 +24,12 @@ df <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes
   drop_na() %>%
   pivot_longer(cols = network_surfarea1:network_surfarea17, names_to = "phenotype") %>%
   nest(data = -phenotype) %>%
-  mutate(herit = map(data,
-    ~ summary(twinlm(value ~ site_id_l + age + female + household.income + high.educ + totalNetworkSurface,
-                     data = as.data.frame(.), DZ = "DZ", zyg = "zyg", id = "FID", type = "ace")),
-    .progress = TRUE))
+  mutate(herit = map(data, function(d) {
+    tryCatch(
+      summary(twinlm(value ~ site_id_l + age + female + household.income + high.educ + totalNetworkSurface,
+                     data = as.data.frame(d), DZ = "DZ", zyg = "zyg", id = "FID", type = "ace")),
+      error = function(e) structure(list(error = conditionMessage(e)), class = "twinlm_error"))
+  }, .progress = TRUE))
 
 out <- "/users/4/coffm049/papers/functionalBrainHerit/results/SA/twinEsts/herit_w_total.Rds"
 dir.create(dirname(out), recursive = TRUE, showWarnings = FALSE)

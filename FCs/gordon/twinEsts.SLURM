@@ -4,6 +4,9 @@
 #SBATCH --mem=32g
 #SBATCH --mail-type=ALL  
 #SBATCH --mail-user=coffm049@umn.edu
+#SBATCH --job-name=gordon_twin
+#SBATCH --output=/users/4/coffm049/papers/functionalBrainHerit/logs/gordon_twin_%A_%a.out
+#SBATCH --error=/users/4/coffm049/papers/functionalBrainHerit/logs/gordon_twin_%A_%a.err
 #SBATCH --array=0-116
 
 

@@ -4,7 +4,10 @@
 #SBATCH --mem=32g
 #SBATCH --mail-type=ALL  
 #SBATCH --mail-user=coffm049@umn.edu
-#SBATCH --array=0-158
+#SBATCH --job-name=probaConns_twin
+#SBATCH --output=/users/4/coffm049/papers/functionalBrainHerit/logs/probaConns_twin_%A_%a.out
+#SBATCH --error=/users/4/coffm049/papers/functionalBrainHerit/logs/probaConns_twin_%A_%a.err
+#SBATCH --array=0-157
 
 
 # srun -N 1  --mem=32gb -t 1:00:00 -p interactive --pty bash 

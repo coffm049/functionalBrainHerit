@@ -52,3 +52,6 @@ twinEstResults/*
 # Package build artifacts
 *-Ex.R
 /*.tar.gz
+
+# SLURM logs
+logs/

@@ -1,5 +1,6 @@
 #!/bin/bash -l
 #SBATCH --ntasks=1
+#SBATCH --job-name=FC_MASH
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=coffm049@umn.edu
 

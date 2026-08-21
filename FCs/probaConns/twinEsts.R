@@ -34,9 +34,12 @@ df <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes
   drop_na() %>%
   pivot_longer(cols = starts_with("o"), names_to = "phenotype") %>%
   nest(data = -phenotype) %>%
-  mutate(herit = map(data,
-    ~ summary(twinlm(value ~ site_id_l + age + female + household.income + high.educ,
-                     data = as.data.frame(.), DZ = "DZ", zyg = "zyg", id = "FID", type = "ace"))))
+  mutate(herit = map(data, function(d) {
+    tryCatch(
+      summary(twinlm(value ~ site_id_l + age + female + household.income + high.educ,
+                     data = as.data.frame(d), DZ = "DZ", zyg = "zyg", id = "FID", type = "ace")),
+      error = function(e) structure(list(error = conditionMessage(e)), class = "twinlm_error"))
+  }))
 
 out <- paste0("/users/4/coffm049/papers/functionalBrainHerit/results/FCs/probaConns/herit_", iteration, ".Rds")
 dir.create(dirname(out), recursive = TRUE, showWarnings = FALSE)

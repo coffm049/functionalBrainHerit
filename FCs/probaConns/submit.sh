@@ -46,6 +46,10 @@ NJOBS=$(python ../make_configs.py --template "$TEMPLATE" --method "$METHOD" --ki
 ARGS=(--time="$TIME" --mem="$MEM" --array=0-$((NJOBS - 1)))
 [ -n "$PARTITION" ] && ARGS+=(-p "$PARTITION")
 ARGS+=(--export=ALL,METHOD="$METHOD",KIND="$KIND",WORKINGDIRECTORY="$WORKINGDIRECTORY")
+mkdir -p /users/4/coffm049/papers/functionalBrainHerit/logs
+ARGS+=(--job-name="FCproba_${METHOD}_${KIND}")
+ARGS+=(--output="/users/4/coffm049/papers/functionalBrainHerit/logs/FCproba_${METHOD}_${KIND}_%A_%a.out")
+ARGS+=(--error="/users/4/coffm049/papers/functionalBrainHerit/logs/FCproba_${METHOD}_${KIND}_%A_%a.err")
 
 echo "Submitting $NJOBS jobs for $METHOD $KIND (chunk=$CHUNK phenos):"
 sbatch "${ARGS[@]}" run.slurm
