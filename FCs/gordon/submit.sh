@@ -8,6 +8,10 @@ KIND=$2
 WORKINGDIRECTORY=/users/4/coffm049/papers/functionalBrainHerit/FCs/gordon
 cd "$WORKINGDIRECTORY"
 
+# MASH writes logs into the parent of 'out'; create them first
+mkdir -p /users/4/coffm049/papers/functionalBrainHerit/results/FCs/gordon \
+         /users/4/coffm049/papers/functionalBrainHerit/results/FCs/gordon/pconn.0
+
 # gordon (Gordon parcellation): 61776 FC phenotypes (o0..o61775)
 CHUNK=208
 TOTAL=61776

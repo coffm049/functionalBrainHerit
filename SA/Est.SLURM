@@ -9,6 +9,11 @@ cd ~/software/MASH
 source /users/4/coffm049/miniconda3/etc/profile.d/conda.sh
 conda activate MASH
 
+# MASH writes a .log into the parent of each config's 'out' dir; create them first
+mkdir -p /users/4/coffm049/papers/functionalBrainHerit/results/SA \
+         /users/4/coffm049/papers/functionalBrainHerit/results/SA/GCTA_wo_total \
+         /users/4/coffm049/papers/functionalBrainHerit/results/SA/AdjHE_RE_wo_total
+
 # Organize the data for proper use
 #python /users/4/coffm049/papers/functionalBrainHerit/SA/joinIDs.py
 

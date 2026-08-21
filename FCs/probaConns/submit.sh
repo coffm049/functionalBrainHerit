@@ -8,6 +8,10 @@ KIND=$2
 WORKINGDIRECTORY=/users/4/coffm049/papers/functionalBrainHerit/FCs/probaConns
 cd "$WORKINGDIRECTORY"
 
+# MASH writes logs into the parent of 'out'; create them first
+mkdir -p /users/4/coffm049/papers/functionalBrainHerit/results/FCs/probaConns \
+         /users/4/coffm049/papers/functionalBrainHerit/results/FCs/probaConns/probaConns
+
 # probabilistic connectomes: 3160 FC phenotypes (o0..o3159)
 CHUNK=10
 TOTAL=3160
