@@ -16,7 +16,7 @@ mkdir -p /users/4/coffm049/papers/functionalBrainHerit/results/FCs/gordon \
 CHUNK=208
 TOTAL=61776
 PREFIX=pconns
-TIME=10:00:00
+TIME=12:00:00
 MEM=64g
 PARTITION=
 
