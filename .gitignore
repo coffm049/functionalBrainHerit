@@ -55,3 +55,10 @@ twinEstResults/*
 
 # SLURM logs
 logs/
+
+# Python virtual environment (created with: python3 -m venv .venv)
+.venv/
+venv/
+__pycache__/
+*.pyc
+
