@@ -267,6 +267,10 @@ def main():
     N = args.n
     os.makedirs(args.outdir, exist_ok=True)
 
+    if not os.path.exists(args.wide):
+        sys.exit(f"WIDE file not found: {args.wide}\n"
+                 "Run summary/compare_mash_twin.R first (or let "
+                 "summary/run_brain_viz.sh generate it).")
     df = pd.read_csv(args.wide)
     if "Set" not in df.columns or "Pheno" not in df.columns:
         sys.exit("wide CSV must contain Set and Pheno columns")

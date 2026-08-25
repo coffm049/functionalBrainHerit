@@ -15,13 +15,18 @@ read_mash_stream <- function(pattern, label) {
   dfs <- map_dfr(files, function(f) {
     d <- suppressWarnings(read_csv(f, show_col_types = FALSE))
     if ("pheno" %in% names(d)) d <- rename(d, Pheno = pheno)
-    if (!"Pheno" %in% names(d) || !"h2" %in% names(d) || !"PCs" %in% names(d)) return(empty_row)
-    d <- d %>% mutate(var_h2 = as.numeric(`var(h2)`)) %>% select(Pheno, h2, var_h2)
+    if (!"Pheno" %in% names(d) || !"h2" %in% names(d)) return(empty_row)
+    d <- d %>% mutate(var_h2 = as.numeric(`var(h2)`)) %>%
+      select(Pheno, h2, var_h2, any_of("PCs"))
     d
   })
   if (nrow(dfs) == 0) return(empty_mash)
+  if (!"PCs" %in% names(dfs) || all(is.na(dfs$PCs))) {
+    message("stream ", label, ": no/NA PCs column; assuming alternating npc 0/30")
+    dfs <- dfs %>% mutate(PCs = rep(c(0, 30), length.out = nrow(dfs)))
+  }
   avail <- unique(dfs$PCs)
-  use_npc <- if (NPC %in% avail) NPC else max(avail)
+  use_npc <- if (NPC %in% avail) NPC else max(avail, na.rm = TRUE)
   if (!(NPC %in% avail)) message("stream ", label, ": npc ", NPC, " absent; using npc=", use_npc)
   dfs %>% filter(PCs == use_npc) %>% distinct(Pheno, .keep_all = TRUE) %>% mutate(stream = label)
 }

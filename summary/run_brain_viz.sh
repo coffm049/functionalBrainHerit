@@ -3,6 +3,7 @@
 # atlases, inside the project-root Python venv (.venv).
 #
 #   cd <project-root> && bash summary/run_brain_viz.sh
+#   (optional) conda activate gdc   # if R + python live in the 'gdc' env
 #
 # Before first use, create the venv (once) from the conda-base python:
 #   ~/miniconda3/bin/python -m venv .venv
@@ -11,6 +12,14 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+WIDE="$ROOT/results/summary/mash_twin_wide.csv"
+
+# Regenerate the summary table if it is missing (needs R + tidyverse on PATH).
+if [ ! -f "$WIDE" ]; then
+  echo "WIDE summary not found at $WIDE -> running compare_mash_twin.R"
+  Rscript "$ROOT/summary/compare_mash_twin.R"
+fi
+
 VENV="$ROOT/.venv"
 
 # Use the conda-base interpreter at ~/miniconda3 as the base python.
@@ -33,7 +42,7 @@ source "$VENV/bin/activate"
 export MPLBACKEND=Agg   # headless HPC: no X display needed for PNG output
 
 # ---- EDIT THESE: paths on the HPC ----------------------------------------
-WIDE="$ROOT/results/summary/mash_twin_wide.csv"
+# WIDE is defined above (and auto-generated from compare_mash_twin.R if missing)
 DLABEL_GORDON="/path/to/Gordon352.dlabel.nii"
 DLABEL_PROBA="/path/to/proba80.dlabel.nii"
 SURF_L="/path/to/L.white.surf.gii"
