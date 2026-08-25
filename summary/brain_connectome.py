@@ -59,6 +59,8 @@ def column_for(atlas, method):
         return f"h2_{atlas}_AdjHE_FE"
     if m == "gcta":
         return f"h2_{atlas}_GCTA"
+    if m == "hereg":
+        return f"h2_{atlas}_HEREG"
     raise ValueError(f"unknown method token: {method}")
 
 

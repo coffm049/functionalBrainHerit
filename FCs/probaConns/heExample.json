@@ -12,7 +12,7 @@
   "covar_discrete": ["abcd_site", "female", "household_income"],
   "loop_covars": false,
   "random_groups": null,
-  "Method": "GCTA",
+  "Method": "HEreg",
   "ids": null,
   "Naive": false,
   "pheno_filter": null,

@@ -42,7 +42,11 @@ streams <- list(
   gordon_GCTA     = c(pattern = "results/FCs/gordon/pconns.GCTA.FE.*.csv",
                       label = "gordon_GCTA"),
   proba_GCTA      = c(pattern = "results/FCs/probaConns/probaConns.GCTA.FE.*.csv",
-                      label = "proba_GCTA")
+                      label = "proba_GCTA"),
+  gordon_HEREG    = c(pattern = "results/FCs/gordon/pconns.HEreg.FE.*.csv",
+                      label = "gordon_HEREG"),
+  proba_HEREG     = c(pattern = "results/FCs/probaConns/probaConns.HEreg.FE.*.csv",
+                      label = "proba_HEREG")
 )
 
 mash <- map_dfr(streams, function(s) read_mash_stream(s[["pattern"]], s[["label"]]),

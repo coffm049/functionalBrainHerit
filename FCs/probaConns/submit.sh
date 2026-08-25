@@ -1,6 +1,6 @@
 #!/bin/bash
 # Generate per-chunk MASH configs and submit a SLURM array to estimate them.
-# usage: bash submit.sh <Method> <FE|RE|GCTA> [--chunk N] [--time HH:MM:SS] [--mem Ng] [--partition NAME]
+# usage: bash submit.sh <Method> <FE|RE|GCTA|HEreg> [--chunk N] [--time HH:MM:SS] [--mem Ng] [--partition NAME] [--total N]
 set -euo pipefail
 
 METHOD=$1
@@ -24,7 +24,8 @@ case "$KIND" in
   FE) CHUNK=10; TEMPLATE=feExample2.json ;;
   RE) CHUNK=40; TEMPLATE=reExample2.json ;;
   GCTA) TEMPLATE=gctaExample.json ;;
-  *) echo "KIND must be FE, RE or GCTA"; exit 1 ;;
+  HEreg) TEMPLATE=heExample.json ;;
+  *) echo "KIND must be FE, RE, GCTA or HEreg"; exit 1 ;;
 esac
 
 shift 2
@@ -34,6 +35,7 @@ while [ $# -gt 0 ]; do
     --time) TIME=$2; shift 2 ;;
     --mem) MEM=$2; shift 2 ;;
     --partition) PARTITION=$2; shift 2 ;;
+    --total) TOTAL=$2; shift 2 ;;
     *) echo "Unknown argument: $1"; exit 1 ;;
   esac
 done
