@@ -4,17 +4,28 @@
 #
 #   cd <project-root> && bash summary/run_brain_viz.sh
 #
-# Before first use, create the venv (once):
-#   python3 -m venv .venv
+# Before first use, create the venv (once) from the conda-base python:
+#   ~/miniconda3/bin/python -m venv .venv
 #   .venv/bin/pip install "numpy>=1.24" "pandas>=2.0" "nibabel>=5.0" \
 #                          "nilearn>=0.10" "plotly>=5.0"
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VENV="$ROOT/.venv"
+
+# Use the conda-base interpreter at ~/miniconda3 as the base python.
+CONDA_ROOT="$HOME/miniconda3"
+if [ -f "$CONDA_ROOT/etc/profile.d/conda.sh" ]; then
+  # shellcheck disable=SC1091
+  source "$CONDA_ROOT/etc/profile.d/conda.sh"
+  conda activate base
+fi
+
 if [ ! -f "$VENV/bin/activate" ]; then
   echo "ERROR: venv not found at $VENV" >&2
-  echo "Create it with: python3 -m venv $VENV && $VENV/bin/pip install ..." >&2
+  echo "Create it with: $CONDA_ROOT/bin/python -m venv $VENV && \\" >&2
+  echo "                 $VENV/bin/pip install \"numpy>=1.24\" \"pandas>=2.0\" \\" >&2
+  echo "                 \"nibabel>=5.0\" \"nilearn>=0.10\" \"plotly>=5.0\"" >&2
   exit 1
 fi
 # shellcheck disable=SC1091
