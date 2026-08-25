@@ -23,7 +23,7 @@ PARTITION=
 case "$KIND" in
   FE) TEMPLATE=feExample2.json ;;
   RE) TEMPLATE=reExample2.json ;;
-  GCTA) CHUNK=100; TEMPLATE=gctaExample.json ;;
+  GCTA) CHUNK=100; TIME=24:00:00; TEMPLATE=gctaExample.json ;;
   *) echo "KIND must be FE, RE or GCTA"; exit 1 ;;
 esac
 
