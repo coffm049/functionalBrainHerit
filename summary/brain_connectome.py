@@ -26,7 +26,7 @@ python brain_connectome.py \
   --dlabel /path/Gordon352.dlabel.nii \
   --surf-l /path/L.white.surf.gii --surf-r /path/R.white.surf.gii \
   --centroids /path/gordon352_MNIcentroids.csv \
-  --methods twin AdjHE GCTA \
+  --methods twin AdjHE \
   --node-pct 90 --edge-pct 90 \
   --outdir results/summary/brain
 """
@@ -199,7 +199,7 @@ def dlabel_parcel_maps(N, dlabel, n_left=None, n_right=None):
 # --------------------------------------------------------------------------
 # plotting
 # --------------------------------------------------------------------------
-def plot_surface(node_h2, surf_l, surf_r, tex_left, tex_right, outdir, tag):
+def plot_surface(node_h2, surf_l, surf_r, tex_left, tex_right, outdir, tag, vmin, vmax):
     # tex_left/right currently hold parcel indices; convert to node_h2 values
     val_l = np.nan_to_num(node_h2[np.nan_to_num(tex_left, nan=0).astype(int)], nan=0.0) \
         if tex_left is not None else None
@@ -213,11 +213,12 @@ def plot_surface(node_h2, surf_l, surf_r, tex_left, tex_right, outdir, tag):
         name = "left" if side == 0 else "right"
         png = os.path.join(outdir, f"{tag}_surface_{name}.png")
         niplot.plot_surf_stat_map(surf, val, title=f"{tag} ({name})",
-                                 output_file=png, cmap="coolwarm",
-                                 colorbar=True, threshold=None)
+                                  output_file=png, cmap="coolwarm",
+                                  colorbar=True, threshold=None,
+                                  vmin=vmin, vmax=vmax)
         html = os.path.join(outdir, f"{tag}_surface_{name}.html")
         try:
-            niplot.view_surf(surf, val, cmap="coolwarm",
+            niplot.view_surf(surf, val, cmap="coolwarm", vmin=vmin, vmax=vmax,
                              title=f"{tag} ({name})").save_as_html(html)
         except Exception as e:  # pragma: no cover
             warnings.warn(f"view_surf html failed for {name}: {e}")
@@ -251,7 +252,7 @@ def main():
     ap.add_argument("--centroids", help="optional Nx3 MNI centroid CSV")
     ap.add_argument("--wb-command", default="wb_command",
                     help="wb_command binary (for centroid derivation)")
-    ap.add_argument("--methods", nargs="+", default=["twin", "AdjHE", "GCTA"],
+    ap.add_argument("--methods", nargs="+", default=["twin", "AdjHE"],
                     help="twin | AdjHE | AdjHE_FE | GCTA")
     ap.add_argument("--node-pct", type=float, default=90,
                     help="percentile for node summary (default 90)")
@@ -284,6 +285,9 @@ def main():
         Vr = load_surf(surf_r)[0].shape[0] if surf_r else None
         tex_left, tex_right, _ = dlabel_parcel_maps(N, args.dlabel, Vl, Vr)
 
+    # ---- compute matrices for all requested methods -----------------------
+    matrices = {}
+    node_vals = {}
     for method in args.methods:
         col = column_for(atlas, method)
         if col not in sub.columns:
@@ -294,27 +298,42 @@ def main():
             warnings.warn(f"no data for {method} ({col}); skipping")
             continue
         M = rebuild_pconn(s["Pheno"].values, s[col].values.astype(float), N)
-        tag = f"{atlas}_{method}"
-        print(f"[{tag}] edges={int(np.isfinite(M).sum()//2)} nodes={N}")
+        matrices[method] = M
+        node_vals[method] = node_summary(M, args.node_pct)
+        print(f"[{atlas}_{method}] edges={int(np.isfinite(M).sum() // 2)} nodes={N}")
 
-        if not args.no_surface and (surf_l or surf_r):
-            node_h2 = node_summary(M, args.node_pct)
+    if not matrices:
+        sys.exit("no methods produced data; nothing to plot")
+
+    # ---- shared colour / threshold scales for fair comparison -------------
+    allv = np.concatenate([np.abs(v[~np.isnan(v)]) for v in node_vals.values()])
+    vmax = float(np.nanmax(allv)) if allv.size else 1.0
+    vmin = -vmax
+    alledges = np.concatenate([np.abs(M[np.triu_indices(N, 1)])
+                               for M in matrices.values()])
+    gthr = float(np.nanpercentile(alledges, args.edge_pct)) if alledges.size else 0.0
+
+    # ---- surface node-summary plots --------------------------------------
+    if not args.no_surface and (surf_l or surf_r):
+        for method, node_h2 in node_vals.items():
             plot_surface(node_h2, surf_l, surf_r, tex_left, tex_right,
-                         args.outdir, tag)
+                         args.outdir, f"{atlas}_{method}", vmin, vmax)
 
-        if not args.no_connectome:
-            if args.centroids is None and not (args.dlabel and (surf_l or surf_r)):
-                warnings.warn("connectome skipped: need --centroids or "
-                              "--dlabel + surfaces for derivation")
-                continue
+    # ---- connectome plots -------------------------------------------------
+    if not args.no_connectome:
+        if args.centroids is None and not (args.dlabel and (surf_l or surf_r)):
+            warnings.warn("connectome skipped: need --centroids or "
+                          "--dlabel + surfaces for derivation")
+        else:
             try:
                 coords = load_centroids(N, args.dlabel, surf_l, surf_r,
                                         args.wb_command, args.centroids)
             except Exception as e:
                 warnings.warn(f"connectome skipped: centroid derivation failed: {e}")
-                continue
-            thr = np.nanpercentile(np.abs(M[np.triu_indices(N, 1)]), args.edge_pct)
-            plot_connectome(M, coords, args.outdir, tag, thr)
+                coords = None
+            if coords is not None:
+                for method, M in matrices.items():
+                    plot_connectome(M, coords, args.outdir, f"{atlas}_{method}", gthr)
 
     print("Done. Outputs in", args.outdir)
 
