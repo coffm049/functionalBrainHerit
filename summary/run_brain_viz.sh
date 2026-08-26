@@ -32,20 +32,25 @@ DLABEL_PROBA="/projects/standard/faird/shared/data/Probabilitic_network_ROIs_sma
 SURF_L="/users/4/coffm049/papers/brainTemplates/Conte69.L.inflated.32k_fs_LR.surf.gii"
 SURF_R="/users/4/coffm049/papers/brainTemplates/Conte69.R.inflated.32k_fs_LR.surf.gii"
 NODE_PCT=90
+# Network dictionary CSV (row/key matches the dlabel value -> network name).
+# Only needed for network grouping; leave empty to skip.
+NETWORKS_CSV_GORDON="/users/4/coffm049/papers/brainTemplates/shortDicionary.csv"
+NETWORKS_CSV_PROBA=""
 # --------------------------------------------------------------------------
 
 run_atlas () {
-  local atlas="$1" n="$2" dlabel="$3"
+  local atlas="$1" n="$2" dlabel="$3" netcsv="$4"
   local out="$ROOT/results/summary/brain/$atlas"
   mkdir -p "$out"
   python "$ROOT/summary/brain_connectome.py" \
     --wide "$WIDE" --atlas "$atlas" --n "$n" \
     --dlabel "$dlabel" --surf-l "$SURF_L" --surf-r "$SURF_R" \
     --node-pct "$NODE_PCT" \
+    ${netcsv:+--networks-csv "$netcsv"} \
     --outdir "$out"
 }
 
-run_atlas gordon 352 "$DLABEL_GORDON"
-run_atlas probaConns 80 "$DLABEL_PROBA"
+run_atlas gordon 352 "$DLABEL_GORDON" "$NETWORKS_CSV_GORDON"
+run_atlas probaConns 80 "$DLABEL_PROBA" "$NETWORKS_CSV_PROBA"
 
 echo "Done. Outputs in $ROOT/results/summary/brain/"

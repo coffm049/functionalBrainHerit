@@ -125,12 +125,50 @@ def dlabel_values(node_h2, dlabel, N):
     return tex_left, tex_right
 
 
-def dlabel_networks(dlabel, N):
-    """Per-node network label derived from the dlabel's CIFTI label table:
-    the network is the first token of each region's name (e.g. 'SomMotA_3'
-    -> 'SomMotA'). Returns an array of N network strings."""
+def read_network_csv(path, network_col=None):
+    """Return dict {dlabel_value(int): network_name(str)} from a CSV mapping
+    each dlabel value (the row, or an explicit key column) to a network name.
+    If the first column is numeric and equals 1..N or 0..N-1 it is used as an
+    explicit key (1-based or 0-based respectively); otherwise rows are
+    positional (row i <-> dlabel value i+1)."""
+    df = pd.read_csv(path)
+    cols = list(df.columns)
+    if network_col is None:
+        if "network" in cols:
+            network_col = "network"
+        elif "name" in cols:
+            network_col = "name"
+        else:
+            network_col = cols[-1]
+    key_vals = df.iloc[:, 0].to_numpy()
+    net_vals = df[network_col].astype(str).to_numpy()
+    result = {}
+    n = len(df)
+    is_num = np.issubdtype(key_vals.dtype, np.number)
+    uniq = set(int(k) for k in key_vals)
+    if is_num and uniq == set(range(1, n + 1)):
+        for k, nv in zip(key_vals, net_vals):
+            result[int(k)] = nv
+    elif is_num and uniq == set(range(0, n)):
+        for k, nv in zip(key_vals, net_vals):
+            result[int(k) + 1] = nv
+    else:
+        for i, nv in enumerate(net_vals):
+            result[i + 1] = nv
+            result[i] = nv
+    return result
+
+
+def dlabel_networks(dlabel, N, csv_path=None):
+    """Per-node network label (array of N strings). Uses the network CSV when
+    given; otherwise falls back to the dlabel CIFTI label table (first token of
+    each region name, e.g. 'SomMotA_3' -> 'SomMotA')."""
+    if csv_path:
+        net_by_value = read_network_csv(csv_path)
+        return np.array([net_by_value.get(p, "NA") for p in range(1, N + 1)],
+                        dtype=object)
     img = nib.load(dlabel)
-    lt = img.header.label
+    lt = getattr(img, "labeltable", None)
     labels = getattr(lt, "labels", {}) if lt is not None else {}
     nets = []
     for p in range(1, N + 1):
@@ -338,6 +376,8 @@ def main():
     ap.add_argument("--surf-r", help="fsLR right white/gray gifti surface")
     ap.add_argument("--node-pct", type=float, default=90,
                     help="percentile for node summary (default 90)")
+    ap.add_argument("--networks-csv", help="CSV mapping dlabel value -> "
+                    "network name (row/key matches dlabel value)")
     ap.add_argument("--outdir", default="results/summary/brain")
     args = ap.parse_args()
 
@@ -372,15 +412,17 @@ def main():
     # fixed 0..0.5 scale so every surface heatmap is directly comparable
     vmax = 0.5
 
-    # network grouping (parsed from the dlabel label table)
+    # network grouping (from the network CSV, when provided)
     networks = None
     net_names = None
     net_id = None
-    if args.dlabel:
-        networks = dlabel_networks(args.dlabel, N)
+    if args.dlabel and args.networks_csv:
+        networks = dlabel_networks(args.dlabel, N, args.networks_csv)
         net_names = list(dict.fromkeys(networks.tolist()))
         net_id = np.array([net_names.index(s) for s in networks], dtype=int)
         print(f"[networks] {len(net_names)} groups: {net_names}")
+    elif args.dlabel and not args.networks_csv:
+        print("[networks] no --networks-csv given; skipping network grouping")
 
     # ---- cortical-surface node-summary (h2) plots ------------------------
     if surf_l or surf_r:
@@ -396,9 +438,10 @@ def main():
             plot_surface(val_l, val_r, surf_l, surf_r,
                          args.outdir, f"{atlas}_{method}", vmax)
         # network topography surface (categorical, one colour per network)
-        nl, nr = dlabel_network_values(args.dlabel, N, net_id)
-        plot_surface_networks(nl, nr, net_names, surf_l, surf_r,
-                              args.outdir, f"{atlas}_networks")
+        if networks is not None:
+            nl, nr = dlabel_network_values(args.dlabel, N, net_id)
+            plot_surface_networks(nl, nr, net_names, surf_l, surf_r,
+                                  args.outdir, f"{atlas}_networks")
 
     # ---- circular connectome (h2 > 0.35, grouped by network) -------------
     for method, M in matrices.items():
