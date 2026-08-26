@@ -264,28 +264,38 @@ def dlabel_parcel_maps(N, dlabel, n_left=None, n_right=None):
 # plotting
 # --------------------------------------------------------------------------
 def plot_surface(node_h2, surf_l, surf_r, tex_left, tex_right, outdir, tag, vmin, vmax):
-    # tex_left/right currently hold parcel indices; convert to node_h2 values
-    val_l = np.nan_to_num(node_h2[np.nan_to_num(tex_left, nan=0).astype(int)], nan=0.0) \
-        if tex_left is not None else None
-    val_r = np.nan_to_num(node_h2[np.nan_to_num(tex_right, nan=0).astype(int)], nan=0.0) \
-        if tex_right is not None else None
+    # tex_left/right hold parcel indices (or NaN). Map to node_h2 values, leaving
+    # unassigned vertices as NaN so nilearn renders them as background.
+    def to_val(tex):
+        if tex is None:
+            return None
+        val = np.full(tex.shape, np.nan, dtype=float)
+        valid = ~np.isnan(tex)
+        if valid.any():
+            val[valid] = node_h2[tex[valid].astype(int)]
+        assigned = int(valid.sum())
+        nz = int(np.count_nonzero(~np.isnan(val)))
+        if nz:
+            print(f"  [{tag}] surface assigned={assigned} val "
+                  f"min={np.nanmin(val):.3f} max={np.nanmax(val):.3f} nonzero={nz}")
+        else:
+            print(f"  [{tag}] surface WARNING: no finite values "
+                  f"(assigned={assigned}, node_h2 range "
+                  f"{np.nanmin(node_h2):.3f}..{np.nanmax(node_h2):.3f})")
+        return val
 
-    for side, (surf, tex, val) in enumerate([(surf_l, tex_left, val_l),
-                                             (surf_r, tex_right, val_r)]):
-        if surf is None or tex is None:
+    val_l = to_val(tex_left)
+    val_r = to_val(tex_right)
+    # h2 is non-negative (heritability); use 0..vmax so variation is visible.
+    for side, (surf, val) in enumerate([(surf_l, val_l), (surf_r, val_r)]):
+        if surf is None or val is None:
             continue
         name = "left" if side == 0 else "right"
         png = os.path.join(outdir, f"{tag}_surface_{name}.png")
         niplot.plot_surf_stat_map(surf, val, title=f"{tag} ({name})",
                                   output_file=png, cmap="coolwarm",
                                   colorbar=True, threshold=None,
-                                  vmin=vmin, vmax=vmax)
-        html = os.path.join(outdir, f"{tag}_surface_{name}.html")
-        try:
-            niplot.view_surf(surf, val, cmap="coolwarm", vmin=vmin, vmax=vmax,
-                             title=f"{tag} ({name})").save_as_html(html)
-        except Exception as e:  # pragma: no cover
-            warnings.warn(f"view_surf html failed for {name}: {e}")
+                                  vmin=0.0, vmax=vmax)
         print(f"  wrote {png}")
 
 
@@ -296,6 +306,34 @@ def plot_connectome(M, coords, outdir, tag, thr):
     niplot.plot_connectome(Mp, coords, edge_threshold=thr,
                            node_size=8, title=f"{tag}",
                            output_file=png, cmap="coolwarm")
+    print(f"  wrote {png}")
+
+
+def plot_circular(M, outdir, tag, h2_thr=0.3):
+    """Circular (chord-style) connectome: nodes evenly spaced on a ring, edges
+    drawn for |h2| > h2_thr, coloured by sign (red=+, blue=-)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    N = M.shape[0]
+    angles = np.linspace(0, 2 * np.pi, N, endpoint=False)
+    xy = np.column_stack([np.cos(angles), np.sin(angles)])
+    fig, ax = plt.subplots(figsize=(9, 9))
+    iu = np.triu_indices(N, 1)
+    vals = M[iu]
+    mask = np.abs(vals) > h2_thr
+    n_edges = int(mask.sum())
+    for (a, b), v in zip(zip(iu[0][mask], iu[1][mask]), vals[mask]):
+        ax.plot([xy[a, 0], xy[b, 0]], [xy[a, 1], xy[b, 1]],
+                color=("red" if v > 0 else "blue"), alpha=0.25, linewidth=0.4)
+    ax.scatter(xy[:, 0], xy[:, 1], s=12, c="black", zorder=5)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    ax.set_title(f"{tag} circular (|h2|>{h2_thr}, {n_edges} edges)")
+    png = os.path.join(outdir, f"{tag}_circular.png")
+    fig.savefig(png, dpi=150, bbox_inches="tight")
+    plt.close(fig)
     print(f"  wrote {png}")
 
 
@@ -325,6 +363,9 @@ def main():
     ap.add_argument("--outdir", default="results/summary/brain")
     ap.add_argument("--no-surface", action="store_true")
     ap.add_argument("--no-connectome", action="store_true")
+    ap.add_argument("--no-circular", action="store_true")
+    ap.add_argument("--circular-thr", type=float, default=0.3,
+                    help="|h2| threshold for the circular connectome (default 0.3)")
     args = ap.parse_args()
 
     atlas = "probaConns" if args.atlas.lower().startswith("proba") else args.atlas
@@ -352,6 +393,12 @@ def main():
         Vl = load_surf(surf_l)[0].shape[0] if surf_l else None
         Vr = load_surf(surf_r)[0].shape[0] if surf_r else None
         tex_left, tex_right, _ = dlabel_parcel_maps(N, args.dlabel, Vl, Vr)
+        if tex_left is not None:
+            aL = int(np.count_nonzero(~np.isnan(tex_left)))
+            aR = int(np.count_nonzero(~np.isnan(tex_right))) if tex_right is not None else 0
+            mx = (np.nanmax(tex_left) if aL else 0)
+            print(f"[dlabel] left assigned={aL}/{tex_left.size} "
+                  f"right assigned={aR} parcel-idx max={mx:.0f} (N={N})")
 
     # ---- compute matrices for all requested methods -----------------------
     matrices = {}
@@ -402,6 +449,11 @@ def main():
             if coords is not None:
                 for method, M in matrices.items():
                     plot_connectome(M, coords, args.outdir, f"{atlas}_{method}", gthr)
+
+    # ---- circular connectome (filtered by |h2|) ----------------------------
+    if not args.no_circular:
+        for method, M in matrices.items():
+            plot_circular(M, args.outdir, f"{atlas}_{method}", args.circular_thr)
 
     print("Done. Outputs in", args.outdir)
 
