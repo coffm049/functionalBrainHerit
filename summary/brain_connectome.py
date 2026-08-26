@@ -127,36 +127,49 @@ def dlabel_values(node_h2, dlabel, N):
 
 def read_network_csv(path, network_col=None):
     """Return dict {dlabel_value(int): network_name(str)} from a CSV mapping
-    each dlabel value (the row, or an explicit key column) to a network name.
-    If the first column is numeric and equals 1..N or 0..N-1 it is used as an
-    explicit key (1-based or 0-based respectively); otherwise rows are
-    positional (row i <-> dlabel value i+1)."""
+    each dlabel value to a network name.
+
+    Layouts handled:
+      * explicit numeric key in the first column (1-based or 0-based) -> use it
+        as the key; the network name comes from --network-col (or a
+        'network'/'name' column, else the last column).
+      * otherwise the first column is the network name and rows are positional
+        (row i <-> dlabel value i+1).
+    """
     df = pd.read_csv(path)
     cols = list(df.columns)
-    if network_col is None:
-        if "network" in cols:
-            network_col = "network"
-        elif "name" in cols:
-            network_col = "name"
+    first = df.iloc[:, 0]
+    is_num = np.issubdtype(first.dtype, np.number)
+
+    if is_num:
+        key_vals = first.to_numpy()
+        if network_col is None:
+            non_key = [c for c in cols if c != cols[0]]
+            if "network" in non_key:
+                network_col = "network"
+            elif "name" in non_key:
+                network_col = "name"
+            else:
+                network_col = non_key[-1] if non_key else cols[0]
+        net_vals = df[network_col].astype(str).to_numpy()
+        result = {}
+        n = len(df)
+        uniq = set(int(k) for k in key_vals)
+        if uniq == set(range(1, n + 1)):
+            for k, nv in zip(key_vals, net_vals):
+                result[int(k)] = nv
+        elif uniq == set(range(0, n)):
+            for k, nv in zip(key_vals, net_vals):
+                result[int(k) + 1] = nv
         else:
-            network_col = cols[-1]
-    key_vals = df.iloc[:, 0].to_numpy()
-    net_vals = df[network_col].astype(str).to_numpy()
-    result = {}
-    n = len(df)
-    is_num = np.issubdtype(key_vals.dtype, np.number)
-    uniq = set(int(k) for k in key_vals)
-    if is_num and uniq == set(range(1, n + 1)):
-        for k, nv in zip(key_vals, net_vals):
-            result[int(k)] = nv
-    elif is_num and uniq == set(range(0, n)):
-        for k, nv in zip(key_vals, net_vals):
-            result[int(k) + 1] = nv
-    else:
-        for i, nv in enumerate(net_vals):
-            result[i + 1] = nv
-            result[i] = nv
-    return result
+            for i, nv in enumerate(net_vals):
+                result[int(key_vals[i])] = nv
+        return result
+
+    # non-numeric first column -> positional, name = first (or chosen) column
+    name_col = network_col if network_col else cols[0]
+    net_vals = df[name_col].astype(str).to_numpy()
+    return {i + 1: nv for i, nv in enumerate(net_vals)}
 
 
 def dlabel_networks(dlabel, N, csv_path=None):
