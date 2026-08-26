@@ -22,8 +22,8 @@ read_mash_stream <- function(pattern, label) {
   })
   if (nrow(dfs) == 0) return(empty_mash)
   if (!"PCs" %in% names(dfs) || all(is.na(dfs$PCs))) {
-    message("stream ", label, ": no/NA PCs column; assuming alternating npc 0/30")
-    dfs <- dfs %>% mutate(PCs = rep(c(0, 30), length.out = nrow(dfs)))
+    message("stream ", label, ": no/NA PCs column; assuming npc 30")
+    dfs <- dfs %>% mutate(PCs = 30)
   }
   avail <- unique(dfs$PCs)
   use_npc <- if (NPC %in% avail) NPC else max(avail, na.rm = TRUE)
