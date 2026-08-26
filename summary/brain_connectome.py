@@ -139,7 +139,7 @@ def read_network_csv(path, network_col=None):
     df = pd.read_csv(path)
     cols = list(df.columns)
     first = df.iloc[:, 0]
-    is_num = np.issubdtype(first.dtype, np.number)
+    is_num = pd.api.types.is_numeric_dtype(first)
 
     if is_num:
         key_vals = first.to_numpy()
