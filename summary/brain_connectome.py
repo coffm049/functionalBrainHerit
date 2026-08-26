@@ -125,6 +125,64 @@ def dlabel_values(node_h2, dlabel, N):
     return tex_left, tex_right
 
 
+def dlabel_networks(dlabel, N):
+    """Per-node network label derived from the dlabel's CIFTI label table:
+    the network is the first token of each region's name (e.g. 'SomMotA_3'
+    -> 'SomMotA'). Returns an array of N network strings."""
+    img = nib.load(dlabel)
+    lt = img.header.label
+    labels = getattr(lt, "labels", {}) if lt is not None else {}
+    nets = []
+    for p in range(1, N + 1):
+        name = None
+        if p in labels:
+            lab = labels[p]
+            name = getattr(lab, "label", None) or getattr(lab, "key", None)
+        nets.append(_network_of(name))
+    return np.asarray(nets)
+
+
+def _network_of(name):
+    if not name:
+        return "NA"
+    s = str(name)
+    return s.split("_")[0] if "_" in s else s
+
+
+def dlabel_network_values(dlabel, N, net_id):
+    """Return (tex_left, tex_right): per-vertex network-index maps
+    (NaN = unassigned). Built the same way as dlabel_values but with the
+    integer network id per parcel, for a categorical topography surface."""
+    img = nib.load(dlabel)
+    label_data = np.asarray(img.get_fdata()).astype(int).ravel()
+    full = np.full(label_data.shape, -1, dtype=int)
+    for p in range(1, N + 1):
+        nid = int(net_id[p - 1])
+        if nid >= 0:
+            full[label_data == p] = nid
+    ax = img.header.get_axis(1)
+    va = np.asarray(getattr(ax, "vertex", None), dtype=int)
+    if va is None or len(va) != len(full):
+        raise ValueError("dlabel vertex/structure mismatch for network map")
+    nv = getattr(ax, "nvertices", {}) or {}
+    tex_left = tex_right = None
+    pos = 0
+    for structure, count in nv.items():
+        s = str(structure).upper()
+        c = int(count)
+        if c == 0:
+            continue
+        blk = va[pos:pos + c]
+        seg = full[pos:pos + c].astype(float)
+        seg[seg < 0] = np.nan
+        if "LEFT" in s:
+            tex_left = seg
+        elif "RIGHT" in s:
+            tex_right = seg
+        pos += c
+    return tex_left, tex_right
+
+
 # --------------------------------------------------------------------------
 # plotting
 # --------------------------------------------------------------------------
@@ -168,32 +226,102 @@ def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
         print(f"  [{tag}] surface WARNING: no finite values")
 
 
-def plot_circular(M, outdir, tag, h2_thr=0.3):
+def plot_circular(M, outdir, tag, h2_thr=0.35, networks=None):
     """Circular (chord-style) connectome: nodes evenly spaced on a ring, edges
-    drawn for |h2| > h2_thr, coloured by sign (red=+, blue=-)."""
+    drawn for h2 > h2_thr (positive only). When `networks` (array of network
+    labels, one per node) is given, nodes are grouped and coloured by network.
+    """
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     N = M.shape[0]
+    if networks is not None and len(networks) == N:
+        order = np.argsort(networks, kind="stable")  # group by network
+        net_ordered = np.asarray(networks)[order]
+    else:
+        order = np.arange(N)
+        net_ordered = None
+
+    pos = np.empty(N, dtype=int)
+    pos[order] = np.arange(N)
+
     angles = np.linspace(0, 2 * np.pi, N, endpoint=False)
     xy = np.column_stack([np.cos(angles), np.sin(angles)])
+
     fig, ax = plt.subplots(figsize=(9, 9))
     iu = np.triu_indices(N, 1)
     vals = M[iu]
-    mask = np.abs(vals) > h2_thr
+    mask = vals > h2_thr
     n_edges = int(mask.sum())
     for (a, b), v in zip(zip(iu[0][mask], iu[1][mask]), vals[mask]):
-        ax.plot([xy[a, 0], xy[b, 0]], [xy[a, 1], xy[b, 1]],
-                color=("red" if v > 0 else "blue"), alpha=0.25, linewidth=0.4)
-    ax.scatter(xy[:, 0], xy[:, 1], s=12, c="black", zorder=5)
+        pa, pb = pos[a], pos[b]
+        ax.plot([xy[pa, 0], xy[pb, 0]], [xy[pa, 1], xy[pb, 1]],
+                color="red", alpha=0.25, linewidth=0.4)
+
+    if net_ordered is not None:
+        uniq = list(dict.fromkeys(net_ordered.tolist()))
+        cmap = plt.get_cmap("tab20")
+        net_color = {net: cmap(i % 20) for i, net in enumerate(uniq)}
+        node_colors = [net_color[net_ordered[i]] for i in range(N)]
+        ax.scatter(xy[:, 0], xy[:, 1], s=20, c=node_colors, zorder=5,
+                   edgecolors="black", linewidths=0.3)
+        handles = [plt.Line2D([0], [0], marker="o", linestyle="",
+                              color=net_color[net], label=net) for net in uniq]
+        ax.legend(handles=handles, loc="center left",
+                  bbox_to_anchor=(1.02, 0.5), fontsize=7, frameon=False)
+    else:
+        ax.scatter(xy[:, 0], xy[:, 1], s=12, c="black", zorder=5)
+
     ax.set_aspect("equal")
     ax.axis("off")
-    ax.set_title(f"{tag} circular (|h2|>{h2_thr}, {n_edges} edges)")
+    title = f"{tag} circular (h2>{h2_thr}, {n_edges} edges)"
+    if net_ordered is not None:
+        title += f", {len(uniq)} networks"
+    ax.set_title(title)
     png = os.path.join(outdir, f"{tag}_circular.png")
     fig.savefig(png, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"  wrote {png}")
+
+
+def plot_surface_networks(net_left, net_right, net_names, surf_l, surf_r,
+                          outdir, tag):
+    """Categorical brain-surface map of network topography (one colour per
+    network), both hemispheres in one figure."""
+    import matplotlib.pyplot as plt
+    sides = [("left", surf_l, net_left), ("right", surf_r, net_right)]
+    sides = [(n, s, v) for n, s, v in sides if s is not None and v is not None]
+    if not sides:
+        return
+    K = len(net_names)
+    cmap = plt.get_cmap("tab20")
+    png = os.path.join(outdir, f"{tag}_networks_surface.png")
+    try:
+        fig = plt.figure(figsize=(6 * len(sides), 5))
+        for i, (name, surf, val) in enumerate(sides, start=1):
+            ax = fig.add_subplot(1, len(sides), i, projection="3d")
+            niplot.plot_surf_stat_map(surf, val, hemi=name, axes=ax, figure=fig,
+                                      cmap="tab20", colorbar=False, threshold=None,
+                                      vmin=0.0, vmax=max(K - 1, 1),
+                                      title=f"{tag} networks ({name})")
+        handles = [plt.Line2D([0], [0], marker="o", linestyle="",
+                              color=cmap(i / max(K - 1, 1)), label=net_names[i])
+                   for i in range(K)]
+        fig.legend(handles=handles, loc="lower center", ncol=4, fontsize=7,
+                   frameon=False)
+        fig.savefig(png, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+        print(f"  wrote {png}")
+    except Exception:
+        for name, surf, val in sides:
+            sp = os.path.join(outdir, f"{tag}_networks_surface_{name}.png")
+            niplot.plot_surf_stat_map(surf, val, hemi=name, cmap="tab20",
+                                      colorbar=False, threshold=None,
+                                      vmin=0.0, vmax=max(K - 1, 1),
+                                      title=f"{tag} networks ({name})",
+                                      output_file=sp)
+            print(f"  wrote {sp}")
 
 
 # --------------------------------------------------------------------------
@@ -241,11 +369,20 @@ def main():
         node_vals[method] = node_summary(M, args.node_pct)
         print(f"[{atlas}_{method}] edges={int(np.isfinite(M).sum() // 2)} nodes={N}")
 
-    # shared colour scale for fair comparison (heritability is non-negative)
-    allv = np.concatenate([np.abs(v[~np.isnan(v)]) for v in node_vals.values()])
-    vmax = float(np.nanmax(allv)) if allv.size else 1.0
+    # fixed 0..0.5 scale so every surface heatmap is directly comparable
+    vmax = 0.5
 
-    # ---- cortical-surface node-summary plots -----------------------------
+    # network grouping (parsed from the dlabel label table)
+    networks = None
+    net_names = None
+    net_id = None
+    if args.dlabel:
+        networks = dlabel_networks(args.dlabel, N)
+        net_names = list(dict.fromkeys(networks.tolist()))
+        net_id = np.array([net_names.index(s) for s in networks], dtype=int)
+        print(f"[networks] {len(net_names)} groups: {net_names}")
+
+    # ---- cortical-surface node-summary (h2) plots ------------------------
     if surf_l or surf_r:
         if not args.dlabel:
             sys.exit("--dlabel is required for the surface view")
@@ -258,10 +395,15 @@ def main():
             val_l, val_r = dlabel_values(node_h2, args.dlabel, N)
             plot_surface(val_l, val_r, surf_l, surf_r,
                          args.outdir, f"{atlas}_{method}", vmax)
+        # network topography surface (categorical, one colour per network)
+        nl, nr = dlabel_network_values(args.dlabel, N, net_id)
+        plot_surface_networks(nl, nr, net_names, surf_l, surf_r,
+                              args.outdir, f"{atlas}_networks")
 
-    # ---- circular connectome (|h2| > 0.3) --------------------------------
+    # ---- circular connectome (h2 > 0.35, grouped by network) -------------
     for method, M in matrices.items():
-        plot_circular(M, args.outdir, f"{atlas}_{method}", h2_thr=0.3)
+        plot_circular(M, args.outdir, f"{atlas}_{method}",
+                      h2_thr=0.35, networks=networks)
 
     print("Done. Outputs in", args.outdir)
 
