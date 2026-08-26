@@ -125,43 +125,53 @@ def vertex_mni(surf, wb_cmd):
     return np.asarray(nib.load(out).agg_data()[0], dtype=float)
 
 
-def _brain_models(bm_axis):
+def _brain_models(header):
     """Yield (structure, is_surface, vertex, voxel, vol_affine) for each brain
-    model in a CIFTI BrainModelAxis, tolerating nibabel API differences
-    (iter_brain_models / brain_models may be absent in some versions)."""
-    if hasattr(bm_axis, "brain_models"):                 # list of Cifti2BrainModel
-        for bm in bm_axis.brain_models:
-            s = str(bm.structure)
-            v = np.asarray(bm.vertex) if getattr(bm, "vertex", None) is not None else None
-            vx = np.asarray(bm.voxel) if getattr(bm, "voxel", None) is not None else None
-            aff = getattr(getattr(bm, "volume", None), "transform", None)
-            yield (s, s.startswith("CORTEX"), v, vx, aff)
-        return
-    # fallback: contiguous-segment parse of the stable array attributes
-    structs = [str(s) for s in np.asarray(bm_axis.structure)]
-    verts = np.asarray(bm_axis.vertex)
-    voxs = np.asarray(bm_axis.voxel) if getattr(bm_axis, "voxel", None) is not None else None
-    volaff = getattr(getattr(bm_axis, "volume", None), "transform", None)
-    segs = []
-    prev, start = None, 0
-    for i, s in enumerate(structs):
-        if s != prev:
-            if prev is not None:
-                segs.append((prev, start, i))
-            prev, start = s, i
-    segs.append((prev, start, len(structs)))
-    for s, a, b in segs:
+    model in a CIFTI dlabel, tolerating nibabel API differences.
+
+    Primary path: header.get_index_map(1).brain_models()  (Cifti2BrainModel list).
+    Fallback: BrainModelAxis.iter_structures() -> (structure, positions).
+    """
+    ax = header.get_axis(1)
+    bms = []
+    try:
+        mim = header.get_index_map(1)
+        gen = getattr(mim, "brain_models", None)
+        if callable(gen):
+            bms = list(gen())
+        elif gen is not None:
+            bms = list(gen)
+    except Exception:
+        bms = []
+    if bms:
+        try:
+            for bm in bms:
+                s = str(bm.structure)
+                v = np.asarray(bm.vertex) if getattr(bm, "vertex", None) is not None else None
+                vx = np.asarray(bm.voxel) if getattr(bm, "voxel", None) is not None else None
+                aff = getattr(getattr(bm, "volume", None), "transform", None)
+                yield (s, s.startswith("CORTEX"), v, vx, aff)
+            return
+        except Exception:
+            pass
+    # Fallback: BrainModelAxis.iter_structures()
+    for structure, positions in ax.iter_structures():
+        s = str(structure)
         is_surf = s.startswith("CORTEX")
-        yield (s, is_surf,
-               (verts[a:b] if is_surf else None),
-               (voxs[a:b] if (voxs is not None and not is_surf) else None),
-               (volaff if not is_surf else None))
+        if is_surf:
+            vertex = np.asarray(ax.vertex)[positions]
+            voxel = None
+            aff = None
+        else:
+            vertex = None
+            voxel = np.asarray(ax.voxel)[positions]
+            aff = getattr(ax, "affine", None)
+        yield (s, is_surf, vertex, voxel, aff)
 
 
 def derive_centroids(N, dlabel, surf_l, surf_r, wb_cmd):
     img = nib.load(dlabel)
     data = img.get_fdata().astype(int).ravel()
-    bm_axis = img.header.get_axis(1)
 
     vtx_mni = {}
     if surf_l:
@@ -171,7 +181,7 @@ def derive_centroids(N, dlabel, surf_l, surf_r, wb_cmd):
 
     acc = defaultdict(list)
     offset = 0
-    for structure, is_surface, vertex, voxel, vol_affine in _brain_models(bm_axis):
+    for structure, is_surface, vertex, voxel, vol_affine in _brain_models(img.header):
         n = len(vertex) if is_surface else (len(voxel) if voxel is not None else 0)
         elem = data[offset:offset + n]
         if is_surface:
@@ -212,19 +222,18 @@ def dlabel_parcel_maps(N, dlabel, n_left=None, n_right=None):
     """Return (tex_left, tex_right, offset) holding the parcel index per vertex."""
     img = nib.load(dlabel)
     data = img.get_fdata().astype(int).ravel()
-    bm_axis = img.header.get_axis(1)
 
     off = 1 if (int(data.max()) == N) else 0  # 1-based label tables
 
     # learn surface vertex counts if not supplied
     if n_left is None:
         n_left = 0
-        for structure, is_surface, vertex, voxel, _ in _brain_models(bm_axis):
+        for structure, is_surface, vertex, voxel, _ in _brain_models(img.header):
             if structure == "CORTEX_LEFT" and vertex is not None:
                 n_left = max(n_left, int(np.max(vertex)) + 1)
     if n_right is None:
         n_right = 0
-        for structure, is_surface, vertex, voxel, _ in _brain_models(bm_axis):
+        for structure, is_surface, vertex, voxel, _ in _brain_models(img.header):
             if structure == "CORTEX_RIGHT" and vertex is not None:
                 n_right = max(n_right, int(np.max(vertex)) + 1)
 
@@ -232,7 +241,7 @@ def dlabel_parcel_maps(N, dlabel, n_left=None, n_right=None):
     tex_right = np.full(n_right, np.nan)
 
     offset = 0
-    for structure, is_surface, vertex, voxel, _ in _brain_models(bm_axis):
+    for structure, is_surface, vertex, voxel, _ in _brain_models(img.header):
         n = len(vertex) if is_surface else (len(voxel) if voxel is not None else 0)
         elem = data[offset:offset + n]
         if structure == "CORTEX_LEFT":
