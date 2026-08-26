@@ -41,7 +41,7 @@ run_atlas () {
   python "$ROOT/summary/brain_connectome.py" \
     --wide "$WIDE" --atlas "$atlas" --n "$n" \
     --dlabel "$dlabel" --surf-l "$SURF_L" --surf-r "$SURF_R" \
-    --node-pct "$NODE_PCT" --write-dscalar \
+    --node-pct "$NODE_PCT" \
     --outdir "$out"
 }
 

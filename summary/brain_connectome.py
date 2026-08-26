@@ -71,172 +71,98 @@ def node_summary(M, pct):
 
 
 # --------------------------------------------------------------------------
-# dlabel -> per-structure vertex->label, and parcel centroids
+# dlabel -> per-hemisphere surface value maps
 # --------------------------------------------------------------------------
-def load_surf(path):
-    img = nib.load(path)
-    if hasattr(img, "darrays"):  # GiftiImage: select arrays by intent
-        coords = faces = None
-        for da in img.darrays:
-            it = da.intent
-            is_point = it in ("NIFTI_INTENT_POINTSET", "POINTSET", 1008)
-            is_tri = it in ("NIFTI_INTENT_TRIANGLE", "TRIANGLE", 1009)
-            if is_point:
-                coords = np.asarray(da.data, dtype=float)
-            elif is_tri:
-                faces = np.asarray(da.data, dtype=int)
-        if coords is None:  # fallback: standard surface order (first=verts, second=tris)
-            arrs = [np.asarray(da.data) for da in img.darrays]
-            if arrs:
-                coords = arrs[0].astype(float)
-                faces = arrs[1].astype(int) if len(arrs) > 1 else np.zeros((0, 0), int)
-        if faces is None:
-            faces = np.zeros((0, 0), dtype=int)
-        return coords, faces
-    data = img.agg_data()  # non-gifti fallback
-    if isinstance(data, tuple):
-        coords = data[0]
-        faces = data[1] if len(data) > 1 else np.zeros((0, 0), dtype=int)
-    else:
-        coords, faces = np.asarray(data, dtype=float), np.zeros((0, 0), dtype=int)
-    return np.asarray(coords, dtype=float), np.asarray(faces, dtype=int)
+def dlabel_values(node_h2, dlabel, N):
+    """Return (tex_left, tex_right): per-vertex h2 values (NaN = unassigned),
+    using the same mapping as the 01-07 scripts:
 
+        vertex_scalar_map[label_data == region] = value
 
-def _brain_models(header):
-    """Yield (structure, is_surface, vertex, voxel, vol_affine) for each brain
-    model in a CIFTI dlabel, tolerating nibabel API differences.
-
-    Strategy:
-    1. Reconstruct surface/volume blocks from the BrainModelAxis `nvertices`
-       count dict + the concatenated `vertex`/`voxel` arrays (attributes
-       confirmed present across nibabel versions; reliable for cortex-only
-       dlabels such as Gordon352 / probaConns80).
-    2. Fallback to header.get_index_map(1).brain_models() (canonical API).
+    i.e. build the full greyordinate map from the dlabel's label array, then
+    split it into left/right hemisphere textures via the BrainModelAxis.
     """
-    ax = header.get_axis(1)
-    # Primary: nvertices + concatenated vertex/voxel arrays
-    nv = getattr(ax, "nvertices", None)
-    if nv:
-        try:
-            nv = dict(nv)
-            vertex_arr = np.asarray(ax.vertex) if getattr(ax, "vertex", None) is not None else None
-            voxel_arr = np.asarray(ax.voxel) if getattr(ax, "voxel", None) is not None else None
-            pos_v = 0
-            pos_x = 0
-            for structure, count in nv.items():
-                s = str(structure)
-                c = int(count)
-                if s.startswith("CORTEX"):
-                    vertex = vertex_arr[pos_v:pos_v + c] if vertex_arr is not None else None
-                    yield (s, True, vertex, None, None)
-                    pos_v += c
-                else:
-                    voxel = voxel_arr[pos_x:pos_x + c] if voxel_arr is not None else None
-                    yield (s, False, None, voxel, None)
-                    pos_x += c
-            return
-        except Exception:
-            pass
-    # Fallback: canonical header-level brain-model list
-    try:
-        mim = header.get_index_map(1)
-        gen = getattr(mim, "brain_models", None)
-        bms = list(gen()) if callable(gen) else (list(gen) if gen is not None else [])
-        for bm in bms:
-            s = str(bm.structure)
-            v = np.asarray(bm.vertex) if getattr(bm, "vertex", None) is not None else None
-            vx = np.asarray(bm.voxel) if getattr(bm, "voxel", None) is not None else None
-            aff = getattr(getattr(bm, "volume", None), "transform", None)
-            yield (s, s.startswith("CORTEX"), v, vx, aff)
-        return
-    except Exception:
-        pass
-    raise RuntimeError("Could not extract brain models from CIFTI header")
-
-
-def dlabel_parcel_maps(N, dlabel, n_left=None, n_right=None):
-    """Return (tex_left, tex_right): per-vertex parcel index (0-based), with
-    background / unassigned vertices set to NaN."""
     img = nib.load(dlabel)
-    data = np.asarray(img.get_fdata()).astype(int).ravel()
+    label_data = np.asarray(img.get_fdata()).astype(int).ravel()
 
-    # learn surface vertex counts if not supplied
-    if n_left is None:
-        n_left = 0
-        for structure, is_surface, vertex, voxel, _ in _brain_models(img.header):
-            if structure == "CORTEX_LEFT" and vertex is not None:
-                n_left = max(n_left, int(np.max(vertex)) + 1)
-    if n_right is None:
-        n_right = 0
-        for structure, is_surface, vertex, voxel, _ in _brain_models(img.header):
-            if structure == "CORTEX_RIGHT" and vertex is not None:
-                n_right = max(n_right, int(np.max(vertex)) + 1)
+    # 01-07 style: full greyordinate map, one value per parcel.
+    full = np.full(label_data.shape, np.nan, dtype=float)
+    for p in range(1, N + 1):
+        val = node_h2[p - 1]
+        if np.isfinite(val):
+            full[label_data == p] = val
 
-    tex_left = np.full(n_left, np.nan)
-    tex_right = np.full(n_right, np.nan)
+    ax = img.header.get_axis(1)
+    tex_left = tex_right = None
 
-    offset = 0
-    for structure, is_surface, vertex, voxel, _ in _brain_models(img.header):
-        n = len(vertex) if is_surface else (len(voxel) if voxel is not None else 0)
-        if vertex is None:
-            offset += n
-            continue
-        lab = data[offset:offset + n].astype(int)
-        # CIFTI dlabels: 0 = background/unknown; real parcels are 1..N (1-based).
-        parcel = np.where(lab <= 0, -1, lab - 1)
-        parcel = np.where((parcel >= 0) & (parcel < N), parcel, -1)
-        pmap = np.full(lab.shape, np.nan, dtype=float)
-        ok = parcel >= 0
-        pmap[ok] = parcel[ok]
-        if structure == "CORTEX_LEFT":
-            tex_left[vertex] = pmap
-        elif structure == "CORTEX_RIGHT":
-            tex_right[vertex] = pmap
-        offset += n
+    # Canonical API: iter_structures() yields (structure, slice, brainmodel),
+    # with `slice` already positioned correctly in the greyordinate array
+    # (handles subcortical voxels without desyncing the surface vertices).
+    try:
+        for structure, slc, bm in ax.iter_structures():
+            s = str(structure).upper()
+            v = getattr(bm, "vertex", None)
+            if v is None:
+                continue
+            v = np.asarray(v)
+            if "LEFT" in s:
+                tex_left = np.full(int(np.max(v)) + 1, np.nan)
+                tex_left[v] = full[slc]
+            elif "RIGHT" in s:
+                tex_right = np.full(int(np.max(v)) + 1, np.nan)
+                tex_right[v] = full[slc]
+        if tex_left is not None or tex_right is not None:
+            return tex_left, tex_right
+    except Exception as e:
+        print(f"  [dlabel] iter_structures failed ({e}); using nvertices fallback")
+
+    # Fallback (cortex-only dlabels): nvertices dict + concatenated vertex array.
+    nv = dict(getattr(ax, "nvertices", {}) or {})
+    va = np.asarray(ax.vertex) if getattr(ax, "vertex", None) is not None else None
+    pos = 0
+    for structure, count in nv.items():
+        s = str(structure).upper()
+        c = int(count)
+        if "LEFT" in s and va is not None:
+            blk = va[pos:pos + c]
+            tex_left = np.full(int(np.max(blk)) + 1, np.nan)
+            tex_left[blk] = full[pos:pos + c]
+        elif "RIGHT" in s and va is not None:
+            blk = va[pos:pos + c]
+            tex_right = np.full(int(np.max(blk)) + 1, np.nan)
+            tex_right[blk] = full[pos:pos + c]
+        pos += c
     return tex_left, tex_right
 
 
 # --------------------------------------------------------------------------
 # plotting
 # --------------------------------------------------------------------------
-def plot_surface(node_h2, surf_l, surf_r, tex_left, tex_right, outdir, tag, vmin, vmax):
-    # tex_left/right hold parcel indices (or NaN). Map to node_h2 values, leaving
-    # unassigned vertices as NaN so nilearn renders them as background.
-    def to_val(tex):
-        if tex is None:
-            return None
-        val = np.full(tex.shape, np.nan, dtype=float)
-        valid = ~np.isnan(tex)
-        if valid.any():
-            idx = tex[valid].astype(int)
-            idx = idx[(idx >= 0) & (idx < len(node_h2))]
-            if idx.size:
-                val[valid] = node_h2[idx]
-        assigned = int(np.count_nonzero(~np.isnan(val)))
-        nz = assigned
-        if nz:
-            print(f"  [{tag}] surface assigned={assigned} val "
-                  f"min={np.nanmin(val):.3f} max={np.nanmax(val):.3f}")
-        else:
-            print(f"  [{tag}] surface WARNING: no finite values "
-                  f"(node_h2 range {np.nanmin(node_h2):.3f}..{np.nanmax(node_h2):.3f})")
-        return val
-
-    val_l = to_val(tex_left)
-    val_r = to_val(tex_right)
-    # h2 is non-negative (heritability); use 0..vmax so variation is visible.
-    vmax = vmax if (np.isfinite(vmax) and np.isfinite(vmax)) else 1e-6
-    vmax = max(float(vmax), 1e-6)
-    for side, (surf, val) in enumerate([(surf_l, val_l), (surf_r, val_r)]):
-        if surf is None or val is None:
-            continue
-        name = "left" if side == 0 else "right"
-        png = os.path.join(outdir, f"{tag}_surface_{name}.png")
-        niplot.plot_surf_stat_map(surf, val, title=f"{tag} ({name})",
-                                  output_file=png, cmap="coolwarm",
-                                  colorbar=True, threshold=None,
-                                  vmin=0.0, vmax=vmax)
-        print(f"  wrote {png}")
+def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
+    # val_left/right are per-vertex h2 value arrays (NaN = unassigned/background).
+    # Both hemispheres are drawn in a single figure when available.
+    vmax = max(float(vmax) if np.isfinite(vmax) else 1e-6, 1e-6)
+    surfs, vals = [], []
+    if surf_l is not None and val_left is not None:
+        surfs.append(surf_l)
+        vals.append(val_left)
+    if surf_r is not None and val_right is not None:
+        surfs.append(surf_r)
+        vals.append(val_right)
+    if not surfs:
+        return
+    png = os.path.join(outdir, f"{tag}_surface.png")
+    niplot.plot_surf_stat_map(surfs, vals, title=tag, output_file=png,
+                              cmap="coolwarm", colorbar=True, threshold=None,
+                              vmin=0.0, vmax=vmax)
+    assigned = int(sum(np.count_nonzero(~np.isnan(v)) for v in vals))
+    if assigned:
+        allv = np.concatenate([v[~np.isnan(v)] for v in vals])
+        print(f"  [{tag}] surface assigned={assigned} "
+              f"min={np.nanmin(allv):.3f} max={np.nanmax(allv):.3f}")
+    else:
+        print(f"  [{tag}] surface WARNING: no finite values")
+    print(f"  wrote {png}")
 
 
 def plot_circular(M, outdir, tag, h2_thr=0.3):
@@ -267,24 +193,6 @@ def plot_circular(M, outdir, tag, h2_thr=0.3):
     print(f"  wrote {png}")
 
 
-def write_dscalar(node_h2, dlabel, outdir, tag, N):
-    """Write a CIFTI dscalar (parcel value per greyordinate) built from the
-    dlabel's own BrainModelAxis + a fresh ScalarAxis. No wb_command needed."""
-    img = nib.load(dlabel)
-    labels = np.asarray(img.get_fdata()).astype(int).ravel()
-    ax1 = img.header.get_axis(1)
-    ax0 = nib.cifti2.ScalarAxis(["herit"])
-    hdr = nib.cifti2.Cifti2Header.from_axes((ax0, ax1))
-    vsm = np.zeros(img.shape, dtype=float)
-    for p in range(1, N + 1):
-        val = node_h2[p - 1]
-        if np.isfinite(val):
-            vsm[0, labels == p] = val
-    out = os.path.join(outdir, f"{tag}.dscalar.nii")
-    nib.save(nib.cifti2.Cifti2Image(vsm, header=hdr), out)
-    print(f"  wrote {out}")
-
-
 # --------------------------------------------------------------------------
 # main
 # --------------------------------------------------------------------------
@@ -299,8 +207,6 @@ def main():
     ap.add_argument("--surf-r", help="fsLR right white/gray gifti surface")
     ap.add_argument("--node-pct", type=float, default=90,
                     help="percentile for node summary (default 90)")
-    ap.add_argument("--write-dscalar", action="store_true",
-                    help="also write a CIFTI .dscalar.nii per method (no wb_command needed)")
     ap.add_argument("--outdir", default="results/summary/brain")
     args = ap.parse_args()
 
@@ -313,22 +219,8 @@ def main():
     if sub.empty:
         sys.exit(f"No rows for Set={atlas} in {args.wide}")
 
-    # load surface geometry + dlabel parcel maps once
     surf_l = args.surf_l
     surf_r = args.surf_r
-    tex_left = tex_right = None
-    if surf_l or surf_r:
-        if not args.dlabel:
-            sys.exit("--dlabel is required for the surface view")
-        Vl = load_surf(surf_l)[0].shape[0] if surf_l else None
-        Vr = load_surf(surf_r)[0].shape[0] if surf_r else None
-        tex_left, tex_right = dlabel_parcel_maps(N, args.dlabel, Vl, Vr)
-        if tex_left is not None:
-            aL = int(np.count_nonzero(~np.isnan(tex_left)))
-            aR = int(np.count_nonzero(~np.isnan(tex_right))) if tex_right is not None else 0
-            mx = (np.nanmax(tex_left) if aL else 0)
-            print(f"[dlabel] left assigned={aL}/{tex_left.size} "
-                  f"right assigned={aR} parcel-idx max={mx:.0f} (N={N})")
 
     # compute matrices for the two methods we care about (twin + AdjHE_RE)
     methods = ["twin", "AdjHE"]
@@ -352,12 +244,17 @@ def main():
 
     # ---- cortical-surface node-summary plots -----------------------------
     if surf_l or surf_r:
+        if not args.dlabel:
+            sys.exit("--dlabel is required for the surface view")
+        # diagnostic: confirm the dlabel maps onto the surface (AdjHE method)
+        dL, dR = dlabel_values(node_vals["AdjHE"], args.dlabel, N)
+        aL = int(np.count_nonzero(~np.isnan(dL))) if dL is not None else 0
+        aR = int(np.count_nonzero(~np.isnan(dR))) if dR is not None else 0
+        print(f"[dlabel] left assigned={aL} right assigned={aR} (N={N})")
         for method, node_h2 in node_vals.items():
-            plot_surface(node_h2, surf_l, surf_r, tex_left, tex_right,
-                         args.outdir, f"{atlas}_{method}", 0.0, vmax)
-            if args.write_dscalar and args.dlabel:
-                write_dscalar(node_h2, args.dlabel, args.outdir,
-                              f"{atlas}_{method}", N)
+            val_l, val_r = dlabel_values(node_h2, args.dlabel, N)
+            plot_surface(val_l, val_r, surf_l, surf_r,
+                         args.outdir, f"{atlas}_{method}", vmax)
 
     # ---- circular connectome (|h2| > 0.3) --------------------------------
     for method, M in matrices.items():
