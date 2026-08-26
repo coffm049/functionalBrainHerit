@@ -139,39 +139,39 @@ def dlabel_values(node_h2, dlabel, N):
 # plotting
 # --------------------------------------------------------------------------
 def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
-    # val_left/right are per-vertex h2 value arrays (NaN = unassigned/background).
+    # val_left/right are per-vertex h2 value arrays (NaN = unassigned/background),
+    # one per hemisphere, length == gifti vertex count for that hemisphere.
     vmax = max(float(vmax) if np.isfinite(vmax) else 1e-6, 1e-6)
-    surfs, vals = [], []
-    if surf_l is not None and val_left is not None:
-        surfs.append(surf_l)
-        vals.append(val_left)
-    if surf_r is not None and val_right is not None:
-        surfs.append(surf_r)
-        vals.append(val_right)
-    if not surfs:
+    sides = [("left", surf_l, val_left), ("right", surf_r, val_right)]
+    sides = [(n, s, v) for n, s, v in sides if s is not None and v is not None]
+    if not sides:
         return
-    # Prefer one figure with both hemispheres; fall back to separate L/R PNGs
-    # if this nilearn version does not accept list inputs.
+    png = os.path.join(outdir, f"{tag}_surface.png")
+    # nilearn 0.14 dropped list inputs to plot_surf_stat_map, so draw both
+    # hemispheres into one figure by giving each its own 3D axes.
     try:
-        png = os.path.join(outdir, f"{tag}_surface.png")
-        niplot.plot_surf_stat_map(surfs, vals, title=tag, output_file=png,
-                                  cmap="coolwarm", colorbar=True, threshold=None,
-                                  vmin=0.0, vmax=vmax)
+        import matplotlib.pyplot as plt
+        fig = plt.figure(figsize=(6 * len(sides), 5))
+        for i, (name, surf, val) in enumerate(sides, start=1):
+            ax = fig.add_subplot(1, len(sides), i, projection="3d")
+            niplot.plot_surf_stat_map(surf, val, hemi=name, axes=ax, figure=fig,
+                                      cmap="coolwarm", colorbar=True,
+                                      threshold=None, vmin=0.0, vmax=vmax,
+                                      title=f"{tag} ({name})")
+        fig.savefig(png, dpi=150, bbox_inches="tight")
+        plt.close(fig)
         print(f"  wrote {png}")
-    except (ValueError, TypeError):
-        for name, surf, val in (("left", surf_l, val_left),
-                                ("right", surf_r, val_right)):
-            if surf is None or val is None:
-                continue
-            png = os.path.join(outdir, f"{tag}_surface_{name}.png")
-            niplot.plot_surf_stat_map(surf, val, title=f"{tag} ({name})",
-                                      output_file=png, cmap="coolwarm",
-                                      colorbar=True, threshold=None,
-                                      vmin=0.0, vmax=vmax)
-            print(f"  wrote {png}")
-    assigned = int(sum(np.count_nonzero(~np.isnan(v)) for v in vals))
+    except Exception:
+        for name, surf, val in sides:
+            sp = os.path.join(outdir, f"{tag}_surface_{name}.png")
+            niplot.plot_surf_stat_map(surf, val, hemi=name,
+                                      cmap="coolwarm", colorbar=True,
+                                      threshold=None, vmin=0.0, vmax=vmax,
+                                      title=f"{tag} ({name})", output_file=sp)
+            print(f"  wrote {sp}")
+    assigned = int(sum(np.count_nonzero(~np.isnan(v)) for _, _, v in sides))
     if assigned:
-        allv = np.concatenate([v[~np.isnan(v)] for v in vals])
+        allv = np.concatenate([v[~np.isnan(v)] for _, _, v in sides])
         print(f"  [{tag}] surface assigned={assigned} "
               f"min={np.nanmin(allv):.3f} max={np.nanmax(allv):.3f}")
     else:
