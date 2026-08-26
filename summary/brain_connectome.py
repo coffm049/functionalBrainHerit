@@ -2,46 +2,27 @@
 """Brain-space visualization of edge heritability (h2) from MASH / twin estimates.
 
 Reads results/summary/mash_twin_wide.csv (produced by compare_mash_twin.R) and,
-for each atlas (gordon 352, probaConns 80) and method (twin, AdjHE),
-reconstructs the N x N h2 pconn (via np.triu_indices) and produces:
+for each atlas (gordon 352, probaConns 80), reconstructs the N x N h2 pconn
+(via np.triu_indices) and produces, for twin and AdjHE_RE:
 
-  (A) a cortical-surface NODE-SUMMARY plot (nilearn view_surf / plot_surf_stat_map)
-      using the fsLR gifti surfaces + dlabel vertex->parcel map. No MNI coordinates
-      are needed for this view. The node value is the `node-pct` percentile (default
-      90th) of the h2 values over the node's incident edges.
+  (A) a cortical-surface NODE-SUMMARY plot (nilearn plot_surf_stat_map) using the
+       fsLR gifti surfaces + dlabel vertex->parcel map. The node value is the
+       `node-pct` percentile (default 90th) of the h2 values over the node's
+       incident edges.
 
-  (B) a CONNECTOME plot (nilearn plot_connectome) using N x 3 MNI node coordinates.
-      Edges are thresholded at the `edge-pct` percentile (default 90th) of |h2|.
-      Coordinates are taken from --centroids (CSV) if given, otherwise derived from
-      the dlabel + fsLR surfaces via wb_command (or the volume affine for subcortex).
+  (B) a CIRCULAR connectome (nodes on a ring, edges drawn for |h2| > 0.3, coloured
+       by sign: red positive, blue negative) at <atlas>_<method>_circular.png.
 
 This script must run where the atlas files (dlabel, fsLR gifti surfaces) and the
 Python packages nilearn + nibabel are available (i.e. the HPC).
-
-Example
--------
-python brain_connectome.py \
-  --wide results/summary/mash_twin_wide.csv \
-  --atlas gordon --n 352 \
-  --dlabel /path/Gordon352.dlabel.nii \
-  --surf-l /path/L.white.surf.gii --surf-r /path/R.white.surf.gii \
-  --centroids /path/gordon352_MNIcentroids.csv \
-  --methods twin AdjHE \
-  --node-pct 90 --edge-pct 90 \
-  --outdir results/summary/brain
 """
 import argparse
 import os
-import subprocess
 import sys
-import tempfile
-import warnings
-from collections import defaultdict
 
 import numpy as np
 import pandas as pd
 import nibabel as nib
-from nibabel.affines import apply_affine
 
 import nilearn.plotting as niplot
 
@@ -119,12 +100,6 @@ def load_surf(path):
     return np.asarray(coords, dtype=float), np.asarray(faces, dtype=int)
 
 
-def vertex_mni(surf, wb_cmd):
-    out = tempfile.NamedTemporaryFile(suffix=".gii", delete=False).name
-    subprocess.run([wb_cmd, "-surface-coordinates-to-mni", surf, out], check=True)
-    return np.asarray(nib.load(out).agg_data()[0], dtype=float)
-
-
 def _brain_models(header):
     """Yield (structure, is_surface, vertex, voxel, vol_affine) for each brain
     model in a CIFTI dlabel, tolerating nibabel API differences.
@@ -175,55 +150,6 @@ def _brain_models(header):
     except Exception:
         pass
     raise RuntimeError("Could not extract brain models from CIFTI header")
-
-
-def derive_centroids(N, dlabel, surf_l, surf_r, wb_cmd):
-    img = nib.load(dlabel)
-    data = img.get_fdata().astype(int).ravel()
-
-    vtx_mni = {}
-    if surf_l:
-        vtx_mni["CORTEX_LEFT"] = vertex_mni(surf_l, wb_cmd)
-    if surf_r:
-        vtx_mni["CORTEX_RIGHT"] = vertex_mni(surf_r, wb_cmd)
-
-    acc = defaultdict(list)
-    offset = 0
-    for structure, is_surface, vertex, voxel, vol_affine in _brain_models(img.header):
-        n = len(vertex) if is_surface else (len(voxel) if voxel is not None else 0)
-        elem = data[offset:offset + n]
-        if is_surface:
-            mni = vtx_mni.get(structure)
-            if mni is not None:
-                for li, v in zip(elem, vertex):
-                    acc[int(li)].append(mni[v])
-        else:
-            if vol_affine is not None and voxel is not None:
-                for li, vv in zip(elem, voxel):
-                    acc[int(li)].append(apply_affine(vol_affine, vv))
-        offset += n
-
-    labels = list(acc.keys())
-    off = 1 if (labels and max(labels) == N) else 0
-    C = np.full((N, 3), np.nan)
-    for li, pts in acc.items():
-        idx = li - off
-        if 0 <= idx < N:
-            C[idx] = np.mean(pts, axis=0)
-    if np.isnan(C).any():
-        warnings.warn("Some parcels have no coordinate (subcortex missing or "
-                      "label/parcel order mismatch). Filling with 0.")
-        C = np.nan_to_num(C, nan=0.0)
-    return C
-
-
-def load_centroids(N, dlabel, surf_l, surf_r, wb_cmd, centroids_csv):
-    if centroids_csv:
-        C = np.loadtxt(centroids_csv, delimiter=",")
-        if C.shape[0] != N:
-            raise ValueError(f"centroids have {C.shape[0]} rows, expected {N}")
-        return C
-    return derive_centroids(N, dlabel, surf_l, surf_r, wb_cmd)
 
 
 def dlabel_parcel_maps(N, dlabel, n_left=None, n_right=None):
@@ -299,16 +225,6 @@ def plot_surface(node_h2, surf_l, surf_r, tex_left, tex_right, outdir, tag, vmin
         print(f"  wrote {png}")
 
 
-def plot_connectome(M, coords, outdir, tag, thr):
-    Mp = np.nan_to_num(M, nan=0.0)
-    np.fill_diagonal(Mp, 0.0)
-    png = os.path.join(outdir, f"{tag}_connectome.png")
-    niplot.plot_connectome(Mp, coords, edge_threshold=thr,
-                           node_size=8, title=f"{tag}",
-                           output_file=png, cmap="coolwarm")
-    print(f"  wrote {png}")
-
-
 def plot_circular(M, outdir, tag, h2_thr=0.3):
     """Circular (chord-style) connectome: nodes evenly spaced on a ring, edges
     drawn for |h2| > h2_thr, coloured by sign (red=+, blue=-)."""
@@ -341,8 +257,6 @@ def plot_circular(M, outdir, tag, h2_thr=0.3):
 # main
 # --------------------------------------------------------------------------
 def main():
-    import subprocess  # local import so --centroids-only path avoids it
-
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--wide", required=True, help="mash_twin_wide.csv")
@@ -351,41 +265,23 @@ def main():
     ap.add_argument("--dlabel", help="parcellation dlabel CIFTI")
     ap.add_argument("--surf-l", help="fsLR left white/gray gifti surface")
     ap.add_argument("--surf-r", help="fsLR right white/gray gifti surface")
-    ap.add_argument("--centroids", help="optional Nx3 MNI centroid CSV")
-    ap.add_argument("--wb-command", default="wb_command",
-                    help="wb_command binary (for centroid derivation)")
-    ap.add_argument("--methods", nargs="+", default=["twin", "AdjHE"],
-                    help="twin | AdjHE | AdjHE_FE")
     ap.add_argument("--node-pct", type=float, default=90,
                     help="percentile for node summary (default 90)")
-    ap.add_argument("--edge-pct", type=float, default=90,
-                    help="percentile threshold for connectome edges (default 90)")
     ap.add_argument("--outdir", default="results/summary/brain")
-    ap.add_argument("--no-surface", action="store_true")
-    ap.add_argument("--no-connectome", action="store_true")
-    ap.add_argument("--no-circular", action="store_true")
-    ap.add_argument("--circular-thr", type=float, default=0.3,
-                    help="|h2| threshold for the circular connectome (default 0.3)")
     args = ap.parse_args()
 
     atlas = "probaConns" if args.atlas.lower().startswith("proba") else args.atlas
     N = args.n
     os.makedirs(args.outdir, exist_ok=True)
 
-    if not os.path.exists(args.wide):
-        sys.exit(f"WIDE file not found: {args.wide}\n"
-                 "Run summary/compare_mash_twin.R first (or let "
-                 "summary/run_brain_viz.sh generate it).")
     df = pd.read_csv(args.wide)
-    if "Set" not in df.columns or "Pheno" not in df.columns:
-        sys.exit("wide CSV must contain Set and Pheno columns")
     sub = df[df["Set"] == atlas]
     if sub.empty:
         sys.exit(f"No rows for Set={atlas} in {args.wide}")
 
     # load surface geometry + dlabel parcel maps once
-    surf_l = args.surf_l if (args.surf_l and not args.no_surface) else None
-    surf_r = args.surf_r if (args.surf_r and not args.no_surface) else None
+    surf_l = args.surf_l
+    surf_r = args.surf_r
     tex_left = tex_right = None
     if surf_l or surf_r:
         if not args.dlabel:
@@ -400,60 +296,35 @@ def main():
             print(f"[dlabel] left assigned={aL}/{tex_left.size} "
                   f"right assigned={aR} parcel-idx max={mx:.0f} (N={N})")
 
-    # ---- compute matrices for all requested methods -----------------------
+    # compute matrices for the two methods we care about (twin + AdjHE_RE)
+    methods = ["twin", "AdjHE"]
     matrices = {}
     node_vals = {}
-    for method in args.methods:
+    for method in methods:
         col = column_for(atlas, method)
         if col not in sub.columns:
-            warnings.warn(f"column {col} missing for method {method}; skipping")
-            continue
+            sys.exit(f"column {col} missing for method {method}")
         s = sub[["Pheno", col]].dropna()
         if s.empty:
-            warnings.warn(f"no data for {method} ({col}); skipping")
-            continue
+            sys.exit(f"no data for {method} ({col})")
         M = rebuild_pconn(s["Pheno"].values, s[col].values.astype(float), N)
         matrices[method] = M
         node_vals[method] = node_summary(M, args.node_pct)
         print(f"[{atlas}_{method}] edges={int(np.isfinite(M).sum() // 2)} nodes={N}")
 
-    if not matrices:
-        sys.exit("no methods produced data; nothing to plot")
-
-    # ---- shared colour / threshold scales for fair comparison -------------
+    # shared colour scale for fair comparison (heritability is non-negative)
     allv = np.concatenate([np.abs(v[~np.isnan(v)]) for v in node_vals.values()])
     vmax = float(np.nanmax(allv)) if allv.size else 1.0
-    vmin = -vmax
-    alledges = np.concatenate([np.abs(M[np.triu_indices(N, 1)])
-                               for M in matrices.values()])
-    gthr = float(np.nanpercentile(alledges, args.edge_pct)) if alledges.size else 0.0
 
-    # ---- surface node-summary plots --------------------------------------
-    if not args.no_surface and (surf_l or surf_r):
+    # ---- cortical-surface node-summary plots -----------------------------
+    if surf_l or surf_r:
         for method, node_h2 in node_vals.items():
             plot_surface(node_h2, surf_l, surf_r, tex_left, tex_right,
-                         args.outdir, f"{atlas}_{method}", vmin, vmax)
+                         args.outdir, f"{atlas}_{method}", 0.0, vmax)
 
-    # ---- connectome plots -------------------------------------------------
-    if not args.no_connectome:
-        if args.centroids is None and not (args.dlabel and (surf_l or surf_r)):
-            warnings.warn("connectome skipped: need --centroids or "
-                          "--dlabel + surfaces for derivation")
-        else:
-            try:
-                coords = load_centroids(N, args.dlabel, surf_l, surf_r,
-                                        args.wb_command, args.centroids)
-            except Exception as e:
-                warnings.warn(f"connectome skipped: centroid derivation failed: {e}")
-                coords = None
-            if coords is not None:
-                for method, M in matrices.items():
-                    plot_connectome(M, coords, args.outdir, f"{atlas}_{method}", gthr)
-
-    # ---- circular connectome (filtered by |h2|) ----------------------------
-    if not args.no_circular:
-        for method, M in matrices.items():
-            plot_circular(M, args.outdir, f"{atlas}_{method}", args.circular_thr)
+    # ---- circular connectome (|h2| > 0.3) --------------------------------
+    for method, M in matrices.items():
+        plot_circular(M, args.outdir, f"{atlas}_{method}", h2_thr=0.3)
 
     print("Done. Outputs in", args.outdir)
 
