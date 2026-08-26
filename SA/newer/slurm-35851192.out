@@ -1,43 +1,0 @@
-flatpak: symbol lookup error: /lib64/libk5crypto.so.3: undefined symbol: EVP_KDF_ctrl, version OPENSSL_1_1_1b
-Reading GRM:  /panfs/jay/groups/31/rando149/coffm049/ABCD/Results/01_Gene_QC/filters/filter1/GRMs/full/full
-Reading GRM:  /panfs/jay/groups/31/rando149/coffm049/ABCD/Results/01_Gene_QC/filters/filter1/GRMs/full/full
-It took 6.696980109903961 (s) to read GRM, covariates
-Phenos + Covars: ['FID', 'IID', 'abcd_site', 'age', 'female', 'household.income', 'high.educ', 'race_ethnicity', 'mri_info_manufacturer', 'anthro_height_calc', 'genetic_paired_subjectid_4', 'genetic_pi_hat_1', 'genetic_pi_hat_2', 'genetic_pi_hat_3', 'genetic_pi_hat_4', 'genetic_zygosity_status_1', 'genetic_zygosity_status_2', 'genetic_zygosity_status_3', 'genetic_zygosity_status_4', 'genetic_ancestry_factor_african', 'genetic_ancestry_factor_european', 'genetic_ancestry_factor_east_asian', 'genetic_ancestry_factor_american', 'genetic_paired_subjectid_1', 'genetic_paired_subjectid_2', 'genetic_paired_subjectid_3', 'rel_relationship', 'totalNetworkSurface', 'pc_1', 'pc_2', 'pc_3', 'pc_4', 'pc_5', 'pc_6', 'pc_7', 'pc_8', 'pc_9', 'pc_10', 'pc_11', 'pc_12', 'pc_13', 'pc_14', 'pc_15', 'pc_16', 'pc_17', 'pc_18', 'pc_19', 'pc_20', 'pc_21', 'pc_22', 'pc_23', 'pc_24', 'pc_25', 'pc_26', 'pc_27', 'pc_28', 'pc_29', 'pc_30', 'pc_31', 'pc_32', 'pc_33', 'pc_34', 'pc_35', 'pc_36', 'pc_37', 'pc_38', 'pc_39', 'pc_40', 'pc_41', 'pc_42', 'pc_43', 'pc_44', 'pc_45', 'pc_46', 'pc_47', 'pc_48', 'pc_49', 'pc_50', 'pc_51', 'pc_52', 'pc_53', 'pc_54', 'pc_55', 'pc_56', 'pc_57', 'pc_58', 'pc_59', 'pc_60', 'pc_61', 'pc_62', 'pc_63', 'pc_64', 'pc_65', 'pc_66', 'pc_67', 'pc_68', 'pc_69', 'pc_70', 'pc_71', 'pc_72', 'pc_73', 'pc_74', 'pc_75', 'pc_76', 'pc_77', 'pc_78', 'pc_79', 'pc_80', 'pc_81', 'pc_82', 'pc_83', 'pc_84', 'pc_85', 'pc_86', 'pc_87', 'pc_88', 'pc_89', 'pc_90', 'pc_91', 'pc_92', 'pc_93', 'pc_94', 'pc_95', 'pc_96', 'pc_97', 'pc_98', 'pc_99', 'pc_100', 'pc_101', 'pc_102', 'pc_103', 'pc_104', 'pc_105', 'pc_106', 'pc_107', 'pc_108', 'pc_109', 'pc_110', 'pc_111', 'pc_112', 'pc_113', 'pc_114', 'pc_115', 'pc_116', 'pc_117', 'pc_118', 'pc_119', 'pc_120', 'pc_121', 'pc_122', 'pc_123', 'pc_124', 'pc_125', 'pc_126', 'pc_127', 'pc_128', 'pc_129', 'pc_130', 'pc_131', 'pc_132', 'pc_133', 'pc_134', 'pc_135', 'pc_136', 'pc_137', 'pc_138', 'pc_139', 'pc_140', 'pc_141', 'pc_142', 'pc_143', 'pc_144', 'pc_145', 'pc_146', 'pc_147', 'pc_148', 'pc_149', 'pc_150', 'pc_151', 'pc_152', 'pc_153', 'pc_154', 'pc_155', 'pc_156', 'pc_157', 'pc_158', 'pc_159', 'pc_160', 'pc_161', 'pc_162', 'pc_163', 'pc_164', 'pc_165', 'pc_166', 'pc_167', 'pc_168', 'pc_169', 'pc_170', 'pc_171', 'pc_172', 'pc_173', 'pc_174', 'pc_175', 'pc_176', 'pc_177', 'pc_178', 'pc_179', 'pc_180', 'pc_181', 'pc_182', 'pc_183', 'pc_184', 'pc_185', 'pc_186', 'pc_187', 'pc_188', 'pc_189', 'pc_190', 'pc_191', 'pc_192', 'pc_193', 'pc_194', 'pc_195', 'pc_196', 'pc_197', 'pc_198', 'pc_199', 'pc_200', 'genus1', 'genus2', 'genus3', 'genus4', 'genus5', 'genus6', 'genus7', 'genus8', 'genus9', 'genus10', 'genus11', 'genus12', 'genus13', 'genus14', 'network_surfarea1', 'network_surfarea2', 'network_surfarea3', 'network_surfarea4', 'network_surfarea5', 'network_surfarea6', 'network_surfarea7', 'network_surfarea8', 'network_surfarea9', 'network_surfarea10', 'network_surfarea11', 'network_surfarea12', 'network_surfarea13', 'network_surfarea14', 'network_surfarea15', 'network_surfarea16']
-(10613, 258)
-Covariate sets:   0%|          | 0/1 [00:00<?, ?it/s]
-Phenotype, PC combination counter: 0it [00:00, ?it/s][A
-Phenotype, PC combination counter: 1it [00:43, 43.72s/it][A
-Phenotype, PC combination counter: 2it [01:27, 44.03s/it][A
-Phenotype, PC combination counter: 3it [02:18, 47.10s/it][A
-Phenotype, PC combination counter: 4it [02:23, 30.25s/it][A
-Phenotype, PC combination counter: 5it [03:16, 38.63s/it][A
-Phenotype, PC combination counter: 6it [03:19, 26.59s/it][A
-Phenotype, PC combination counter: 7it [04:11, 34.65s/it][A
-Phenotype, PC combination counter: 8it [05:03, 40.21s/it][A
-Phenotype, PC combination counter: 9it [05:55, 44.08s/it][A
-Phenotype, PC combination counter: 10it [06:43, 45.28s/it][A
-Phenotype, PC combination counter: 11it [07:36, 47.49s/it][A
-Phenotype, PC combination counter: 12it [08:14, 44.61s/it][A
-Phenotype, PC combination counter: 13it [09:04, 46.27s/it][A
-Phenotype, PC combination counter: 14it [09:43, 44.25s/it][A
-Phenotype, PC combination counter: 15it [10:29, 44.53s/it][A
-Phenotype, PC combination counter: 16it [11:03, 41.59s/it][APhenotype, PC combination counter: 16it [11:03, 41.49s/it]
-Covariate sets: 100%|██████████| 1/1 [11:03<00:00, 663.90s/it]Covariate sets: 100%|██████████| 1/1 [11:03<00:00, 663.90s/it]
-/users/4/coffm049/software/bin/gcta64 --grm temp9165 --pheno temp9165_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp9165   --qcovar temp9165_Cont.txt  --covar temp9165_Discrete.txt 
-/users/4/coffm049/software/bin/gcta64 --grm temp9510 --pheno temp9510_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp9510   --qcovar temp9510_Cont.txt  --covar temp9510_Discrete.txt 
-/users/4/coffm049/software/bin/gcta64 --grm temp1717 --pheno temp1717_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp1717   --qcovar temp1717_Cont.txt  --covar temp1717_Discrete.txt 
-/users/4/coffm049/software/bin/gcta64 --grm temp1800 --pheno temp1800_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp1800   --qcovar temp1800_Cont.txt  --covar temp1800_Discrete.txt 
-/users/4/coffm049/software/bin/gcta64 --grm temp1800 --pheno temp1800_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp1800   --qcovar temp1800_Cont.txt  --covar temp1800_Discrete.txt  --reml-no-constrain --reml-maxit 200 --reml-priors 0.025 0.975
-/users/4/coffm049/software/bin/gcta64 --grm temp7843 --pheno temp7843_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp7843   --qcovar temp7843_Cont.txt  --covar temp7843_Discrete.txt 
-/users/4/coffm049/software/bin/gcta64 --grm temp7816 --pheno temp7816_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp7816   --qcovar temp7816_Cont.txt  --covar temp7816_Discrete.txt 
-/users/4/coffm049/software/bin/gcta64 --grm temp7816 --pheno temp7816_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp7816   --qcovar temp7816_Cont.txt  --covar temp7816_Discrete.txt  --reml-no-constrain --reml-maxit 200 --reml-priors 0.025 0.975
-/users/4/coffm049/software/bin/gcta64 --grm temp6418 --pheno temp6418_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp6418   --qcovar temp6418_Cont.txt  --covar temp6418_Discrete.txt 
-/users/4/coffm049/software/bin/gcta64 --grm temp7280 --pheno temp7280_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp7280   --qcovar temp7280_Cont.txt  --covar temp7280_Discrete.txt 
-/users/4/coffm049/software/bin/gcta64 --grm temp3394 --pheno temp3394_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp3394   --qcovar temp3394_Cont.txt  --covar temp3394_Discrete.txt 
-/users/4/coffm049/software/bin/gcta64 --grm temp6875 --pheno temp6875_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp6875   --qcovar temp6875_Cont.txt  --covar temp6875_Discrete.txt 
-/users/4/coffm049/software/bin/gcta64 --grm temp8255 --pheno temp8255_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp8255   --qcovar temp8255_Cont.txt  --covar temp8255_Discrete.txt 
-/users/4/coffm049/software/bin/gcta64 --grm temp5400 --pheno temp5400_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp5400   --qcovar temp5400_Cont.txt  --covar temp5400_Discrete.txt 
-/users/4/coffm049/software/bin/gcta64 --grm temp5323 --pheno temp5323_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp5323   --qcovar temp5323_Cont.txt  --covar temp5323_Discrete.txt 
-/users/4/coffm049/software/bin/gcta64 --grm temp9311 --pheno temp9311_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp9311   --qcovar temp9311_Cont.txt  --covar temp9311_Discrete.txt 
-/users/4/coffm049/software/bin/gcta64 --grm temp1598 --pheno temp1598_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp1598   --qcovar temp1598_Cont.txt  --covar temp1598_Discrete.txt 
-/users/4/coffm049/software/bin/gcta64 --grm temp4538 --pheno temp4538_pheno.txt --mpheno 1  --reml --reml-priors 0.05 0.95 --out temp4538   --qcovar temp4538_Cont.txt  --covar temp4538_Discrete.txt 

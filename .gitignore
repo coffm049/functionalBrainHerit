@@ -62,3 +62,9 @@ venv/
 __pycache__/
 *.pyc
 
+# SLURM job output logs
+slurm-*.out
+
+# Generated results (MASH/twin outputs, summary tables, brain viz)
+results/
+
