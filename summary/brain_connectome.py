@@ -129,44 +129,52 @@ def _brain_models(header):
     """Yield (structure, is_surface, vertex, voxel, vol_affine) for each brain
     model in a CIFTI dlabel, tolerating nibabel API differences.
 
-    Primary path: header.get_index_map(1).brain_models()  (Cifti2BrainModel list).
-    Fallback: BrainModelAxis.iter_structures() -> (structure, positions).
+    Strategy:
+    1. Reconstruct surface/volume blocks from the BrainModelAxis `nvertices`
+       count dict + the concatenated `vertex`/`voxel` arrays (attributes
+       confirmed present across nibabel versions; reliable for cortex-only
+       dlabels such as Gordon352 / probaConns80).
+    2. Fallback to header.get_index_map(1).brain_models() (canonical API).
     """
     ax = header.get_axis(1)
-    bms = []
-    try:
-        mim = header.get_index_map(1)
-        gen = getattr(mim, "brain_models", None)
-        if callable(gen):
-            bms = list(gen())
-        elif gen is not None:
-            bms = list(gen)
-    except Exception:
-        bms = []
-    if bms:
+    # Primary: nvertices + concatenated vertex/voxel arrays
+    nv = getattr(ax, "nvertices", None)
+    if nv:
         try:
-            for bm in bms:
-                s = str(bm.structure)
-                v = np.asarray(bm.vertex) if getattr(bm, "vertex", None) is not None else None
-                vx = np.asarray(bm.voxel) if getattr(bm, "voxel", None) is not None else None
-                aff = getattr(getattr(bm, "volume", None), "transform", None)
-                yield (s, s.startswith("CORTEX"), v, vx, aff)
+            nv = dict(nv)
+            vertex_arr = np.asarray(ax.vertex) if getattr(ax, "vertex", None) is not None else None
+            voxel_arr = np.asarray(ax.voxel) if getattr(ax, "voxel", None) is not None else None
+            pos_v = 0
+            pos_x = 0
+            for structure, count in nv.items():
+                s = str(structure)
+                c = int(count)
+                if s.startswith("CORTEX"):
+                    vertex = vertex_arr[pos_v:pos_v + c] if vertex_arr is not None else None
+                    yield (s, True, vertex, None, None)
+                    pos_v += c
+                else:
+                    voxel = voxel_arr[pos_x:pos_x + c] if voxel_arr is not None else None
+                    yield (s, False, None, voxel, None)
+                    pos_x += c
             return
         except Exception:
             pass
-    # Fallback: BrainModelAxis.iter_structures()
-    for structure, positions in ax.iter_structures():
-        s = str(structure)
-        is_surf = s.startswith("CORTEX")
-        if is_surf:
-            vertex = np.asarray(ax.vertex)[positions]
-            voxel = None
-            aff = None
-        else:
-            vertex = None
-            voxel = np.asarray(ax.voxel)[positions]
-            aff = getattr(ax, "affine", None)
-        yield (s, is_surf, vertex, voxel, aff)
+    # Fallback: canonical header-level brain-model list
+    try:
+        mim = header.get_index_map(1)
+        gen = getattr(mim, "brain_models", None)
+        bms = list(gen()) if callable(gen) else (list(gen) if gen is not None else [])
+        for bm in bms:
+            s = str(bm.structure)
+            v = np.asarray(bm.vertex) if getattr(bm, "vertex", None) is not None else None
+            vx = np.asarray(bm.voxel) if getattr(bm, "voxel", None) is not None else None
+            aff = getattr(getattr(bm, "volume", None), "transform", None)
+            yield (s, s.startswith("CORTEX"), v, vx, aff)
+        return
+    except Exception:
+        pass
+    raise RuntimeError("Could not extract brain models from CIFTI header")
 
 
 def derive_centroids(N, dlabel, surf_l, surf_r, wb_cmd):
