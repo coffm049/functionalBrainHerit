@@ -126,50 +126,41 @@ def dlabel_values(node_h2, dlabel, N):
 
 
 def read_network_csv(path, network_col=None):
-    """Return dict {dlabel_value(int): network_name(str)} from a CSV mapping
-    each dlabel value to a network name.
+    """Return dict {parcel_index(int): network_name(str)} from a CSV.
 
-    Layouts handled:
-      * explicit numeric key in the first column (1-based or 0-based) -> use it
-        as the key; the network name comes from --network-col (or a
-        'network'/'name' column, else the last column).
-      * otherwise the first column is the network name and rows are positional
-        (row i <-> dlabel value i+1).
+    Two layouts are auto-detected:
+      * network-per-row: each row is [network_name, parcel, parcel, ...]; every
+        numeric cell after the first is a parcel index belonging to that
+        network (the Gordon short-dictionary layout). The dlabel value
+        (parcel index) maps to the network name.
+      * parcel-per-row: one row per parcel; the first column is the network
+        name and rows are positional (row i <-> parcel i+1).
     """
-    df = pd.read_csv(path)
-    cols = list(df.columns)
-    first = df.iloc[:, 0]
-    is_num = pd.api.types.is_numeric_dtype(first)
-
-    if is_num:
-        key_vals = first.to_numpy()
-        if network_col is None:
-            non_key = [c for c in cols if c != cols[0]]
-            if "network" in non_key:
-                network_col = "network"
-            elif "name" in non_key:
-                network_col = "name"
-            else:
-                network_col = non_key[-1] if non_key else cols[0]
-        net_vals = df[network_col].astype(str).to_numpy()
-        result = {}
-        n = len(df)
-        uniq = set(int(k) for k in key_vals)
-        if uniq == set(range(1, n + 1)):
-            for k, nv in zip(key_vals, net_vals):
-                result[int(k)] = nv
-        elif uniq == set(range(0, n)):
-            for k, nv in zip(key_vals, net_vals):
-                result[int(k) + 1] = nv
-        else:
-            for i, nv in enumerate(net_vals):
-                result[int(key_vals[i])] = nv
-        return result
-
-    # non-numeric first column -> positional, name = first (or chosen) column
-    name_col = network_col if network_col else cols[0]
-    net_vals = df[name_col].astype(str).to_numpy()
-    return {i + 1: nv for i, nv in enumerate(net_vals)}
+    df = pd.read_csv(path, header=None)
+    name_col = 0 if network_col is None else int(network_col)
+    net_by_value = {}
+    total_parcels = 0
+    for _, row in df.iterrows():
+        cells = list(row.values)
+        if not cells:
+            continue
+        name = str(cells[name_col]) if name_col < len(cells) else str(cells[0])
+        parcels = []
+        for c in cells[name_col + 1:]:
+            try:
+                parcels.append(int(float(c)))
+            except (ValueError, TypeError):
+                pass
+        for p in parcels:
+            net_by_value[p] = name
+        total_parcels += len(parcels)
+    if total_parcels == 0:
+        # parcel-per-row positional fallback (no parcel lists found)
+        for i, row in df.iterrows():
+            cells = list(row.values)
+            if cells:
+                net_by_value[i + 1] = str(cells[0])
+    return net_by_value
 
 
 def dlabel_networks(dlabel, N, csv_path=None):
@@ -237,6 +228,19 @@ def dlabel_network_values(dlabel, N, net_id):
 # --------------------------------------------------------------------------
 # plotting
 # --------------------------------------------------------------------------
+def _network_palette(net_names):
+    """Shared discrete palette so the chord diagram and the surface use
+    identical network colours. Returns (ListedColormap, {network: rgba})."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.colors as mcolors
+    import matplotlib.pyplot as plt
+    base = plt.get_cmap("tab20").colors
+    color_of = {net: base[i % len(base)] for i, net in enumerate(net_names)}
+    cmap = mcolors.ListedColormap([color_of[n] for n in net_names])
+    return cmap, color_of
+
+
 def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     # val_left/right are per-vertex h2 value arrays (NaN = unassigned/background),
     # one per hemisphere, length == gifti vertex count for that hemisphere.
@@ -277,10 +281,11 @@ def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
         print(f"  [{tag}] surface WARNING: no finite values")
 
 
-def plot_circular(M, outdir, tag, h2_thr=0.35, networks=None):
+def plot_circular(M, outdir, tag, h2_thr=0.35, networks=None, net_names=None):
     """Circular (chord-style) connectome: nodes evenly spaced on a ring, edges
     drawn for h2 > h2_thr (positive only). When `networks` (array of network
-    labels, one per node) is given, nodes are grouped and coloured by network.
+    labels, one per node) is given, nodes are grouped and coloured by network
+    using `net_names` so colours match the surface topography plot.
     """
     import matplotlib
     matplotlib.use("Agg")
@@ -310,15 +315,13 @@ def plot_circular(M, outdir, tag, h2_thr=0.35, networks=None):
         ax.plot([xy[pa, 0], xy[pb, 0]], [xy[pa, 1], xy[pb, 1]],
                 color="red", alpha=0.25, linewidth=0.4)
 
-    if net_ordered is not None:
-        uniq = list(dict.fromkeys(net_ordered.tolist()))
-        cmap = plt.get_cmap("tab20")
-        net_color = {net: cmap(i % 20) for i, net in enumerate(uniq)}
-        node_colors = [net_color[net_ordered[i]] for i in range(N)]
+    if net_ordered is not None and net_names is not None:
+        _, color_of = _network_palette(net_names)
+        node_colors = [color_of[net_ordered[i]] for i in range(N)]
         ax.scatter(xy[:, 0], xy[:, 1], s=20, c=node_colors, zorder=5,
                    edgecolors="black", linewidths=0.3)
         handles = [plt.Line2D([0], [0], marker="o", linestyle="",
-                              color=net_color[net], label=net) for net in uniq]
+                              color=color_of[net], label=net) for net in net_names]
         ax.legend(handles=handles, loc="center left",
                   bbox_to_anchor=(1.02, 0.5), fontsize=7, frameon=False)
     else:
@@ -327,8 +330,8 @@ def plot_circular(M, outdir, tag, h2_thr=0.35, networks=None):
     ax.set_aspect("equal")
     ax.axis("off")
     title = f"{tag} circular (h2>{h2_thr}, {n_edges} edges)"
-    if net_ordered is not None:
-        title += f", {len(uniq)} networks"
+    if net_ordered is not None and net_names is not None:
+        title += f", {len(net_names)} networks"
     ax.set_title(title)
     png = os.path.join(outdir, f"{tag}_circular.png")
     fig.savefig(png, dpi=150, bbox_inches="tight")
@@ -346,19 +349,18 @@ def plot_surface_networks(net_left, net_right, net_names, surf_l, surf_r,
     if not sides:
         return
     K = len(net_names)
-    cmap = plt.get_cmap("tab20")
+    cmap, color_of = _network_palette(net_names)
     png = os.path.join(outdir, f"{tag}_networks_surface.png")
     try:
         fig = plt.figure(figsize=(6 * len(sides), 5))
         for i, (name, surf, val) in enumerate(sides, start=1):
             ax = fig.add_subplot(1, len(sides), i, projection="3d")
             niplot.plot_surf_stat_map(surf, val, hemi=name, axes=ax, figure=fig,
-                                      cmap="tab20", colorbar=False, threshold=None,
+                                      cmap=cmap, colorbar=False, threshold=None,
                                       vmin=0.0, vmax=max(K - 1, 1),
                                       title=f"{tag} networks ({name})")
         handles = [plt.Line2D([0], [0], marker="o", linestyle="",
-                              color=cmap(i / max(K - 1, 1)), label=net_names[i])
-                   for i in range(K)]
+                              color=color_of[net], label=net) for net in net_names]
         fig.legend(handles=handles, loc="lower center", ncol=4, fontsize=7,
                    frameon=False)
         fig.savefig(png, dpi=150, bbox_inches="tight")
@@ -367,7 +369,7 @@ def plot_surface_networks(net_left, net_right, net_names, surf_l, surf_r,
     except Exception:
         for name, surf, val in sides:
             sp = os.path.join(outdir, f"{tag}_networks_surface_{name}.png")
-            niplot.plot_surf_stat_map(surf, val, hemi=name, cmap="tab20",
+            niplot.plot_surf_stat_map(surf, val, hemi=name, cmap=cmap,
                                       colorbar=False, threshold=None,
                                       vmin=0.0, vmax=max(K - 1, 1),
                                       title=f"{tag} networks ({name})",
@@ -459,7 +461,7 @@ def main():
     # ---- circular connectome (h2 > 0.35, grouped by network) -------------
     for method, M in matrices.items():
         plot_circular(M, args.outdir, f"{atlas}_{method}",
-                      h2_thr=0.35, networks=networks)
+                      h2_thr=0.35, networks=networks, net_names=net_names)
 
     print("Done. Outputs in", args.outdir)
 
