@@ -140,7 +140,6 @@ def dlabel_values(node_h2, dlabel, N):
 # --------------------------------------------------------------------------
 def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     # val_left/right are per-vertex h2 value arrays (NaN = unassigned/background).
-    # Both hemispheres are drawn in a single figure when available.
     vmax = max(float(vmax) if np.isfinite(vmax) else 1e-6, 1e-6)
     surfs, vals = [], []
     if surf_l is not None and val_left is not None:
@@ -151,10 +150,25 @@ def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
         vals.append(val_right)
     if not surfs:
         return
-    png = os.path.join(outdir, f"{tag}_surface.png")
-    niplot.plot_surf_stat_map(surfs, vals, title=tag, output_file=png,
-                              cmap="coolwarm", colorbar=True, threshold=None,
-                              vmin=0.0, vmax=vmax)
+    # Prefer one figure with both hemispheres; fall back to separate L/R PNGs
+    # if this nilearn version does not accept list inputs.
+    try:
+        png = os.path.join(outdir, f"{tag}_surface.png")
+        niplot.plot_surf_stat_map(surfs, vals, title=tag, output_file=png,
+                                  cmap="coolwarm", colorbar=True, threshold=None,
+                                  vmin=0.0, vmax=vmax)
+        print(f"  wrote {png}")
+    except (ValueError, TypeError):
+        for name, surf, val in (("left", surf_l, val_left),
+                                ("right", surf_r, val_right)):
+            if surf is None or val is None:
+                continue
+            png = os.path.join(outdir, f"{tag}_surface_{name}.png")
+            niplot.plot_surf_stat_map(surf, val, title=f"{tag} ({name})",
+                                      output_file=png, cmap="coolwarm",
+                                      colorbar=True, threshold=None,
+                                      vmin=0.0, vmax=vmax)
+            print(f"  wrote {png}")
     assigned = int(sum(np.count_nonzero(~np.isnan(v)) for v in vals))
     if assigned:
         allv = np.concatenate([v[~np.isnan(v)] for v in vals])
@@ -162,7 +176,6 @@ def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
               f"min={np.nanmin(allv):.3f} max={np.nanmax(allv):.3f}")
     else:
         print(f"  [{tag}] surface WARNING: no finite values")
-    print(f"  wrote {png}")
 
 
 def plot_circular(M, outdir, tag, h2_thr=0.3):
