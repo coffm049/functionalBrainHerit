@@ -79,8 +79,10 @@ def dlabel_values(node_h2, dlabel, N):
 
         vertex_scalar_map[label_data == region] = value
 
-    i.e. build the full greyordinate map from the dlabel's label array, then
-    split it into left/right hemisphere textures via the BrainModelAxis.
+    Build the full greyordinate map from the dlabel's label array, then split
+    it into left/right hemisphere textures via the BrainModelAxis vertex
+    indices (ax.vertex is the concatenated within-structure vertex array, in
+    greyordinate order; ax.nvertices gives the per-structure counts).
     """
     img = nib.load(dlabel)
     label_data = np.asarray(img.get_fdata()).astype(int).ravel()
@@ -93,44 +95,32 @@ def dlabel_values(node_h2, dlabel, N):
             full[label_data == p] = val
 
     ax = img.header.get_axis(1)
+    va = getattr(ax, "vertex", None)
+    if va is None:
+        raise ValueError("dlabel BrainModelAxis has no vertex array")
+    va = np.asarray(va, dtype=int)
+    if len(va) != len(full):
+        raise ValueError(
+            f"dlabel vertex length ({len(va)}) != greyordinate count "
+            f"({len(full)}); only cortex-only dlabels are supported"
+        )
+    nv = getattr(ax, "nvertices", {}) or {}
+
     tex_left = tex_right = None
-
-    # Canonical API: iter_structures() yields (structure, slice, brainmodel),
-    # with `slice` already positioned correctly in the greyordinate array
-    # (handles subcortical voxels without desyncing the surface vertices).
-    try:
-        for structure, slc, bm in ax.iter_structures():
-            s = str(structure).upper()
-            v = getattr(bm, "vertex", None)
-            if v is None:
-                continue
-            v = np.asarray(v)
-            if "LEFT" in s:
-                tex_left = np.full(int(np.max(v)) + 1, np.nan)
-                tex_left[v] = full[slc]
-            elif "RIGHT" in s:
-                tex_right = np.full(int(np.max(v)) + 1, np.nan)
-                tex_right[v] = full[slc]
-        if tex_left is not None or tex_right is not None:
-            return tex_left, tex_right
-    except Exception as e:
-        print(f"  [dlabel] iter_structures failed ({e}); using nvertices fallback")
-
-    # Fallback (cortex-only dlabels): nvertices dict + concatenated vertex array.
-    nv = dict(getattr(ax, "nvertices", {}) or {})
-    va = np.asarray(ax.vertex) if getattr(ax, "vertex", None) is not None else None
     pos = 0
     for structure, count in nv.items():
         s = str(structure).upper()
         c = int(count)
-        if "LEFT" in s and va is not None:
-            blk = va[pos:pos + c]
-            tex_left = np.full(int(np.max(blk)) + 1, np.nan)
-            tex_left[blk] = full[pos:pos + c]
-        elif "RIGHT" in s and va is not None:
-            blk = va[pos:pos + c]
-            tex_right = np.full(int(np.max(blk)) + 1, np.nan)
-            tex_right[blk] = full[pos:pos + c]
+        if c == 0:
+            continue
+        blk = va[pos:pos + c]
+        seg = full[pos:pos + c]
+        if "LEFT" in s:
+            tex_left = np.full(int(blk.max()) + 1, np.nan)
+            tex_left[blk] = seg
+        elif "RIGHT" in s:
+            tex_right = np.full(int(blk.max()) + 1, np.nan)
+            tex_right[blk] = seg
         pos += c
     return tex_left, tex_right
 
