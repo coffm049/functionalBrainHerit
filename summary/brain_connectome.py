@@ -91,14 +91,65 @@ def node_summary(M, pct):
 # dlabel -> per-structure vertex->label, and parcel centroids
 # --------------------------------------------------------------------------
 def load_surf(path):
-    coords, faces = nib.load(path).agg_data()
-    return np.asarray(coords, dtype=float), np.asarray(faces)
+    img = nib.load(path)
+    if hasattr(img, "darrays"):  # GiftiImage: select arrays by intent
+        coords = faces = None
+        for da in img.darrays:
+            if da.intent == "NIFTI_INTENT_POINTSET":
+                coords = np.asarray(da.data, dtype=float)
+            elif da.intent == "NIFTI_INTENT_TRIANGLE":
+                faces = np.asarray(da.data, dtype=int)
+        if coords is None:
+            raise ValueError(f"{path}: no POINTSET array found (not a surface mesh?)")
+        if faces is None:
+            faces = np.zeros((0, 0), dtype=int)
+        return coords, faces
+    data = img.agg_data()  # non-gifti fallback
+    if isinstance(data, tuple):
+        coords = data[0]
+        faces = data[1] if len(data) > 1 else np.zeros((0, 0), dtype=int)
+    else:
+        coords, faces = np.asarray(data, dtype=float), np.zeros((0, 0), dtype=int)
+    return np.asarray(coords, dtype=float), np.asarray(faces, dtype=int)
 
 
 def vertex_mni(surf, wb_cmd):
     out = tempfile.NamedTemporaryFile(suffix=".gii", delete=False).name
     subprocess.run([wb_cmd, "-surface-coordinates-to-mni", surf, out], check=True)
     return np.asarray(nib.load(out).agg_data()[0], dtype=float)
+
+
+def _brain_models(bm_axis):
+    """Yield (structure, is_surface, vertex, voxel, vol_affine) for each brain
+    model in a CIFTI BrainModelAxis, tolerating nibabel API differences
+    (iter_brain_models / brain_models may be absent in some versions)."""
+    if hasattr(bm_axis, "brain_models"):                 # list of Cifti2BrainModel
+        for bm in bm_axis.brain_models:
+            s = str(bm.structure)
+            v = np.asarray(bm.vertex) if getattr(bm, "vertex", None) is not None else None
+            vx = np.asarray(bm.voxel) if getattr(bm, "voxel", None) is not None else None
+            aff = getattr(getattr(bm, "volume", None), "transform", None)
+            yield (s, s.startswith("CORTEX"), v, vx, aff)
+        return
+    # fallback: contiguous-segment parse of the stable array attributes
+    structs = [str(s) for s in np.asarray(bm_axis.structure)]
+    verts = np.asarray(bm_axis.vertex)
+    voxs = np.asarray(bm_axis.voxel) if getattr(bm_axis, "voxel", None) is not None else None
+    volaff = getattr(getattr(bm_axis, "volume", None), "transform", None)
+    segs = []
+    prev, start = None, 0
+    for i, s in enumerate(structs):
+        if s != prev:
+            if prev is not None:
+                segs.append((prev, start, i))
+            prev, start = s, i
+    segs.append((prev, start, len(structs)))
+    for s, a, b in segs:
+        is_surf = s.startswith("CORTEX")
+        yield (s, is_surf,
+               (verts[a:b] if is_surf else None),
+               (voxs[a:b] if (voxs is not None and not is_surf) else None),
+               (volaff if not is_surf else None))
 
 
 def derive_centroids(N, dlabel, surf_l, surf_r, wb_cmd):
@@ -112,25 +163,19 @@ def derive_centroids(N, dlabel, surf_l, surf_r, wb_cmd):
     if surf_r:
         vtx_mni["CORTEX_RIGHT"] = vertex_mni(surf_r, wb_cmd)
 
-    vol_affine = None
-    for bm in bm_axis.iter_brain_models():
-        if not bm.structure.startswith("CORTEX") and getattr(bm, "volume", None) is not None:
-            vol_affine = bm.volume.transform
-            break
-
     acc = defaultdict(list)
     offset = 0
-    for bm in bm_axis.iter_brain_models():
-        n = len(bm.vertex) if bm.structure.startswith("CORTEX") else len(bm.voxel)
+    for structure, is_surface, vertex, voxel, vol_affine in _brain_models(bm_axis):
+        n = len(vertex) if is_surface else (len(voxel) if voxel is not None else 0)
         elem = data[offset:offset + n]
-        if bm.structure.startswith("CORTEX"):
-            mni = vtx_mni.get(bm.structure)
+        if is_surface:
+            mni = vtx_mni.get(structure)
             if mni is not None:
-                for li, v in zip(elem, bm.vertex):
+                for li, v in zip(elem, vertex):
                     acc[int(li)].append(mni[v])
         else:
-            if vol_affine is not None:
-                for li, vv in zip(elem, bm.voxel):
+            if vol_affine is not None and voxel is not None:
+                for li, vv in zip(elem, voxel):
                     acc[int(li)].append(apply_affine(vol_affine, vv))
         offset += n
 
@@ -168,26 +213,26 @@ def dlabel_parcel_maps(N, dlabel, n_left=None, n_right=None):
     # learn surface vertex counts if not supplied
     if n_left is None:
         n_left = 0
-        for bm in bm_axis.iter_brain_models():
-            if bm.structure == "CORTEX_LEFT":
-                n_left = max(n_left, int(bm.vertex.max()) + 1)
+        for structure, is_surface, vertex, voxel, _ in _brain_models(bm_axis):
+            if structure == "CORTEX_LEFT" and vertex is not None:
+                n_left = max(n_left, int(np.max(vertex)) + 1)
     if n_right is None:
         n_right = 0
-        for bm in bm_axis.iter_brain_models():
-            if bm.structure == "CORTEX_RIGHT":
-                n_right = max(n_right, int(bm.vertex.max()) + 1)
+        for structure, is_surface, vertex, voxel, _ in _brain_models(bm_axis):
+            if structure == "CORTEX_RIGHT" and vertex is not None:
+                n_right = max(n_right, int(np.max(vertex)) + 1)
 
     tex_left = np.full(n_left, np.nan)
     tex_right = np.full(n_right, np.nan)
 
     offset = 0
-    for bm in bm_axis.iter_brain_models():
-        n = len(bm.vertex) if bm.structure.startswith("CORTEX") else len(bm.voxel)
+    for structure, is_surface, vertex, voxel, _ in _brain_models(bm_axis):
+        n = len(vertex) if is_surface else (len(voxel) if voxel is not None else 0)
         elem = data[offset:offset + n]
-        if bm.structure == "CORTEX_LEFT":
-            tex_left[bm.vertex] = elem - off
-        elif bm.structure == "CORTEX_RIGHT":
-            tex_right[bm.vertex] = elem - off
+        if structure == "CORTEX_LEFT":
+            tex_left[vertex] = elem - off
+        elif structure == "CORTEX_RIGHT":
+            tex_right[vertex] = elem - off
         offset += n
     return tex_left, tex_right, off
 

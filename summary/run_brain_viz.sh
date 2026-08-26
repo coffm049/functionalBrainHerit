@@ -22,13 +22,10 @@ fi
 
 VENV="$ROOT/.venv"
 
-# Use the conda-base interpreter at ~/miniconda3 as the base python.
+# The project .venv is self-contained (its own python + nilearn), so we do NOT
+# `conda activate base` here: under `set -u` that crashed on the inherited gdc
+# env's deactivate.d scripts (CONDA_BACKUP_* unbound). Rscript is on PATH.
 CONDA_ROOT="$HOME/miniconda3"
-if [ -f "$CONDA_ROOT/etc/profile.d/conda.sh" ]; then
-  # shellcheck disable=SC1091
-  source "$CONDA_ROOT/etc/profile.d/conda.sh"
-  conda activate base
-fi
 
 if [ ! -f "$VENV/bin/activate" ]; then
   echo "ERROR: venv not found at $VENV" >&2
