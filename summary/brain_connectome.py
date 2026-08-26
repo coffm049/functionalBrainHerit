@@ -2,7 +2,7 @@
 """Brain-space visualization of edge heritability (h2) from MASH / twin estimates.
 
 Reads results/summary/mash_twin_wide.csv (produced by compare_mash_twin.R) and,
-for each atlas (gordon 352, probaConns 80) and method (twin, AdjHE, GCTA),
+for each atlas (gordon 352, probaConns 80) and method (twin, AdjHE),
 reconstructs the N x N h2 pconn (via np.triu_indices) and produces:
 
   (A) a cortical-surface NODE-SUMMARY plot (nilearn view_surf / plot_surf_stat_map)
@@ -57,10 +57,6 @@ def column_for(atlas, method):
         return f"h2_{atlas}_AdjHE_RE"
     if m == "adjhe_fe":
         return f"h2_{atlas}_AdjHE_FE"
-    if m == "gcta":
-        return f"h2_{atlas}_GCTA"
-    if m == "hereg":
-        return f"h2_{atlas}_HEREG"
     raise ValueError(f"unknown method token: {method}")
 
 
@@ -253,7 +249,7 @@ def main():
     ap.add_argument("--wb-command", default="wb_command",
                     help="wb_command binary (for centroid derivation)")
     ap.add_argument("--methods", nargs="+", default=["twin", "AdjHE"],
-                    help="twin | AdjHE | AdjHE_FE | GCTA")
+                    help="twin | AdjHE | AdjHE_FE")
     ap.add_argument("--node-pct", type=float, default=90,
                     help="percentile for node summary (default 90)")
     ap.add_argument("--edge-pct", type=float, default=90,
