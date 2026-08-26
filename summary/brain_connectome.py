@@ -32,12 +32,14 @@ import nilearn.plotting as niplot
 # --------------------------------------------------------------------------
 def column_for(atlas, method):
     m = method.lower()
+    # Set label is "probaConns" but the wide-CSV column prefix is "proba".
+    prefix = "proba" if atlas.lower().startswith("proba") else atlas.lower()
     if m == "twin":
         return "Twin_h2"
-    if m == "adjhe":
-        return f"h2_{atlas}_AdjHE_RE"
+    if m in ("adjhe", "adjhe_re"):
+        return f"h2_{prefix}_AdjHE_RE"
     if m == "adjhe_fe":
-        return f"h2_{atlas}_AdjHE_FE"
+        return f"h2_{prefix}_AdjHE_FE"
     raise ValueError(f"unknown method token: {method}")
 
 
@@ -49,10 +51,10 @@ def rebuild_pconn(phenos, edge_h2, N):
     for ii, p in enumerate(phenos):
         s = str(p)
         k[ii] = int(s[1:]) if s.startswith("o") else int(s)  # "o123" -> 123
-    M = np.full((N, N), np.nan)
+    M = np.zeros((N, N))
     i, j = np.triu_indices(N, 1)
     M[i[k], j[k]] = edge_h2
-    M = M + M.T
+    M[j[k], i[k]] = edge_h2
     np.fill_diagonal(M, np.nan)
     return M
 
@@ -153,11 +155,10 @@ def _brain_models(header):
 
 
 def dlabel_parcel_maps(N, dlabel, n_left=None, n_right=None):
-    """Return (tex_left, tex_right, offset) holding the parcel index per vertex."""
+    """Return (tex_left, tex_right): per-vertex parcel index (0-based), with
+    background / unassigned vertices set to NaN."""
     img = nib.load(dlabel)
-    data = img.get_fdata().astype(int).ravel()
-
-    off = 1 if (int(data.max()) == N) else 0  # 1-based label tables
+    data = np.asarray(img.get_fdata()).astype(int).ravel()
 
     # learn surface vertex counts if not supplied
     if n_left is None:
@@ -177,13 +178,22 @@ def dlabel_parcel_maps(N, dlabel, n_left=None, n_right=None):
     offset = 0
     for structure, is_surface, vertex, voxel, _ in _brain_models(img.header):
         n = len(vertex) if is_surface else (len(voxel) if voxel is not None else 0)
-        elem = data[offset:offset + n]
+        if vertex is None:
+            offset += n
+            continue
+        lab = data[offset:offset + n].astype(int)
+        # CIFTI dlabels: 0 = background/unknown; real parcels are 1..N (1-based).
+        parcel = np.where(lab <= 0, -1, lab - 1)
+        parcel = np.where((parcel >= 0) & (parcel < N), parcel, -1)
+        pmap = np.full(lab.shape, np.nan, dtype=float)
+        ok = parcel >= 0
+        pmap[ok] = parcel[ok]
         if structure == "CORTEX_LEFT":
-            tex_left[vertex] = elem - off
+            tex_left[vertex] = pmap
         elif structure == "CORTEX_RIGHT":
-            tex_right[vertex] = elem - off
+            tex_right[vertex] = pmap
         offset += n
-    return tex_left, tex_right, off
+    return tex_left, tex_right
 
 
 # --------------------------------------------------------------------------
@@ -198,21 +208,25 @@ def plot_surface(node_h2, surf_l, surf_r, tex_left, tex_right, outdir, tag, vmin
         val = np.full(tex.shape, np.nan, dtype=float)
         valid = ~np.isnan(tex)
         if valid.any():
-            val[valid] = node_h2[tex[valid].astype(int)]
-        assigned = int(valid.sum())
-        nz = int(np.count_nonzero(~np.isnan(val)))
+            idx = tex[valid].astype(int)
+            idx = idx[(idx >= 0) & (idx < len(node_h2))]
+            if idx.size:
+                val[valid] = node_h2[idx]
+        assigned = int(np.count_nonzero(~np.isnan(val)))
+        nz = assigned
         if nz:
             print(f"  [{tag}] surface assigned={assigned} val "
-                  f"min={np.nanmin(val):.3f} max={np.nanmax(val):.3f} nonzero={nz}")
+                  f"min={np.nanmin(val):.3f} max={np.nanmax(val):.3f}")
         else:
             print(f"  [{tag}] surface WARNING: no finite values "
-                  f"(assigned={assigned}, node_h2 range "
-                  f"{np.nanmin(node_h2):.3f}..{np.nanmax(node_h2):.3f})")
+                  f"(node_h2 range {np.nanmin(node_h2):.3f}..{np.nanmax(node_h2):.3f})")
         return val
 
     val_l = to_val(tex_left)
     val_r = to_val(tex_right)
     # h2 is non-negative (heritability); use 0..vmax so variation is visible.
+    vmax = vmax if (np.isfinite(vmax) and np.isfinite(vmax)) else 1e-6
+    vmax = max(float(vmax), 1e-6)
     for side, (surf, val) in enumerate([(surf_l, val_l), (surf_r, val_r)]):
         if surf is None or val is None:
             continue
@@ -253,6 +267,24 @@ def plot_circular(M, outdir, tag, h2_thr=0.3):
     print(f"  wrote {png}")
 
 
+def write_dscalar(node_h2, dlabel, outdir, tag, N):
+    """Write a CIFTI dscalar (parcel value per greyordinate) built from the
+    dlabel's own BrainModelAxis + a fresh ScalarAxis. No wb_command needed."""
+    img = nib.load(dlabel)
+    labels = np.asarray(img.get_fdata()).astype(int).ravel()
+    ax1 = img.header.get_axis(1)
+    ax0 = nib.cifti2.ScalarAxis(["herit"])
+    hdr = nib.cifti2.Cifti2Header.from_axes((ax0, ax1))
+    vsm = np.zeros(img.shape, dtype=float)
+    for p in range(1, N + 1):
+        val = node_h2[p - 1]
+        if np.isfinite(val):
+            vsm[0, labels == p] = val
+    out = os.path.join(outdir, f"{tag}.dscalar.nii")
+    nib.save(nib.cifti2.Cifti2Image(vsm, header=hdr), out)
+    print(f"  wrote {out}")
+
+
 # --------------------------------------------------------------------------
 # main
 # --------------------------------------------------------------------------
@@ -267,6 +299,8 @@ def main():
     ap.add_argument("--surf-r", help="fsLR right white/gray gifti surface")
     ap.add_argument("--node-pct", type=float, default=90,
                     help="percentile for node summary (default 90)")
+    ap.add_argument("--write-dscalar", action="store_true",
+                    help="also write a CIFTI .dscalar.nii per method (no wb_command needed)")
     ap.add_argument("--outdir", default="results/summary/brain")
     args = ap.parse_args()
 
@@ -288,7 +322,7 @@ def main():
             sys.exit("--dlabel is required for the surface view")
         Vl = load_surf(surf_l)[0].shape[0] if surf_l else None
         Vr = load_surf(surf_r)[0].shape[0] if surf_r else None
-        tex_left, tex_right, _ = dlabel_parcel_maps(N, args.dlabel, Vl, Vr)
+        tex_left, tex_right = dlabel_parcel_maps(N, args.dlabel, Vl, Vr)
         if tex_left is not None:
             aL = int(np.count_nonzero(~np.isnan(tex_left)))
             aR = int(np.count_nonzero(~np.isnan(tex_right))) if tex_right is not None else 0
@@ -321,6 +355,9 @@ def main():
         for method, node_h2 in node_vals.items():
             plot_surface(node_h2, surf_l, surf_r, tex_left, tex_right,
                          args.outdir, f"{atlas}_{method}", 0.0, vmax)
+            if args.write_dscalar and args.dlabel:
+                write_dscalar(node_h2, args.dlabel, args.outdir,
+                              f"{atlas}_{method}", N)
 
     # ---- circular connectome (|h2| > 0.3) --------------------------------
     for method, M in matrices.items():

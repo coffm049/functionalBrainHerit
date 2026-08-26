@@ -14,12 +14,12 @@ networks = Dict(
   0 => nothing, 1 => "DMN", 2 => "VIS", 3 => "FP", 4 => nothing, 5 => "DAN", 
   6=>nothing, 7 => "VAN", 8 => "SAL", 9 => "CO", 10 => "SMD", 11 => "SML", 12 => "AUD", 13 => "Tpole", 14 => "MTL", 15 => "PMN", 16 => "PON")
 
-GordonbrainL = GIFTI.load("brainTemplate/Conte69.L.inflated.32k_fs_LR.surf.gii")
+GordonbrainL = GIFTI.load("/users/4/coffm049/papers/brainTemplates/Conte69.L.inflated.32k_fs_LR.surf.gii")
 GordonbrainLref = deepcopy(GordonbrainL)
-GordonbrainR = GIFTI.load("brainTemplate/Conte69.R.inflated.32k_fs_LR.surf.gii")
-Gordonsnp = CIFTI.load("formattedData/roiMedianHeritGordon_GCTAHeatMap.dscalar.nii")[R]
+GordonbrainR = GIFTI.load("/users/4/coffm049/papers/brainTemplates/Conte69.R.inflated.32k_fs_LR.surf.gii")
+Gordonsnp = CIFTI.load("formattedData/roiMedianHeritGordon_AdjHE_REHeatMap.dscalar.nii")[R]
 Gordontwin = CIFTI.load("formattedData/roiMedianHeritGordon_twinHeatMap.dscalar.nii")[L]
-PFNsnp = CIFTI.load("formattedData/roiMedianHeritPFN_GCTAHeatMap.dscalar.nii")[L]
+PFNsnp = CIFTI.load("formattedData/roiMedianHeritPFN_AdjHE_REHeatMap.dscalar.nii")[L]
 PFNtwin = CIFTI.load("formattedData/roiMedianHeritPFN_twinHeatMap.dscalar.nii")[L]
 θl = -3π / 4  # 45 degrees
 rotZr = [cos(θl) -sin(θl) 0;
@@ -32,9 +32,9 @@ rotZl = [cos(θr) -sin(θr) 0;
 GordonbrainL.position.parent.parent .= (rotZl * GordonbrainL.position.parent.parent)
 GordonbrainR.position.parent.parent .= (rotZr * GordonbrainR.position.parent.parent)
 
-Label = CIFTI.load("brainTemplate/abcd_template_matching_combined_clusters_thresh0.75.dlabel.nii")
+Label = CIFTI.load("/projects/standard/faird/shared/data/Probabilitic_network_ROIs_small_package/ABCD/combined_clusters/combined_clusters_thresh0.8.dlabel.nii")
 colors = convert.(Int, Label.data)
-roiMap = CSV.read("brainTemplate/GRP1_template_parcel.csv", DataFrame)
+roiMap = CSV.read("/users/4/coffm049/papers/brainTemplates/GRP1_template_parcel.csv", DataFrame)
 roilab = map(x -> x==0 ? 0 : roiMap[x, :region], colors)
 # convert the colors vector to strings using the networks dictionary 
 category_colors = [get(ColorSchemes.rainbow1, i / length(unique(colors))) for i in 1:length(unique(roilab))]  # 4 unique categories
@@ -123,4 +123,4 @@ save("makieBrain.png", f)
 # save colorlab object as a new CIFTI file
 colorlab = map(x -> networks[x], roilab)
 
-CIFTI.save("formattedData/networkSurfLabels.dlabel.nii", roilab; template = "brainTemplate/abcd_template_matching_combined_clusters_thresh0.75.dlabel.nii")
+CIFTI.save("formattedData/networkSurfLabels.dlabel.nii", roilab; template = "/projects/standard/faird/shared/data/Probabilitic_network_ROIs_small_package/ABCD/combined_clusters/combined_clusters_thresh0.8.dlabel.nii")
