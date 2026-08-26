@@ -95,12 +95,18 @@ def load_surf(path):
     if hasattr(img, "darrays"):  # GiftiImage: select arrays by intent
         coords = faces = None
         for da in img.darrays:
-            if da.intent == "NIFTI_INTENT_POINTSET":
+            it = da.intent
+            is_point = it in ("NIFTI_INTENT_POINTSET", "POINTSET", 1008)
+            is_tri = it in ("NIFTI_INTENT_TRIANGLE", "TRIANGLE", 1009)
+            if is_point:
                 coords = np.asarray(da.data, dtype=float)
-            elif da.intent == "NIFTI_INTENT_TRIANGLE":
+            elif is_tri:
                 faces = np.asarray(da.data, dtype=int)
-        if coords is None:
-            raise ValueError(f"{path}: no POINTSET array found (not a surface mesh?)")
+        if coords is None:  # fallback: standard surface order (first=verts, second=tris)
+            arrs = [np.asarray(da.data) for da in img.darrays]
+            if arrs:
+                coords = arrs[0].astype(float)
+                faces = arrs[1].astype(int) if len(arrs) > 1 else np.zeros((0, 0), int)
         if faces is None:
             faces = np.zeros((0, 0), dtype=int)
         return coords, faces
