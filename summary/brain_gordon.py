@@ -24,7 +24,7 @@ import nilearn.plotting as niplot
 # --------------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parents[1]
 WIDE = ROOT / "results/summary/mash_twin_wide.csv"
-DLABEL = Path("/users/4/coffm049/papers/brainTemplates/Gordon.networks.32k_fs_LR.dlabel.nii")
+DLABEL = Path("/users/4/coffm049/papers/brainTemplates/Gordon.subcortical.32k_fs_LR.dlabel.nii")
 SURF_L = Path("/users/4/coffm049/papers/brainTemplates/Conte69.L.inflated.32k_fs_LR.surf.gii")
 SURF_R = Path("/users/4/coffm049/papers/brainTemplates/Conte69.R.inflated.32k_fs_LR.surf.gii")
 NETWORKS_CSV = Path("/users/4/coffm049/papers/brainTemplates/shortDicionary.csv")
@@ -90,27 +90,59 @@ def _network_of(name):
     if not name:
         return "NA"
     s = str(name)
-    return s.split("_")[0] if "_" in s else s
+    # Gordon label is like "1_L_Default" -> "Default" (per 03b: re.sub r"^\d{1,3}_._")
+    s = re.sub(r"^\d{1,3}_[LR]_", "", s)
+    # 03b maps full names to short names used in shortDicionary.csv
+    _map = {
+        "Default": "DMN",
+        "Auditory": "Aud",
+        "CinguloOperc": "CO",
+        "FrontoParietal": "FP",
+        "Salience": "Sal",
+        "VentralAttn": "VAN",
+        "DorsalAttn": "DAN",
+        "Visual": "Vis",
+        "SMhand": "SMd",
+        "SMmouth": "SMl",
+        "RetrosplenialTemporal": "Tpole",
+    }
+    return _map.get(s, s)
 
 
 def _cifti_labels(img):
-    """Return {label_value: Cifti2Label} dict for a CIFTI dlabel image."""
+    """Return {label_value: Cifti2Label} dict for a CIFTI dlabel image.
+
+    The label table lives on axis 0's get_element(0)[1] dict (per 03b:34),
+    not on img.labeltable. Handles both dict and list storage.
+    """
+    try:
+        ax0 = img.header.get_axis(0)
+        elem = ax0.get_element(0)
+        d = elem[1]
+        if isinstance(d, dict) and len(d) > 1:
+            return d
+        if isinstance(d, list) and len(d) > 1:
+            return {i: v for i, v in enumerate(d) if v is not None}
+    except Exception:
+        pass
     for attr in ("labeltable", "labels"):
         lt = getattr(img, attr, None)
         if lt is not None:
             d = getattr(lt, "labels", lt)
-            if isinstance(d, dict):
+            if isinstance(d, dict) and len(d) > 1:
                 return d
+            if isinstance(d, list) and len(d) > 1:
+                return {i: v for i, v in enumerate(d) if v is not None}
     try:
         ax0 = img.header.get_axis(0)
         for attr in ("labels", "label", "labeltable"):
             lt = getattr(ax0, attr, None)
             if lt is not None:
                 d = getattr(lt, "labels", lt)
-                if isinstance(d, dict):
+                if isinstance(d, dict) and len(d) > 1:
                     return d
-        if hasattr(ax0, "labels") and isinstance(ax0.labels, dict):
-            return ax0.labels
+                if isinstance(d, list) and len(d) > 1:
+                    return {i: v for i, v in enumerate(d) if v is not None}
     except Exception:
         pass
     return {}

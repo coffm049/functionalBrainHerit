@@ -9,6 +9,7 @@ Produces for twin and AdjHE (90th-percentile node summary):
 Run on the HPC where the dlabel / surfaces and .venv are available:
   /users/4/coffm049/papers/functionalBrainHerit/.venv/bin/python summary/brain_probaconns.py
 """
+import re
 from pathlib import Path
 
 import numpy as np
@@ -86,27 +87,54 @@ def _network_of(name):
     if not name:
         return "NA"
     s = str(name)
+    s = re.sub(r"^\d{1,3}_[LR]_", "", s)
+    _map = {
+        "Default": "DMN",
+        "Auditory": "Aud",
+        "CinguloOperc": "CO",
+        "FrontoParietal": "FP",
+        "Salience": "Sal",
+        "VentralAttn": "VAN",
+        "DorsalAttn": "DAN",
+        "Visual": "Vis",
+        "SMhand": "SMd",
+        "SMmouth": "SMl",
+        "RetrosplenialTemporal": "Tpole",
+    }
+    s = _map.get(s, s)
     return s.split("_")[0] if "_" in s else s
 
 
 def _cifti_labels(img):
     """Return {label_value: Cifti2Label} dict for a CIFTI dlabel image."""
+    try:
+        ax0 = img.header.get_axis(0)
+        elem = ax0.get_element(0)
+        d = elem[1]
+        if isinstance(d, dict) and len(d) > 1:
+            return d
+        if isinstance(d, list) and len(d) > 1:
+            return {i: v for i, v in enumerate(d) if v is not None}
+    except Exception:
+        pass
     for attr in ("labeltable", "labels"):
         lt = getattr(img, attr, None)
         if lt is not None:
             d = getattr(lt, "labels", lt)
-            if isinstance(d, dict):
+            if isinstance(d, dict) and len(d) > 1:
                 return d
+            if isinstance(d, list) and len(d) > 1:
+                return {i: v for i, v in enumerate(d) if v is not None}
     try:
         ax0 = img.header.get_axis(0)
         for attr in ("labels", "label", "labeltable"):
             lt = getattr(ax0, attr, None)
             if lt is not None:
                 d = getattr(lt, "labels", lt)
-                if isinstance(d, dict):
+                if isinstance(d, dict) and len(d) > 1:
                     return d
-        if hasattr(ax0, "labels") and isinstance(ax0.labels, dict):
-            return ax0.labels
+                if isinstance(d, list) and len(d) > 1:
+                    return {i: v for i, v in enumerate(d) if v is not None}
     except Exception:
         pass
     return {}
