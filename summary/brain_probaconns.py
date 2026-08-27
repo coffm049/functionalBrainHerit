@@ -232,12 +232,12 @@ def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.35):
     vals = M[iu]
     mask = vals > h2_thr
     n_edges = int(mask.sum())
-    # line thickness rescaled: h2 0–0.5 -> linewidth 0–1
+    # line thickness + alpha rescaled: h2 0–0.5 -> lw 0.15–1.5, alpha 0.15–1
     for (a, b), v in zip(zip(iu[0][mask], iu[1][mask]), vals[mask]):
         pa, pb = pos[a], pos[b]
-        lw = float(np.clip(v / 0.5, 0, 1))
-        lw = max(lw, 0.15)
-        ax.plot([xy[pa, 0], xy[pb, 0]], [xy[pa, 1], xy[pb, 1]], color="red", alpha=0.25, linewidth=lw)
+        lw = 0.15 + float(np.clip(v / 0.5, 0, 1)) * (1.5 - 0.15)
+        alpha = 0.15 + float(np.clip(v / 0.5, 0, 1)) * (1 - 0.15)
+        ax.plot([xy[pa, 0], xy[pb, 0]], [xy[pa, 1], xy[pb, 1]], color="red", alpha=alpha, linewidth=lw)
     _, color_of = _network_palette(net_names)
     node_colors = [color_of[net_ordered[i]] for i in range(N)]
     ax.scatter(xy[:, 0], xy[:, 1], s=20, c=node_colors, zorder=5, edgecolors="black", linewidths=0.3)
