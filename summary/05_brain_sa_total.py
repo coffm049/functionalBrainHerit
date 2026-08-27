@@ -25,6 +25,36 @@ import pandas as pd
 import nibabel as nib
 import nilearn.plotting as niplot
 
+
+def _display_tag(tag: str) -> str:
+    parts = tag.split("_")
+    atlas = parts[0]
+    if atlas.lower() == "gordon":
+        atlas_disp = "Gordon"
+    elif atlas.lower().startswith("proba"):
+        atlas_disp = "ProbaConns"
+    elif atlas.lower() == "sa":
+        atlas_disp = "SA"
+    else:
+        atlas_disp = atlas.capitalize()
+    if len(parts) == 1:
+        return atlas_disp
+    method = "_".join(parts[1:])
+    if method.lower().startswith("w_total"):
+        suffix = method[7:].lstrip("_")
+        base = "SA w_total" if atlas_disp == "SA" else atlas_disp
+        if suffix.lower() == "twin":
+            return f"{base} Twin"
+        if suffix.lower() in ("adjhe", "adjhe_re", "adjhe-re"):
+            return f"{base} AdjHE-RE"
+        return f"{base} {suffix}"
+    m = method.lower()
+    if m == "twin":
+        return f"{atlas_disp} Twin"
+    if m in ("adjhe", "adjhe_re", "adjhe-re"):
+        return f"{atlas_disp} AdjHE-RE"
+    return f"{atlas_disp} {method.replace('_', ' ')}"
+
 ROOT = Path(__file__).resolve().parents[1]
 WIDE = ROOT / "results/summary/mash_twin_wide.csv"
 DLABEL = Path("/users/4/coffm049/papers/brainTemplates/Gordon.networks.32k_fs_LR.dlabel.nii")
@@ -134,7 +164,7 @@ def plot_sa_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
         ax = fig.add_subplot(1, len(sides), i, projection="3d")
         niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
                                   cmap="coolwarm", colorbar=True, threshold=None,
-                                  vmin=0.0, vmax=vmax, title=f"{tag} ({hemi})")
+                                  vmin=0.0, vmax=vmax, title=f"{_display_tag(tag)} ({hemi})")
     fig.savefig(png, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"  wrote {png}")

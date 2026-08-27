@@ -220,6 +220,33 @@ def _network_palette(net_names):
     return cmap, color_of
 
 
+def _display_tag(tag: str) -> str:
+    parts = tag.split("_")
+    atlas = parts[0]
+    if atlas.lower() == "gordon":
+        atlas_disp = "Gordon"
+    elif atlas.lower().startswith("proba"):
+        atlas_disp = "ProbaConns"
+    elif atlas.lower() == "sa":
+        atlas_disp = "SA"
+    else:
+        atlas_disp = atlas.capitalize()
+    if len(parts) == 1:
+        return atlas_disp
+    method = "_".join(parts[1:])
+    m = method.lower()
+    if m == "twin":
+        method_disp = "Twin"
+    elif m in ("adjhe", "adjhe_re", "adjhe-re"):
+        method_disp = "AdjHE-RE"
+    elif m == "networks":
+        return f"{atlas_disp} Networks"
+    else:
+        method_disp = re.sub(r"AdjHE", "AdjHE-RE", method.replace("_", "-"), flags=re.IGNORECASE)
+        method_disp = method_disp[0].upper() + method_disp[1:] if method_disp else method_disp
+    return f"{atlas_disp} {method_disp}"
+
+
 def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     import matplotlib.pyplot as plt
     sides = [("left", surf_l, val_left), ("right", surf_r, val_right)]
@@ -230,7 +257,7 @@ def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
         ax = fig.add_subplot(1, len(sides), i, projection="3d")
         niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
                                   cmap="coolwarm", colorbar=True, threshold=None,
-                                  vmin=0.0, vmax=vmax, title=f"{tag} ({hemi})")
+                                  vmin=0.0, vmax=vmax, title=f"{_display_tag(tag)} ({hemi})")
     fig.savefig(png, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"  wrote {png}")
@@ -271,7 +298,7 @@ def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.25):
     ax.legend(handles=handles, loc="center left", bbox_to_anchor=(1.02, 0.5), fontsize=7, frameon=False)
     ax.set_aspect("equal")
     ax.axis("off")
-    ax.set_title(f"{tag} circular (h2>{h2_thr}, {n_edges} edges, {len(net_names)} networks)")
+    ax.set_title(f"{_display_tag(tag)} Circular (h2>{h2_thr}, {n_edges} edges, {len(net_names)} networks)")
     png = outdir / f"{tag}_circular.png"
     fig.savefig(png, dpi=150, bbox_inches="tight")
     plt.close(fig)
@@ -290,7 +317,7 @@ def plot_surface_networks(net_left, net_right, net_names, surf_l, surf_r, outdir
         ax = fig.add_subplot(1, len(sides), i, projection="3d")
         niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
                                   cmap=cmap, colorbar=False, threshold=None,
-                                  vmin=0.0, vmax=max(K - 1, 1), title=f"{tag} networks ({hemi})")
+                                  vmin=0.0, vmax=max(K - 1, 1), title=f"{_display_tag(tag)} Networks ({hemi})")
     handles = [plt.Line2D([0], [0], marker="o", linestyle="", color=color_of[net], label=net) for net in net_names]
     fig.legend(handles=handles, loc="lower center", ncol=4, fontsize=7, frameon=False)
     fig.savefig(png, dpi=150, bbox_inches="tight")
