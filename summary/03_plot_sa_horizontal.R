@@ -6,7 +6,6 @@
 # Run: Rscript summary/plot_sa_horizontal.R  (on acn01 with R/4.4.0)
 
 library(tidyverse)
-library(ggsci)
 
 ROOT <- "/users/4/coffm049/papers/functionalBrainHerit"
 WIDE <- file.path(ROOT, "results/summary/mash_twin_wide.csv")
@@ -62,7 +61,6 @@ p <- df %>%
   ggplot(aes(y = pheno_label, x = h2, fill = Type)) +
   geom_col(position = position_dodge2(width = 0.8, preserve = "single"),
            width = 0.7) +
-  scale_fill_npg() +
   scale_x_continuous(limits = c(0, 0.6), breaks = seq(0, 0.6, 0.1)) +
   labs(
     x = expression(paste("Heritability (", h^2, ")")),
