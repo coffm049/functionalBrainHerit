@@ -170,8 +170,11 @@ def build_long_for_set(wide, atlas, N, h2_col, twin_col="Twin_h2"):
 
 
 def manhattan_for_df(df, atlas, method, out_path):
-    """Single-panel Manhattan y=h2 (faithful to 03-matrixManhattan2.py
-    groups by network-pair, nlabels=30 Tableau colours, divider compression).
+    """Single-panel Manhattan y=h2 (0-1) — groups by network-pair.
+
+    Network-network pairs accounting for <1.5% of total ROI-ROI connections
+    are rescaled 100-fold on the x-axis and displayed in grey, exactly as
+    in 03-matrixManhattan2.py (original used nlabels=30 + pROIs=0.015).
     """
     connection_order = (
         df.groupby("connection")["h2"].mean().sort_values(ascending=False).index.tolist()
@@ -184,27 +187,43 @@ def manhattan_for_df(df, atlas, method, out_path):
     df["index"] = df["idx"]
 
     grouped = df.groupby("connection", observed=True)
-    groupsizes = np.array([g.shape[0] for _, g in grouped])
-
+    total = len(df)
+    # 1.5% threshold for small groups (as per description)
+    small_thresh = 0.015
+    is_small = {name: (len(g) / total) < small_thresh for name, g in grouped}
+    # Tableau colours for large groups, grey for small
     nlabels = 30
-    colors = np.fromiter(mcolors.TABLEAU_COLORS.values(), dtype="<U7")
-    colors = np.tile(colors, math.ceil(nlabels / len(colors)))[:nlabels]
-    colors = np.append(colors, np.repeat("grey", max(0, len(groupsizes) - nlabels)))
+    colors_large = np.fromiter(mcolors.TABLEAU_COLORS.values(), dtype="<U7")
+    colors_large = np.tile(colors_large, math.ceil(nlabels / len(colors_large)))[:nlabels]
 
-    fig, ax = plt.subplots(1, figsize=(8, 3.2))
+    fig, ax = plt.subplots(1, figsize=(9, 3.5))
 
-    divider = None
-    for num, (name, group) in enumerate(grouped):
-        if divider is None and num > (nlabels - 1):
-            divider = group["index"].min()
-        if num > (nlabels - 1):
+    # divider is the start of the first small group in sorted order
+    small_starts = [g["index"].min() for name, g in grouped if is_small.get(name, False)]
+    divider = min(small_starts) if small_starts else None
+
+    color_idx = 0
+    for name, group in grouped:
+        small = is_small.get(name, False)
+        if small and divider is not None:
             group["index"] = (group["index"] - divider) / 100 + divider
-        group.plot(kind="scatter", x="index", y="h2", color=colors[num],
-                   ax=ax, s=8, zorder=10)
+            col = "grey"
+        else:
+            col = colors_large[color_idx % len(colors_large)]
+            color_idx += 1
+        group.plot(kind="scatter", x="index", y="h2", color=col,
+                   ax=ax, s=10 if not small else 6, zorder=10, alpha=0.9 if not small else 0.6)
 
     ax.set_xlabel("")
     ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
-    ax.set_xlim([0, df["index"].max()])
+    # xlim must cover the compressed tail
+    try:
+        xmax = df["index"].max()
+        # df["index"] was modified in-place for small groups; recompute max from plotted data
+        xmax = max(g["index"].max() for _, g in grouped) if len(grouped) else xmax
+    except Exception:
+        xmax = df["index"].max()
+    ax.set_xlim([0, xmax * 1.02])
     ax.set_ylim([0, 1])
     disp = {"gordon": "Gordon", "probaConns": "ProbaConns", "SA": "SA"}.get(atlas, atlas)
     ax.set_ylabel(r"Heritability ($h^2$)", size=11)
@@ -214,7 +233,8 @@ def manhattan_for_df(df, atlas, method, out_path):
 
     plt.savefig(out_path, dpi=300, bbox_inches="tight", pad_inches=0)
     plt.close(fig)
-    print(f"  wrote {out_path}  n={len(df)} groups={len(groupsizes)}")
+    n_small = sum(is_small.values())
+    print(f"  wrote {out_path}  n={len(df)} groups={len(grouped)} small(<1.5%)={n_small}")
 
 
 # --------------------------------------------------------------------------
