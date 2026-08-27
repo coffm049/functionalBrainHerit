@@ -1,0 +1,250 @@
+#!/usr/bin/env python3
+"""ProbaConns (80 parcels) brain-space visualization — simple, hardcoded.
+
+Produces for twin and AdjHE (90th-percentile node summary):
+  - <out>/probaConns_{twin,AdjHE}_surface.png  (both hemispheres, 0–0.5)
+  - <out>/probaConns_networks_surface.png      (categorical, from label table)
+  - <out>/probaConns_{twin,AdjHE}_circular.png (h2 > 0.35, nodes grouped by network)
+
+Run on the HPC where the dlabel / surfaces and .venv are available:
+  /users/4/coffm049/papers/functionalBrainHerit/.venv/bin/python summary/brain_probaconns.py
+"""
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import nibabel as nib
+import nilearn.plotting as niplot
+
+# --------------------------------------------------------------------------
+# Hardcoded paths / constants — edit here if needed, no fallbacks
+# --------------------------------------------------------------------------
+ROOT = Path(__file__).resolve().parents[1]
+WIDE = ROOT / "results/summary/mash_twin_wide.csv"
+DLABEL = Path("/projects/standard/faird/shared/data/Probabilitic_network_ROIs_small_package/ABCD/combined_clusters/combined_clusters_thresh0.8.dlabel.nii")
+SURF_L = Path("/users/4/coffm049/papers/brainTemplates/Conte69.L.inflated.32k_fs_LR.surf.gii")
+SURF_R = Path("/users/4/coffm049/papers/brainTemplates/Conte69.R.inflated.32k_fs_LR.surf.gii")
+OUTDIR = ROOT / "results/summary/brain/probaConns"
+N = 80
+NODE_PCT = 90
+VMAX = 0.5
+
+
+# --------------------------------------------------------------------------
+# Helpers
+# --------------------------------------------------------------------------
+def rebuild_pconn(phenos, edge_h2, N):
+    k = np.array([int(str(p)[1:]) if str(p).startswith("o") else int(str(p)) for p in phenos])
+    M = np.zeros((N, N))
+    i, j = np.triu_indices(N, 1)
+    M[i[k], j[k]] = edge_h2
+    M[j[k], i[k]] = edge_h2
+    np.fill_diagonal(M, np.nan)
+    return M
+
+
+def node_summary(M, pct):
+    out = np.full(M.shape[0], np.nan)
+    for i in range(M.shape[0]):
+        vals = M[i, :][~np.isnan(M[i, :])]
+        if len(vals):
+            out[i] = np.percentile(vals, pct)
+    return out
+
+
+def dlabel_values(node_h2, dlabel, N):
+    img = nib.load(str(dlabel))
+    label_data = np.asarray(img.get_fdata()).astype(int).ravel()
+    full = np.full(label_data.shape, np.nan, dtype=float)
+    for p in range(1, N + 1):
+        v = node_h2[p - 1]
+        if np.isfinite(v):
+            full[label_data == p] = v
+    ax = img.header.get_axis(1)
+    va = np.asarray(ax.vertex, dtype=int)
+    nv = ax.nvertices
+    tex_left = tex_right = None
+    pos = 0
+    for structure, count in nv.items():
+        s = str(structure).upper()
+        c = int(count)
+        if c == 0:
+            continue
+        blk = va[pos:pos + c]
+        seg = full[pos:pos + c]
+        if "LEFT" in s:
+            tex_left = np.full(int(blk.max()) + 1, np.nan)
+            tex_left[blk] = seg
+        elif "RIGHT" in s:
+            tex_right = np.full(int(blk.max()) + 1, np.nan)
+            tex_right[blk] = seg
+        pos += c
+    return tex_left, tex_right
+
+
+def _network_of(name):
+    if not name:
+        return "NA"
+    s = str(name)
+    return s.split("_")[0] if "_" in s else s
+
+
+def load_probaconns_networks(dlabel, N):
+    """Parcel (1..N) -> network from the CIFTI label table (first token)."""
+    img = nib.load(str(dlabel))
+    lt = img.labeltable
+    labels = lt.labels
+    nets = []
+    for p in range(1, N + 1):
+        lab = labels.get(p)
+        parcel_label = lab.label if lab is not None else None
+        nets.append(_network_of(parcel_label))
+    return np.asarray(nets)
+
+
+def dlabel_network_values(dlabel, N, net_id):
+    img = nib.load(str(dlabel))
+    label_data = np.asarray(img.get_fdata()).astype(int).ravel()
+    full = np.full(label_data.shape, -1, dtype=int)
+    for p in range(1, N + 1):
+        full[label_data == p] = int(net_id[p - 1])
+    ax = img.header.get_axis(1)
+    va = np.asarray(ax.vertex, dtype=int)
+    nv = ax.nvertices
+    tex_left = tex_right = None
+    pos = 0
+    for structure, count in nv.items():
+        s = str(structure).upper()
+        c = int(count)
+        if c == 0:
+            continue
+        blk = va[pos:pos + c]
+        seg = full[pos:pos + c].astype(float)
+        seg[seg < 0] = np.nan
+        if "LEFT" in s:
+            tex_left = seg
+        elif "RIGHT" in s:
+            tex_right = seg
+        pos += c
+    return tex_left, tex_right
+
+
+def _network_palette(net_names):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.colors as mcolors
+    import matplotlib.pyplot as plt
+    base = plt.get_cmap("tab20").colors
+    color_of = {net: base[i % len(base)] for i, net in enumerate(net_names)}
+    cmap = mcolors.ListedColormap([color_of[n] for n in net_names])
+    return cmap, color_of
+
+
+def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
+    import matplotlib.pyplot as plt
+    sides = [("left", surf_l, val_left), ("right", surf_r, val_right)]
+    sides = [(n, s, v) for n, s, v in sides if v is not None]
+    png = outdir / f"{tag}_surface.png"
+    fig = plt.figure(figsize=(6 * len(sides), 5))
+    for i, (hemi, surf, val) in enumerate(sides, start=1):
+        ax = fig.add_subplot(1, len(sides), i, projection="3d")
+        niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
+                                  cmap="coolwarm", colorbar=True, threshold=None,
+                                  vmin=0.0, vmax=vmax, title=f"{tag} ({hemi})")
+    fig.savefig(png, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  wrote {png}")
+    assigned = sum(np.count_nonzero(~np.isnan(v)) for _, _, v in sides)
+    allv = np.concatenate([v[~np.isnan(v)] for _, _, v in sides])
+    print(f"  [{tag}] surface assigned={assigned} min={np.nanmin(allv):.3f} max={np.nanmax(allv):.3f}")
+
+
+def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.35):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    N = M.shape[0]
+    order = np.argsort(networks, kind="stable")
+    net_ordered = np.asarray(networks)[order]
+    pos = np.empty(N, dtype=int)
+    pos[order] = np.arange(N)
+    angles = np.linspace(0, 2 * np.pi, N, endpoint=False)
+    xy = np.column_stack([np.cos(angles), np.sin(angles)])
+    fig, ax = plt.subplots(figsize=(9, 9))
+    iu = np.triu_indices(N, 1)
+    vals = M[iu]
+    mask = vals > h2_thr
+    n_edges = int(mask.sum())
+    for (a, b) in zip(iu[0][mask], iu[1][mask]):
+        pa, pb = pos[a], pos[b]
+        ax.plot([xy[pa, 0], xy[pb, 0]], [xy[pa, 1], xy[pb, 1]], color="red", alpha=0.25, linewidth=0.4)
+    _, color_of = _network_palette(net_names)
+    node_colors = [color_of[net_ordered[i]] for i in range(N)]
+    ax.scatter(xy[:, 0], xy[:, 1], s=20, c=node_colors, zorder=5, edgecolors="black", linewidths=0.3)
+    handles = [plt.Line2D([0], [0], marker="o", linestyle="", color=color_of[net], label=net) for net in net_names]
+    ax.legend(handles=handles, loc="center left", bbox_to_anchor=(1.02, 0.5), fontsize=7, frameon=False)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    ax.set_title(f"{tag} circular (h2>{h2_thr}, {n_edges} edges, {len(net_names)} networks)")
+    png = outdir / f"{tag}_circular.png"
+    fig.savefig(png, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  wrote {png}")
+
+
+def plot_surface_networks(net_left, net_right, net_names, surf_l, surf_r, outdir, tag):
+    import matplotlib.pyplot as plt
+    sides = [("left", surf_l, net_left), ("right", surf_r, net_right)]
+    sides = [(n, s, v) for n, s, v in sides if v is not None]
+    K = len(net_names)
+    cmap, color_of = _network_palette(net_names)
+    png = outdir / f"{tag}_networks_surface.png"
+    fig = plt.figure(figsize=(6 * len(sides), 5))
+    for i, (hemi, surf, val) in enumerate(sides, start=1):
+        ax = fig.add_subplot(1, len(sides), i, projection="3d")
+        niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
+                                  cmap=cmap, colorbar=False, threshold=None,
+                                  vmin=0.0, vmax=max(K - 1, 1), title=f"{tag} networks ({hemi})")
+    handles = [plt.Line2D([0], [0], marker="o", linestyle="", color=color_of[net], label=net) for net in net_names]
+    fig.legend(handles=handles, loc="lower center", ncol=4, fontsize=7, frameon=False)
+    fig.savefig(png, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  wrote {png}")
+
+
+# --------------------------------------------------------------------------
+# Run
+# --------------------------------------------------------------------------
+OUTDIR.mkdir(parents=True, exist_ok=True)
+
+df = pd.read_csv(WIDE)
+sub = df[df["Set"] == "probaConns"]
+
+matrices = {}
+node_vals = {}
+for method, col in [("twin", "Twin_h2"), ("AdjHE", "h2_proba_AdjHE_RE")]:
+    s = sub[["Pheno", col]].dropna()
+    M = rebuild_pconn(s["Pheno"].values, s[col].values.astype(float), N)
+    matrices[method] = M
+    node_vals[method] = node_summary(M, NODE_PCT)
+    print(f"[probaConns_{method}] edges={int(np.isfinite(M).sum() // 2)} nodes={N}")
+
+networks = load_probaconns_networks(DLABEL, N)
+net_names = list(dict.fromkeys(networks.tolist()))
+net_id = np.array([net_names.index(s) for s in networks], dtype=int)
+print(f"[networks] {len(net_names)} groups: {net_names}")
+
+dL, dR = dlabel_values(node_vals["AdjHE"], DLABEL, N)
+print(f"[dlabel] left assigned={int(np.count_nonzero(~np.isnan(dL)))} right assigned={int(np.count_nonzero(~np.isnan(dR)))} (N={N})")
+
+for method, node_h2 in node_vals.items():
+    val_l, val_r = dlabel_values(node_h2, DLABEL, N)
+    plot_surface(val_l, val_r, SURF_L, SURF_R, OUTDIR, f"probaConns_{method}", VMAX)
+
+nl, nr = dlabel_network_values(DLABEL, N, net_id)
+plot_surface_networks(nl, nr, net_names, SURF_L, SURF_R, OUTDIR, "probaConns_networks")
+
+for method, M in matrices.items():
+    plot_circular(M, OUTDIR, f"probaConns_{method}", networks, net_names)
+
+print(f"Done. Outputs in {OUTDIR}")
