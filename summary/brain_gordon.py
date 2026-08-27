@@ -239,7 +239,7 @@ def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     print(f"  [{tag}] surface assigned={assigned} min={np.nanmin(allv):.3f} max={np.nanmax(allv):.3f}")
 
 
-def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.35):
+def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.25):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -255,11 +255,14 @@ def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.35):
     vals = M[iu]
     mask = vals > h2_thr
     n_edges = int(mask.sum())
-    # line thickness + alpha rescaled: h2 0–0.5 -> lw 0.15–1.5, alpha 0.15–1
+    # line thickness + alpha rescaled: h2 0.25–0.5 -> lw 0.1–1.0, alpha 0.1–1.0
     for (a, b), v in zip(zip(iu[0][mask], iu[1][mask]), vals[mask]):
         pa, pb = pos[a], pos[b]
-        lw = 0.15 + float(np.clip(v / 0.5, 0, 1)) * (1.5 - 0.15)
-        alpha = 0.15 + float(np.clip(v / 0.5, 0, 1)) * (1 - 0.15)
+        # clip h2 to 0.25–0.5 then rescale to 0.1–1.0
+        v_clipped = float(np.clip(v, 0.25, 0.5))
+        norm = (v_clipped - 0.25) / (0.5 - 0.25)  # 0→1
+        lw = 0.1 + norm * (1.0 - 0.1)
+        alpha = 0.1 + norm * (1.0 - 0.1)
         ax.plot([xy[pa, 0], xy[pb, 0]], [xy[pa, 1], xy[pb, 1]], color="red", alpha=alpha, linewidth=lw)
     _, color_of = _network_palette(net_names)
     node_colors = [color_of[net_ordered[i]] for i in range(N)]
