@@ -200,22 +200,27 @@ def manhattan_for_df(df, atlas, method, out_path):
 
     # bottom: proportion heritable (signif mean) per connection
     plotdata = grouped["signif"].mean()
-    colored = plotdata.iloc[:nlabels].copy()
-    colored["others"] = 0
-    ax[1].bar(x=plotdata.iloc[:nlabels].index, height=colored.iloc[:nlabels], color=colors[:nlabels])
     ax[1].set_ylim([0, 0.35])
-    # hide last ytick
-    if ax[1].get_yticklabels():
-        ax[1].get_yticklabels()[-1].set_visible(False)
-    ax[1].bar(
-        x=np.linspace(start=nlabels, stop=nlabels + (nlabels / 10), num=len(plotdata.iloc[nlabels:])),
-        height=np.flip(plotdata.iloc[nlabels:].values),
-        color="grey",
-        width=0.8 / 200,
-    )
-    ax[1].set_xticklabels(ax[1].get_xticklabels(), rotation=45, size=5,
-                          fontdict={"horizontalalignment": "right", "weight": "bold"})
-    ax[1].set_yticklabels(ax[1].get_yticklabels(), size=10)
+    if len(plotdata) <= nlabels:
+        # few groups (e.g. SA 17) — show all, no "others" compression
+        ax[1].bar(x=plotdata.index, height=plotdata.values, color=colors[:len(plotdata)])
+        ax[1].tick_params(axis="x", labelsize=5, labelrotation=45)
+        ax[1].tick_params(axis="y", labelsize=10)
+    else:
+        colored = plotdata.iloc[:nlabels].copy()
+        colored["others"] = 0
+        ax[1].bar(x=plotdata.iloc[:nlabels].index, height=colored.iloc[:nlabels].values, color=colors[:nlabels])
+        # hide last ytick
+        if ax[1].get_yticklabels():
+            ax[1].get_yticklabels()[-1].set_visible(False)
+        ax[1].bar(
+            x=np.linspace(start=nlabels, stop=nlabels + (nlabels / 10), num=len(plotdata.iloc[nlabels:])),
+            height=np.flip(plotdata.iloc[nlabels:].values),
+            color="grey",
+            width=0.8 / 200,
+        )
+        ax[1].tick_params(axis="x", labelsize=5, labelrotation=45)
+        ax[1].tick_params(axis="y", labelsize=10)
     ax[1].set_ylabel("Prop heritable", size=11)
 
     # top: Manhattan scatter
