@@ -20,6 +20,7 @@ Notes (from 03a/03b/05-topoViz + HPC check 2026-08-27):
   - Template dlabel is Gordon.networks.32k_fs_LR.dlabel.nii.
   - Surfaces are Conte69 inflated 32k.
 """
+import re
 from pathlib import Path
 
 import numpy as np
@@ -48,10 +49,51 @@ NETWORKS = {
 }
 
 
+def _cifti_labels(img):
+    try:
+        ax0 = img.header.get_axis(0)
+        elem = ax0.get_element(0)
+        d = elem[1]
+        if isinstance(d, dict) and len(d) > 1:
+            return d
+        if isinstance(d, list) and len(d) > 1:
+            return {i: v for i, v in enumerate(d) if v is not None}
+    except Exception:
+        pass
+    for attr in ("labeltable", "labels"):
+        lt = getattr(img, attr, None)
+        if lt is not None:
+            d = getattr(lt, "labels", lt)
+            if isinstance(d, dict) and len(d) > 1:
+                return d
+    return {}
+
+
+def _network_of(name):
+    if not name:
+        return "NA"
+    s = str(name)
+    s = re.sub(r"^\d{1,3}_[LR]_", "", s)
+    _map = {
+        "Default": "DMN",
+        "Auditory": "Aud",
+        "CinguloOperc": "CO",
+        "FrontoParietal": "FP",
+        "Salience": "Sal",
+        "VentralAttn": "VAN",
+        "DorsalAttn": "DAN",
+        "Visual": "Vis",
+        "SMhand": "SMd",
+        "SMmouth": "SMl",
+        "RetrosplenialTemporal": "Tpole",
+    }
+    s = _map.get(s, s)
+    return s.split("_")[0] if "_" in s else s
+
+
 def sa_region_from_pheno(pheno: str) -> int | None:
     """'network_surfarea12' -> 12, '12' -> 12, else None."""
     s = str(pheno)
-    # 03b used pheno.str[16:] to strip "network_surfarea"
     if "network_surfarea" in s:
         try:
             return int(s.split("network_surfarea")[-1])
@@ -64,15 +106,40 @@ def sa_region_from_pheno(pheno: str) -> int | None:
 
 
 def sa_values_to_textures(sa_h2: dict[int, float], dlabel: Path):
-    """Map per-network SA h2 (network index -> h2) onto per-vertex textures
-    via 01-07 style: vertex_map[dlabel == region] = value.
+    """Map per-network SA h2 (network index -> h2) onto per-vertex textures.
+
+    SA h2 is per Gordon network (1..17); the dlabel is parcel-level
+    (333 parcels like '1_L_Default'). For each SA network k with value v and
+    short name NETWORKS[k], find all parcels p whose network (via label table)
+    equals that short name, then set vertices where dlabel == p to v.
     """
     img = nib.load(str(dlabel))
     label_data = np.asarray(img.get_fdata()).astype(int).ravel()
     full = np.full(label_data.shape, np.nan, dtype=float)
+    # parcel index -> network short name via label table
+    labels = _cifti_labels(img)
+    parcel_to_net = {}
+    for p, lab in labels.items():
+        if p == 0:
+            continue
+        lab_str = lab[0] if isinstance(lab, (tuple, list)) else getattr(lab, "label", str(lab))
+        parcel_to_net[p] = _network_of(lab_str)
+    # invert: network short name -> list of parcel indices
+    net_to_parcels = {}
+    for p, net in parcel_to_net.items():
+        net_to_parcels.setdefault(net, []).append(p)
     for region, value in sa_h2.items():
-        if np.isfinite(value):
-            full[label_data == region] = value
+        if not np.isfinite(value):
+            continue
+        net_name = NETWORKS.get(region)
+        if net_name is None:
+            # fallback: use region as direct dlabel value (for 14-network files)
+            if np.any(label_data == region):
+                full[label_data == region] = value
+            continue
+        parcels = net_to_parcels.get(net_name, [])
+        for p in parcels:
+            full[label_data == p] = value
     ax = img.header.get_axis(1)
     va = np.asarray(ax.vertex, dtype=int)
     nv = ax.nvertices

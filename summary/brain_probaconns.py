@@ -147,9 +147,14 @@ def load_probaconns_networks(dlabel, N):
     nets = []
     for p in range(1, N + 1):
         lab = labels.get(p)
-        parcel_label = getattr(lab, "label", None) if lab is not None else None
-        if parcel_label is None and lab is not None:
-            parcel_label = getattr(lab, "key", None)
+        if lab is None:
+            parcel_label = None
+        elif isinstance(lab, (tuple, list)):
+            parcel_label = lab[0]
+        else:
+            parcel_label = getattr(lab, "label", None) or getattr(lab, "key", None)
+            if parcel_label is None:
+                parcel_label = str(lab)
         nets.append(_network_of(parcel_label))
     return np.asarray(nets)
 
@@ -294,7 +299,7 @@ for method, node_h2 in node_vals.items():
     plot_surface(val_l, val_r, SURF_L, SURF_R, OUTDIR, f"probaConns_{method}", VMAX)
 
 nl, nr = dlabel_network_values(DLABEL, N, net_id)
-plot_surface_networks(nl, nr, net_names, SURF_L, SURF_R, OUTDIR, "probaConns_networks")
+plot_surface_networks(nl, nr, net_names, SURF_L, SURF_R, OUTDIR, "probaConns")
 
 for method, M in matrices.items():
     plot_circular(M, OUTDIR, f"probaConns_{method}", networks, net_names)

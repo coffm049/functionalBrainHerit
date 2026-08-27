@@ -152,8 +152,9 @@ def load_gordon_networks(dlabel, csv_path, N):
     """Parcel (1..N) -> network shortname for Gordon.
 
     shortDicionary.csv is a 14-row network dictionary: columns name,shortname.
-    Parcel->network comes from the dlabel's CIFTI label table (first token of
-    each parcel's label, e.g. 'Aud_01' -> 'Aud'), translated via name->shortname.
+    Parcel->network comes from the dlabel's CIFTI label table (e.g.
+    '1_L_Default' -> 'Default' -> 'DMN' via 03b mapping), translated via
+    name->shortname.
     """
     df = pd.read_csv(csv_path)
     name_to_short = dict(zip(df["name"].astype(str), df["shortname"].astype(str)))
@@ -162,9 +163,14 @@ def load_gordon_networks(dlabel, csv_path, N):
     nets = []
     for p in range(1, N + 1):
         lab = labels.get(p)
-        parcel_label = getattr(lab, "label", None) if lab is not None else None
-        if parcel_label is None and lab is not None:
-            parcel_label = getattr(lab, "key", None)
+        if lab is None:
+            parcel_label = None
+        elif isinstance(lab, (tuple, list)):
+            parcel_label = lab[0]
+        else:
+            parcel_label = getattr(lab, "label", None) or getattr(lab, "key", None)
+            if parcel_label is None:
+                parcel_label = str(lab)
         net = _network_of(parcel_label)
         short = name_to_short.get(net, net)
         if short == net:
@@ -316,7 +322,7 @@ for method, node_h2 in node_vals.items():
     plot_surface(val_l, val_r, SURF_L, SURF_R, OUTDIR, f"gordon_{method}", VMAX)
 
 nl, nr = dlabel_network_values(DLABEL, N, net_id)
-plot_surface_networks(nl, nr, net_names, SURF_L, SURF_R, OUTDIR, "gordon_networks")
+plot_surface_networks(nl, nr, net_names, SURF_L, SURF_R, OUTDIR, "gordon")
 
 for method, M in matrices.items():
     plot_circular(M, OUTDIR, f"gordon_{method}", networks, net_names)
