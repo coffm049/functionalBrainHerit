@@ -10,7 +10,7 @@
   "std": false,
   "qcovar": ["age", "totalNetworkSurface"],
   "covar_discrete": ["abcd_site", "female", "household_income"],
-  "loop_covs": false,
+  "loop_covars": false,
   "random_groups": null,
   "Method": "AdjHE",
   "ids": null,
