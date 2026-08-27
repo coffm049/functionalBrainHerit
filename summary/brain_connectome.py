@@ -20,6 +20,8 @@ import argparse
 import os
 import sys
 
+import re
+
 import numpy as np
 import pandas as pd
 import nibabel as nib
@@ -130,37 +132,69 @@ def read_network_csv(path, network_col=None):
 
     Two layouts are auto-detected:
       * network-per-row: each row is [network_name, parcel, parcel, ...]; every
-        numeric cell after the first is a parcel index belonging to that
-        network (the Gordon short-dictionary layout). The dlabel value
-        (parcel index) maps to the network name.
-      * parcel-per-row: one row per parcel; the first column is the network
-        name and rows are positional (row i <-> parcel i+1).
+        numeric cell after the first is a parcel index in that network (the
+        Gordon short-dictionary layout when parcel lists are present).
+      * parcel-per-row / dictionary: one row per parcel or per network; the
+        chosen column is the network name and rows are positional
+        (row i <-> value i+1). This is the shortDicionary layout you pasted.
     """
-    df = pd.read_csv(path, header=None)
-    name_col = 0 if network_col is None else int(network_col)
+    df = pd.read_csv(path)
+    cols = list(df.columns)
+    # network name column: explicit override, else prefer 'shortname'/'name'
+    if network_col is None:
+        if "shortname" in cols:
+            network_col = "shortname"
+        elif "name" in cols:
+            network_col = "name"
+        else:
+            network_col = cols[0]
+
+    # Try network-per-row with parcel lists (numeric cells after the name)
     net_by_value = {}
-    total_parcels = 0
+    total = 0
     for _, row in df.iterrows():
-        cells = list(row.values)
-        if not cells:
-            continue
-        name = str(cells[name_col]) if name_col < len(cells) else str(cells[0])
+        name = str(row[network_col])
         parcels = []
-        for c in cells[name_col + 1:]:
-            try:
-                parcels.append(int(float(c)))
-            except (ValueError, TypeError):
-                pass
+        for c in cols:
+            if c == network_col:
+                continue
+            val = row[c]
+            if pd.isna(val):
+                continue
+            for tok in re.split(r"[,\s;]+", str(val)):
+                tok = tok.strip()
+                if not tok:
+                    continue
+                try:
+                    parcels.append(int(float(tok)))
+                except (ValueError, TypeError):
+                    pass
         for p in parcels:
             net_by_value[p] = name
-        total_parcels += len(parcels)
-    if total_parcels == 0:
-        # parcel-per-row positional fallback (no parcel lists found)
-        for i, row in df.iterrows():
-            cells = list(row.values)
-            if cells:
-                net_by_value[i + 1] = str(cells[0])
-    return net_by_value
+        total += len(parcels)
+
+    if total > 0:
+        return net_by_value
+
+    # parcel-per-row positional fallback: row i <-> parcel/value i+1
+    # (e.g. shortDicionary with ~13 network rows -> parcel 1..13 get a network;
+    #  for 352 parcels this would leave most as NA, so we cycle the networks
+    #  if the dictionary is smaller than N — the Gordon case where the dlabel
+    #  is the 13-network topography and each ROI belongs to one network by its
+    #  position is not available, so we fall back to parcel-cycle is NOT right.
+    #  Instead, for this layout we map dlabel value (network index) -> name;
+    #  the caller maps dlabel value directly, so positional 1..K is correct.
+    #  The chord's 352 ROIs need parcel->network; that requires a separate
+    #  parcel->network file, but shortDicionary only has 13 networks, so we
+    #  return the 1..K mapping and the caller will get NA for parcels >K.
+    #  To avoid hundreds of NAs and honour 'multiple ROIs per network', we
+    #  detect the Gordon 13-network case and provide a parcel->network mapping
+    #  by cycling? No — we must not guess. Return the 1..K dictionary; the
+    #  caller (352 ROIs) will then show the problem and we will ask for the
+    #  real parcel->network file. For now, return the 1..K mapping; the
+    #  surface (13 networks) will be correct and the chord will make the
+    #  mismatch visible.
+    return {i + 1: str(v) for i, v in enumerate(df[network_col].astype(str))}
 
 
 def dlabel_networks(dlabel, N, csv_path=None):
