@@ -132,12 +132,29 @@ for (sm in unique(melt$MashMethod)) {
   ggsave(file.path(plot_dir, paste0("blandaltman_", sm, ".png")), p2, width = 6, height = 4)
 }
 
+twin_labels <- c("SA" = "SA", "gordon" = "Gordon", "probaConns" = "ProbaConns")
 for (s in c("SA", "gordon", "probaConns")) {
-  d <- twin %>% filter(Set == s) %>% mutate(t = 1:n()) %>%
-    pivot_longer(c(A, C, E), names_to = "Comp", values_to = "val")
-  p <- ggplot(d, aes(x = t, y = val, fill = Comp)) + geom_area() +
-    labs(title = paste("Twin ACE composition", s)) + theme_minimal()
-  ggsave(file.path(plot_dir, paste0("twin_composition_", s, ".png")), p, width = 6, height = 4)
+  d <- twin %>%
+    filter(Set == s) %>%
+    arrange(Phenotype) %>%
+    mutate(t = row_number()) %>%
+    pivot_longer(c(A, C, E), names_to = "Comp", values_to = "val") %>%
+    mutate(Comp = factor(Comp, levels = c("A", "C", "E"),
+                         labels = c("Additive (A)", "Common (C)", "Unique (E)")))
+  # drop fully-NA phenotypes for cleaner x-axis
+  keep <- d %>% group_by(t) %>% summarise(m = max(val, na.rm = TRUE), .groups = "drop") %>% filter(is.finite(m))
+  d <- d %>% filter(t %in% keep$t)
+  p <- ggplot(d, aes(x = t, y = val, fill = Comp)) +
+    geom_area(color = "white", linewidth = 0.15, alpha = 0.9) +
+    scale_fill_manual(values = c("Additive (A)" = "#1f77b4", "Common (C)" = "#ff7f0e", "Unique (E)" = "#2ca02c")) +
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0), limits = c(0, NA)) +
+    labs(title = paste0(twin_labels[s], " — Twin ACE composition"),
+         x = "Phenotype (ordered)", y = "Variance component") +
+    theme_minimal(base_size = 11) +
+    theme(legend.position = "bottom", plot.title = element_text(face = "bold", hjust = 0.5),
+          panel.grid = element_blank())
+  ggsave(file.path(plot_dir, paste0("twin_composition_", s, ".png")), p, width = 7, height = 3.5, dpi = 300)
 }
 
 cat("\n=== MASH vs Twin correlations (by set) ===\n")
