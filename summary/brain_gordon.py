@@ -93,6 +93,29 @@ def _network_of(name):
     return s.split("_")[0] if "_" in s else s
 
 
+def _cifti_labels(img):
+    """Return {label_value: Cifti2Label} dict for a CIFTI dlabel image."""
+    for attr in ("labeltable", "labels"):
+        lt = getattr(img, attr, None)
+        if lt is not None:
+            d = getattr(lt, "labels", lt)
+            if isinstance(d, dict):
+                return d
+    try:
+        ax0 = img.header.get_axis(0)
+        for attr in ("labels", "label", "labeltable"):
+            lt = getattr(ax0, attr, None)
+            if lt is not None:
+                d = getattr(lt, "labels", lt)
+                if isinstance(d, dict):
+                    return d
+        if hasattr(ax0, "labels") and isinstance(ax0.labels, dict):
+            return ax0.labels
+    except Exception:
+        pass
+    return {}
+
+
 def load_gordon_networks(dlabel, csv_path, N):
     """Parcel (1..N) -> network shortname for Gordon.
 
@@ -103,12 +126,13 @@ def load_gordon_networks(dlabel, csv_path, N):
     df = pd.read_csv(csv_path)
     name_to_short = dict(zip(df["name"].astype(str), df["shortname"].astype(str)))
     img = nib.load(str(dlabel))
-    lt = img.labeltable
-    labels = lt.labels
+    labels = _cifti_labels(img)
     nets = []
     for p in range(1, N + 1):
         lab = labels.get(p)
-        parcel_label = lab.label if lab is not None else None
+        parcel_label = getattr(lab, "label", None) if lab is not None else None
+        if parcel_label is None and lab is not None:
+            parcel_label = getattr(lab, "key", None)
         net = _network_of(parcel_label)
         short = name_to_short.get(net, net)
         if short == net:
