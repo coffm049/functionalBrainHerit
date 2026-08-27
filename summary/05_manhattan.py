@@ -170,11 +170,9 @@ def build_long_for_set(wide, atlas, N, h2_col, twin_col="Twin_h2"):
 
 
 def manhattan_for_df(df, atlas, method, out_path):
-    """Two-panel Manhattan (top scatter y=h2, bottom bar y=prop heritable)
-    following 03-matrixManhattan2.py exactly: nlabels=30, pROIs=0.005,
-    Tableau colours, divider compression for tail groups.
+    """Single-panel Manhattan y=h2 (faithful to 03-matrixManhattan2.py
+    groups by network-pair, nlabels=30 Tableau colours, divider compression).
     """
-    # connectionOrder: mean h2 per connection, descending, as in 03
     connection_order = (
         df.groupby("connection")["h2"].mean().sort_values(ascending=False).index.tolist()
     )
@@ -183,66 +181,36 @@ def manhattan_for_df(df, atlas, method, out_path):
     )
     df = df.sort_values("connection").reset_index(drop=True).reset_index(drop=False)
     df = df.rename(columns={"index": "idx"})
-    # use idx as x
     df["index"] = df["idx"]
 
     grouped = df.groupby("connection", observed=True)
     groupsizes = np.array([g.shape[0] for _, g in grouped])
 
     nlabels = 30
-    pROIs = 0.005
     colors = np.fromiter(mcolors.TABLEAU_COLORS.values(), dtype="<U7")
     colors = np.tile(colors, math.ceil(nlabels / len(colors)))[:nlabels]
     colors = np.append(colors, np.repeat("grey", max(0, len(groupsizes) - nlabels)))
 
-    fig, ax = plt.subplots(2, figsize=(8, 5))
-    fig.subplots_adjust(hspace=0)
+    fig, ax = plt.subplots(1, figsize=(8, 3.2))
 
-    # bottom: proportion heritable (signif mean) per connection
-    plotdata = grouped["signif"].mean()
-    ax[1].set_ylim([0, 0.35])
-    if len(plotdata) <= nlabels:
-        # few groups (e.g. SA 17) — show all, no "others" compression
-        ax[1].bar(x=plotdata.index, height=plotdata.values, color=colors[:len(plotdata)])
-        ax[1].tick_params(axis="x", labelsize=5, labelrotation=45)
-        ax[1].tick_params(axis="y", labelsize=10)
-    else:
-        colored = plotdata.iloc[:nlabels].copy()
-        colored["others"] = 0
-        ax[1].bar(x=plotdata.iloc[:nlabels].index, height=colored.iloc[:nlabels].values, color=colors[:nlabels])
-        # hide last ytick
-        if ax[1].get_yticklabels():
-            ax[1].get_yticklabels()[-1].set_visible(False)
-        ax[1].bar(
-            x=np.linspace(start=nlabels, stop=nlabels + (nlabels / 10), num=len(plotdata.iloc[nlabels:])),
-            height=np.flip(plotdata.iloc[nlabels:].values),
-            color="grey",
-            width=0.8 / 200,
-        )
-        ax[1].tick_params(axis="x", labelsize=5, labelrotation=45)
-        ax[1].tick_params(axis="y", labelsize=10)
-    ax[1].set_ylabel("Prop heritable", size=11)
-
-    # top: Manhattan scatter
     divider = None
     for num, (name, group) in enumerate(grouped):
         if divider is None and num > (nlabels - 1):
             divider = group["index"].min()
         if num > (nlabels - 1):
             group["index"] = (group["index"] - divider) / 100 + divider
-        # alpha handling as in 03 script (top 30 opaque, tail 0.1)
         group.plot(kind="scatter", x="index", y="h2", color=colors[num],
-                   ax=ax[0], s=8, zorder=10)
+                   ax=ax, s=8, zorder=10)
 
-    ax[0].set_xlabel("")
-    ax[0].tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
-    ax[0].set_xlim([0, df["index"].max()])
-    ax[0].set_ylim([0, 1])
+    ax.set_xlabel("")
+    ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
+    ax.set_xlim([0, df["index"].max()])
+    ax.set_ylim([0, 1])
     disp = {"gordon": "Gordon", "probaConns": "ProbaConns", "SA": "SA"}.get(atlas, atlas)
-    ax[0].set_ylabel(r"Heritability ($h^2$)", size=11)
-    ax[0].set_yticks([0, 0.25, 0.5, 0.75, 1])
-    ax[0].set_yticklabels([0, 0.25, 0.5, 0.75, 1], size=9)
-    ax[0].set_title(f"{disp} — {method}", fontsize=12, fontweight="bold")
+    ax.set_ylabel(r"Heritability ($h^2$)", size=11)
+    ax.set_yticks([0, 0.25, 0.5, 0.75, 1])
+    ax.set_yticklabels([0, 0.25, 0.5, 0.75, 1], size=9)
+    ax.set_title(f"{disp} — {method}", fontsize=12, fontweight="bold")
 
     plt.savefig(out_path, dpi=300, bbox_inches="tight", pad_inches=0)
     plt.close(fig)
