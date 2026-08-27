@@ -256,7 +256,7 @@ def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     for i, (hemi, surf, val) in enumerate(sides, start=1):
         ax = fig.add_subplot(1, len(sides), i, projection="3d")
         niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
-                                  cmap="coolwarm", colorbar=True, threshold=None,
+                                  cmap="coolwarm", colorbar=(hemi == "right"), threshold=None,
                                   vmin=0.0, vmax=vmax, title=f"{_display_tag(tag)} ({hemi})")
     fig.savefig(png, dpi=150, bbox_inches="tight")
     plt.close(fig)
@@ -266,7 +266,7 @@ def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     print(f"  [{tag}] surface assigned={assigned} min={np.nanmin(allv):.3f} max={np.nanmax(allv):.3f}")
 
 
-def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.25):
+def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.35):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -282,12 +282,11 @@ def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.25):
     vals = M[iu]
     mask = vals > h2_thr
     n_edges = int(mask.sum())
-    # line thickness + alpha rescaled: h2 0.25–0.5 -> lw 0.1–1.0, alpha 0.1–1.0
+    # line thickness + alpha rescaled: h2 0.35–0.5 -> lw 0.1–1.0, alpha 0.1–1.0
     for (a, b), v in zip(zip(iu[0][mask], iu[1][mask]), vals[mask]):
         pa, pb = pos[a], pos[b]
-        # clip h2 to 0.25–0.5 then rescale to 0.1–1.0
-        v_clipped = float(np.clip(v, 0.25, 0.5))
-        norm = (v_clipped - 0.25) / (0.5 - 0.25)  # 0→1
+        v_clipped = float(np.clip(v, 0.35, 0.5))
+        norm = (v_clipped - 0.35) / (0.5 - 0.35)
         lw = 0.1 + norm * (1.0 - 0.1)
         alpha = 0.1 + norm * (1.0 - 0.1)
         ax.plot([xy[pa, 0], xy[pb, 0]], [xy[pa, 1], xy[pb, 1]], color="red", alpha=alpha, linewidth=lw)

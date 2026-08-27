@@ -163,7 +163,7 @@ def plot_sa_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     for i, (hemi, surf, val) in enumerate(sides, start=1):
         ax = fig.add_subplot(1, len(sides), i, projection="3d")
         niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
-                                  cmap="coolwarm", colorbar=True, threshold=None,
+                                  cmap="coolwarm", colorbar=(hemi == "right"), threshold=None,
                                   vmin=0.0, vmax=vmax, title=f"{_display_tag(tag)} ({hemi})")
     fig.savefig(png, dpi=150, bbox_inches="tight")
     plt.close(fig)
