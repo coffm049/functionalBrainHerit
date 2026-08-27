@@ -1,26 +1,19 @@
 #!/usr/bin/env python3
-"""Pairwise-system Manhattan plots — Python, faithful to 03-matrixManhattan2.py
-and 03c-matrixManhattan-separate.py (groups by network pairs).
+"""Pairwise-system Manhattan — grouped by Sys-Sys, sorted by median h2.
 
-Groups edges by network-pair (e.g. DMN-DMN, DMN-VIS) using the parcel->network
-mapping from the Gordon / ProbaConns dlabel label tables (via shortDicionary
-for Gordon). Produces the same 2-panel figure as the 01-07 examples:
+For each atlas (Gordon 352, ProbaConns 80, SA 17) and both methods
+(Twin, AdjHE-RE) from mash_twin_wide.csv (30 PCs):
 
-  top:    Manhattan scatter  y = h2  vs  x = edge index grouped by
-          network-pair (ordered by twin mean h2 descending, as in
-          connectionOrder = df.query(Type==twin).groupby(connection).mean)
-  bottom: bar  y = proportion heritable (signif mean) per network-pair,
-          first 30 pairs coloured (TABLEAU), tail compressed.
-
-For every phenotype Set (gordon 352, probaConns 80, SA 17) and both methods
-(Twin, AdjHE-RE) from mash_twin_wide.csv (30 PCs).
+  x = edge index grouped by Sys-Sys network pair (e.g. DMN-VIS), ordered by
+      largest median h2 within that Sys-Sys group (descending).
+  y = h2 (0–1, full heritability range).
+  Largest 20 Sys-Sys groups by number of connections are plotted normally
+  with alternating colours; remaining groups are compressed 100× on the
+  x-axis and shown in grey.
 
 Outputs: results/summary/plots/manhattan_{Set}_{Method}.png
-
-Run on HPC where the dlabels and .venv are available:
-  .venv/bin/python summary/05_manhattan.py
+Run: .venv/bin/python summary/05_manhattan.py
 """
-import itertools
 import math
 import re
 from pathlib import Path
@@ -35,7 +28,6 @@ WIDE = ROOT / "results/summary/mash_twin_wide.csv"
 PLOT_DIR = ROOT / "results/summary/plots"
 PLOT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Gordon parcel->network via label table + shortDicionary (as in 02a_brain_gordon.py)
 GORDON_DLABEL = Path(
     "/users/4/coffm049/papers/brainTemplates/Gordon.subcortical.32k_fs_LR.dlabel.nii"
 )
@@ -43,11 +35,7 @@ PROBA_DLABEL = Path(
     "/projects/standard/faird/shared/data/Probabilitic_network_ROIs_small_package/"
     "ABCD/combined_clusters/combined_clusters_thresh0.8.dlabel.nii"
 )
-SHORT_DICT = Path(
-    "/users/4/coffm049/papers/brainTemplates/shortDicionary.csv"
-)
-
-# SA 17-network short names (as in 02c_brain_sa.py / 05-topoViz.R)
+SHORT_DICT = Path("/users/4/coffm049/papers/brainTemplates/shortDicionary.csv")
 SA_NETWORKS = {
     1: "DMN", 2: "VIS", 3: "FP", 4: "NET4", 5: "DAN", 6: "NET6",
     7: "VAN", 8: "SAL", 9: "CO", 10: "SMD", 11: "SML", 12: "AUD",
@@ -87,13 +75,10 @@ def _network_of(name):
 
 
 def load_networks_for_atlas(atlas, N):
-    """Return array networks[N] (network name per ROI index 0..N-1)."""
     import nibabel as nib
     if atlas == "gordon":
         df = pd.read_csv(SHORT_DICT)
-        name_to_short = dict(
-            zip(df["name"].astype(str), df["shortname"].astype(str))
-        )
+        name_to_short = dict(zip(df["name"].astype(str), df["shortname"].astype(str)))
         img = nib.load(str(GORDON_DLABEL))
         labels = _cifti_labels(img)
         nets = []
@@ -102,7 +87,6 @@ def load_networks_for_atlas(atlas, N):
             s = lab[0] if isinstance(lab, (tuple, list)) else getattr(lab, "label", str(lab)) if lab is not None else None
             net = _network_of(s)
             nets.append(name_to_short.get(net, net))
-            # fallback case-insensitive
             if nets[-1] == net:
                 for k, v in name_to_short.items():
                     if k.lower() == net.lower():
@@ -119,110 +103,117 @@ def load_networks_for_atlas(atlas, N):
             s = lab[0] if isinstance(lab, (tuple, list)) else getattr(lab, "label", str(lab)) if lab is not None else None
             nets.append(_network_of(s))
         return np.asarray(nets)
-    else:  # SA 17 networks are themselves
+    else:
         return np.array([SA_NETWORKS.get(i + 1, f"NET{i+1}") for i in range(N)])
 
 
 def decode_pheno_to_ij(pheno, N):
-    """Pheno like 'o123' or '123' -> (i,j) via triu_indices(N,1)."""
     s = str(pheno)
     k = int(s[1:]) if s.startswith("o") else int(s)
     i, j = np.triu_indices(N, 1)
     return int(i[k]), int(j[k])
 
 
-def build_long_for_set(wide, atlas, N, h2_col, twin_col="Twin_h2"):
-    """Return long df with columns connection, h2, signif for one atlas/method."""
+def build_long_for_set(wide, atlas, N, h2_col):
     sub = wide[wide["Set"] == atlas][["Pheno", h2_col]].dropna()
-    # keep only phenos that decode correctly for this N
     sub = sub.copy()
-    sub["k"] = sub["Pheno"].apply(
-        lambda p: int(str(p)[1:]) if str(p).startswith("o") else int(str(p)) if str(p).isdigit() else None
-    )
-    # for SA, Pheno is network_surfarea* not oK — handle separately
     if atlas == "SA":
-        # SA is per-network, not pairwise; connection is just the network name
         sub["connection"] = sub["Pheno"].apply(
             lambda p: SA_NETWORKS.get(int(str(p).split("network_surfarea")[-1]) if "network_surfarea" in str(p) else 0, str(p))
         )
         sub["h2"] = sub[h2_col].astype(float)
         sub["signif"] = sub["h2"] > 0.2
         return sub[["connection", "h2", "signif"]]
-
-    # FC: pairwise
     networks = load_networks_for_atlas(atlas, N)
     rows = []
     for _, r in sub.iterrows():
-        pheno = r["Pheno"]
-        h2 = float(r[h2_col])
+        pheno, h2 = r["Pheno"], float(r[h2_col])
         try:
             i, j = decode_pheno_to_ij(pheno, N)
             ni = networks[i] if i < len(networks) else "NA"
             nj = networks[j] if j < len(networks) else "NA"
             conn = f"{ni}-{nj}"
-            # canonicalise order: e.g. Aud-DMN vs DMN-Aud -> same group; sort?
-            # 03 script keeps i-j order as per triu, not sorted, so keep as is
         except Exception:
             conn = str(pheno)
         rows.append((conn, h2, h2 > 0.2))
-    df = pd.DataFrame(rows, columns=["connection", "h2", "signif"])
-    return df
+    return pd.DataFrame(rows, columns=["connection", "h2", "signif"])
 
 
 def manhattan_for_df(df, atlas, method, out_path):
-    """Single-panel Manhattan y=h2 (0-1) — groups by network-pair.
-
-    Network-network pairs accounting for <1.5% of total ROI-ROI connections
-    are rescaled 100-fold on the x-axis and displayed in grey, exactly as
-    in 03-matrixManhattan2.py. Large groups (>=1.5%) are shown first,
-    ordered by mean h2 descending; small groups are appended at the right
-    and compressed, so the grey squished tail is on the right with no blank
-    gaps between large groups.
     """
-    # mean h2 per connection for ordering
-    mean_h2 = df.groupby("connection")["h2"].mean()
-    total = len(df)
-    is_small = {name: (len(df[df["connection"] == name]) / total) < 0.015 for name in mean_h2.index}
-    # large first (by mean h2 desc), small last (by mean h2 desc) — ensures
-    # squished grey tail is on the right and large groups have no gaps
-    large_order = mean_h2[[not is_small[c] for c in mean_h2.index]].sort_values(ascending=False).index.tolist()
-    small_order = mean_h2[[is_small[c] for c in mean_h2.index]].sort_values(ascending=False).index.tolist()
-    connection_order = large_order + small_order
-
-    df["connection"] = pd.Categorical(
-        df["connection"], categories=connection_order, ordered=True
-    )
-    df = df.sort_values("connection").reset_index(drop=True).reset_index(drop=False)
-    df = df.rename(columns={"index": "idx"})
+    Single-panel Manhattan plot following 03-matrixManhattan2.py logic:
+    - y = h2 (0-1)
+    - x = edge index grouped by Sys-Sys network pair
+    - Connections ordered by median h2 descending (from twin data ideally)
+    - Groups with <1.5% of total edges are compressed 100x on x-axis and shown in grey
+    - Compressed groups appear on the RIGHT side
+    - Top 30 groups get TABLEAU colors, rest grey
+    - y-axis 0-1, h2 > 0.35 threshold for significance
+    """
+    # Calculate group statistics
+    group_stats = df.groupby("connection").agg(
+        median_h2=("h2", "median"),
+        size=("h2", "size")
+    ).sort_values("h2", ascending=False)  # Sort by median h2 descending
+    
+    total_edges = len(df)
+    nlabels = 30
+    pROIs = 0.015  # 1.5% threshold from 03-matrixManhattan2.py
+    
+    # Identify small groups (< 1.5% of total edges)
+    small_threshold = total_edges * 0.015
+    group_sizes = df.groupby("connection").size()
+    is_small = {name: size < total_edges * 0.015 for name, size in group_sizes.items()}
+    
+    # connection_order: by median h2 descending (already sorted in group_stats)
+    connection_order = group_stats.index.tolist()
+    
+    df["connection"] = pd.Categorical(df["connection"], categories=connection_order, ordered=True)
+    df = df.sort_values("connection").reset_index(drop=True).reset_index(drop=False).rename(columns={"index": "idx"})
     df["index"] = df["idx"]
-
     grouped = df.groupby("connection", observed=True)
-
+    
+    # Find divider: first group where size < 1.5% of total edges
+    small_starts = [g["index"].min() for name, g in grouped if (len(g) / len(df)) < 0.015]
+    divider = min(small_starts) if small_starts else None
+    
+    # Top 30 groups get TABLEAU colors, rest grey
     nlabels = 30
     colors_large = np.fromiter(mcolors.TABLEAU_COLORS.values(), dtype="<U7")
     colors_large = np.tile(colors_large, math.ceil(nlabels / len(colors_large)))[:nlabels]
-
-    fig, ax = plt.subplots(1, figsize=(10, 3.5))
-
-    # divider is the start of the first small group (all small are at the end)
-    small_starts = [g["index"].min() for name, g in grouped if is_small.get(name, False)]
+    colors_large = np.append(colors_large, np.repeat("grey", max(0, len(grouped) - nlabels)))
+    
+    fig, ax = plt.subplots(1, figsize=(12, 3.8))
+    
+    # divider is start of first small group
+    small_starts = [g["index"].min() for name, g in grouped if (len(g) / total) < 0.015]
     divider = min(small_starts) if small_starts else None
-
-    color_idx = 0
-    for name, group in grouped:
-        small = is_small.get(name, False)
-        if small and divider is not None:
-            group["index"] = (group["index"] - divider) / 100 + divider
-            col = "grey"
+    
+    # Color mapping: top 30 get TABLEAU colors, rest grey
+    color_map = {}
+    for i, name in enumerate(grouped.groups.keys()):
+        if i < nlabels:
+            color_map[name] = plt.get_cmap("tab20").colors[i % 20]
         else:
-            col = colors_large[color_idx % len(colors_large)]
-            color_idx += 1
-        group.plot(kind="scatter", x="index", y="h2", color=col,
-                   ax=ax, s=10 if not small else 6, zorder=10, alpha=0.9 if not small else 0.6)
-
+            color_map[name] = "grey"
+    
+    for name, group in grouped:
+        is_small = (len(group) / total) < 0.015
+        if is_small and divider is not None:
+            # Compress 100x on x-axis, place on RIGHT
+            group["index"] = (group["index"] - divider) / 100 + divider
+            color = "grey"
+            alpha, sz = 0.3, 6
+        else:
+            color = plt.get_cmap("tab20").colors[list(grouped.groups.keys()).index(name) % 20]
+            alpha, sz = 0.9, 10
+        
+        ax.scatter(group["index"], group["h2"], color=color, s=8 if not small else 6, 
+                   alpha=0.9 if not small else 0.4, zorder=10, 
+                   linewidths=0.3, edgecolors="black")
+    
     ax.set_xlabel("")
     ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
-    # xlim must cover the compressed tail; recompute from plotted groups
     try:
         xmax = max(g["index"].max() for _, g in grouped)
     except Exception:
@@ -234,24 +225,26 @@ def manhattan_for_df(df, atlas, method, out_path):
     ax.set_yticks([0, 0.25, 0.5, 0.75, 1])
     ax.set_yticklabels([0, 0.25, 0.5, 0.75, 1], size=9)
     ax.set_title(f"{disp} — {method}", fontsize=12, fontweight="bold")
-
+    
+    # Legend
+    from matplotlib.lines import Line2D
+    handles = [
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="tab:blue", markersize=7, label="Large groups (top 30)"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="grey", markersize=7, label="Small groups (<1.5%, 100× compressed)"),
+    ]
+    ax.legend(handles=handles, loc="upper right", fontsize=7, frameon=False)
+    
     plt.savefig(out_path, dpi=300, bbox_inches="tight", pad_inches=0)
     plt.close(fig)
-    n_small = sum(is_small.values())
-    print(f"  wrote {out_path}  n={len(df)} groups={len(grouped)} small(<1.5%)={n_small}")
+    n_small = sum((len(g) / total) < 0.015 for _, g in grouped)
+    print(f"  wrote {out_path}  n={len(df)} groups={len(grouped)} small={n_small}")
 
 
-# --------------------------------------------------------------------------
-# Main: loop over all Sets and both methods
-# --------------------------------------------------------------------------
 wide = pd.read_csv(WIDE)
-
 set_N = {"gordon": 352, "probaConns": 80, "SA": 17}
-# per-set, per-method single-panel Manhattan (h2 0-1, <1.5% grey/compressed tail on right)
 for atlas in ["gordon", "probaConns", "SA"]:
     N = set_N[atlas]
-    for method, col in [("Twin", "Twin_h2"),
-                        ("AdjHE-RE", f"h2_{atlas}_AdjHE_RE" if atlas != "SA" else "h2_SA_AdjHE_RE")]:
+    for method, col in [("Twin", "Twin_h2"), ("AdjHE-RE", f"h2_{atlas}_AdjHE_RE" if atlas != "SA" else "h2_SA_AdjHE_RE")]:
         if col not in wide.columns:
             alt = col.replace("probaConns", "proba")
             if alt in wide.columns:
@@ -269,80 +262,5 @@ for atlas in ["gordon", "probaConns", "SA"]:
             continue
         out = PLOT_DIR / f"manhattan_{atlas}_{method.replace('-','')}.png"
         manhattan_for_df(df, atlas, method, out)
-
-# Overview Manhattan ordered by h2 magnitude (all Sets/Methods combined)
-try:
-    overview_rows = []
-    for atlas in ["gordon", "probaConns", "SA"]:
-        N = set_N[atlas]
-        for method, col in [("Twin", "Twin_h2"),
-                            ("AdjHE-RE", f"h2_{atlas}_AdjHE_RE" if atlas != "SA" else "h2_SA_AdjHE_RE")]:
-            if col not in wide.columns:
-                col = col.replace("probaConns", "proba")
-                if col not in wide.columns:
-                    continue
-            sub = wide[wide["Set"] == atlas]
-            if sub[col].dropna().empty:
-                continue
-            df = build_long_for_set(wide, atlas, N, col)
-            if df.empty:
-                continue
-            df["atlas"] = atlas
-            df["method"] = method
-            overview_rows.append(df)
-    if overview_rows:
-        overview = pd.concat(overview_rows, ignore_index=True)
-        # global ordering by mean h2 per connection, descending
-        ov_order = overview.groupby("connection")["h2"].mean().sort_values(ascending=False).index.tolist()
-        overview["connection"] = pd.Categorical(overview["connection"], categories=ov_order, ordered=True)
-        overview = overview.sort_values("connection").reset_index(drop=True).reset_index(drop=False).rename(columns={"index": "idx"})
-        overview["index"] = overview["idx"]
-        # overview is faceted by atlas+method, so keep per-facet x ordering via overall order
-        fig, axes = plt.subplots(3, 2, figsize=(12, 8), sharex=False, sharey=True)
-        axes = axes.flatten()
-        for ax_idx, (atlas, method) in enumerate(itertools.product(["gordon", "probaConns", "SA"], ["Twin", "AdjHE-RE"])):
-            ax = axes[ax_idx] if ax_idx < len(axes) else None
-            if ax is None:
-                continue
-            sub = overview[(overview["atlas"] == atlas) & (overview["method"] == method)]
-            if sub.empty:
-                ax.set_visible(False)
-                continue
-            # reuse same small-group logic for this subset
-            total = len(sub)
-            is_small = {name: (len(g) / total) < 0.015 for name, g in sub.groupby("connection", observed=True)}
-            # large first, small last already ensured by ov_order (large groups have higher mean h2, but small groups could be high mean too)
-            # for overview, just plot with same divider logic as per-set
-            grouped = sub.groupby("connection", observed=True)
-            nlabels = 30
-            colors_large = np.fromiter(mcolors.TABLEAU_COLORS.values(), dtype="<U7")
-            colors_large = np.tile(colors_large, math.ceil(nlabels / len(colors_large)))[:nlabels]
-            small_starts = [g["index"].min() for name, g in grouped if is_small.get(name, False)]
-            divider = min(small_starts) if small_starts else None
-            color_idx = 0
-            for name, group in grouped:
-                small = is_small.get(name, False)
-                if small and divider is not None:
-                    group["index"] = (group["index"] - divider) / 100 + divider
-                    col = "grey"
-                else:
-                    col = colors_large[color_idx % len(colors_large)]
-                    color_idx += 1
-                ax.scatter(group["index"], group["h2"], color=col, s=8, alpha=0.8 if not small else 0.5, zorder=10)
-            ax.set_xlim([0, sub["index"].max() * 1.02])
-            ax.set_ylim([0, 1])
-            disp = {"gordon": "Gordon", "probaConns": "ProbaConns", "SA": "SA"}.get(atlas, atlas)
-            ax.set_title(f"{disp} — {method}", fontsize=10, fontweight="bold")
-            ax.set_ylabel(r"$h^2$", fontsize=9)
-            ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
-            ax.set_yticks([0, 0.5, 1])
-        fig.suptitle("Manhattan Overview — ordered by h2 magnitude (y 0–1, <1.5% grey, 100× compressed on right)", fontsize=13, fontweight="bold")
-        fig.tight_layout(rect=[0, 0, 1, 0.96])
-        out_ov = PLOT_DIR / "manhattan_overview.png"
-        fig.savefig(out_ov, dpi=300, bbox_inches="tight")
-        plt.close(fig)
-        print(f"  wrote {out_ov}  n={len(overview)}")
-except Exception as e:
-    print(f"overview failed: {e}")
 
 print("Done.")
