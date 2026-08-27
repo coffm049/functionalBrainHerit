@@ -141,27 +141,25 @@ def build_long_for_set(wide, atlas, N, h2_col):
 
 def manhattan_for_df(df, atlas, method, out_path):
     """
-    Single-panel Manhattan plot following 03-matrixManhattan2.py logic:
-    - y = h2 (0-1)
-    - x = edge index grouped by Sys-Sys network pair
-    - Connections ordered by median h2 descending (from twin data ideally)
-    - Groups with <1.5% of total edges are compressed 100x on x-axis and shown in grey
-    - Compressed groups appear on the RIGHT side
-    - Top 30 groups get TABLEAU colors, rest grey
-    - y-axis 0-1, h2 > 0.35 threshold for significance
+    Single-panel Manhattan y=h2 (0-1) — groups by network-pair.
+
+    Network-network pairs accounting for <1.5% of total ROI-ROI connections
+    are rescaled 100-fold on the x-axis and displayed in grey, exactly as
+    in 03-matrixManhattan2.py. Large groups (>=1.5%) are shown first,
+    ordered by median h2 descending; small groups are appended at the right
+    and compressed, so the grey squished tail is on the right with no blank
+    gaps between large groups.
     """
+    total_edges = len(df)
+    small_thresh = total_edges * 0.015  # 1.5% threshold
+    
     # Calculate group statistics
     group_stats = df.groupby("connection").agg(
         median_h2=("h2", "median"),
         size=("h2", "size")
     ).sort_values("h2", ascending=False)  # Sort by median h2 descending
     
-    total_edges = len(df)
-    nlabels = 30
-    pROIs = 0.015  # 1.5% threshold from 03-matrixManhattan2.py
-    
     # Identify small groups (< 1.5% of total edges)
-    small_threshold = total_edges * 0.015
     group_sizes = df.groupby("connection").size()
     is_small = {name: size < total_edges * 0.015 for name, size in group_sizes.items()}
     
@@ -172,9 +170,11 @@ def manhattan_for_df(df, atlas, method, out_path):
     df = df.sort_values("connection").reset_index(drop=True).reset_index(drop=False).rename(columns={"index": "idx"})
     df["index"] = df["idx"]
     grouped = df.groupby("connection", observed=True)
+    total_edges = len(df)
     
-    # Find divider: first group where size < 1.5% of total edges
-    small_starts = [g["index"].min() for name, g in grouped if (len(g) / len(df)) < 0.015]
+    # Find divider: first index of first small group in the sorted data
+    small_starts = [g["index"].min() for name, g in df.groupby("connection", observed=True) 
+                    if (len(g) / total_edges) < 0.015]
     divider = min(small_starts) if small_starts else None
     
     # Top 30 groups get TABLEAU colors, rest grey
@@ -190,14 +190,8 @@ def manhattan_for_df(df, atlas, method, out_path):
     divider = min(small_starts) if small_starts else None
     
     # Color mapping: top 30 get TABLEAU colors, rest grey
-    color_map = {}
-    for i, name in enumerate(grouped.groups.keys()):
-        if i < nlabels:
-            color_map[name] = plt.get_cmap("tab20").colors[i % 20]
-        else:
-            color_map[name] = "grey"
-    
-    for name, group in grouped:
+    color_idx = 0
+    for idx, (name, group) in enumerate(grouped):
         is_small = (len(group) / total) < 0.015
         if is_small and divider is not None:
             # Compress 100x on x-axis, place on RIGHT
@@ -205,11 +199,12 @@ def manhattan_for_df(df, atlas, method, out_path):
             color = "grey"
             alpha, sz = 0.3, 6
         else:
-            color = plt.get_cmap("tab20").colors[list(grouped.groups.keys()).index(name) % 20]
+            color = plt.get_cmap("tab20").colors[color_idx % 20]
+            color_idx = (color_idx + 1) % 20
             alpha, sz = 0.9, 10
         
-        ax.scatter(group["index"], group["h2"], color=color, s=8 if not small else 6, 
-                   alpha=0.9 if not small else 0.4, zorder=10, 
+        ax.scatter(group["index"], group["h2"], color=color, s=10 if not is_small else 6,
+                   alpha=0.9 if not is_small else 0.4, zorder=10, 
                    linewidths=0.3, edgecolors="black")
     
     ax.set_xlabel("")
