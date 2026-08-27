@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""SA (network surface area, 14 Gordon networks) brain-surface visualization — draft, simple & hardcoded.
+"""SA (network surface area, 17 Gordon networks) brain-surface visualization — simple & hardcoded.
 
 Follows 03b-topoh2Ests2Brain.py: SA heritability (twin vs AdjHE, 30 PCs) is
 per-network (not per-edge), so values are mapped directly via the Gordon
-networks dlabel (14 networks) — no pconn rebuild / node-summary needed.
+networks dlabel — no pconn rebuild / node-summary needed.
 
 Produces:
   - <out>/SA_{twin,AdjHE}_surface.png  (both hemispheres, 0–0.5)
@@ -11,13 +11,13 @@ Produces:
 Run on the HPC where the dlabel / surfaces and .venv are available:
   /users/4/coffm049/papers/functionalBrainHerit/.venv/bin/python summary/brain_sa.py
 
-Draft notes (from 03a/03b/05-topoViz):
-  - SA Set in mash_twin_wide.csv uses Pheno like "network_surfarea3" (the
-    full SA results have 17 phenos 1..17; the topo set used in 05-topoViz.R
-    keeps 14 after filtering 1,2,3,5,7,8,9,10,11,12,13,14,15,16). This draft
-    keeps the 14 present in mash_twin_wide.csv for Set=="SA" and maps them
-    via the integer suffix; if your SA wide has 17, adjust N / the filter.
-  - Template dlabel is Gordon.networks.32k_fs_LR.dlabel.nii (14 networks).
+Notes (from 03a/03b/05-topoViz + HPC check 2026-08-27):
+  - SA Set in mash_twin_wide.csv has 17 phenos network_surfarea1..17
+    (grep "network_surfarea" -> 17 distinct). The 03b script hard-coded
+    range(1,15) and 05-topoViz.R kept 14 after filtering 1,2,3,5,7,8,9,10,
+    11,12,13,14,15,16 — but the current wide file retains all 17, so this
+    draft maps all 17. Filter to 14 if you want the topo subset.
+  - Template dlabel is Gordon.networks.32k_fs_LR.dlabel.nii.
   - Surfaces are Conte69 inflated 32k.
 """
 from pathlib import Path
@@ -38,14 +38,14 @@ SURF_R = Path("/users/4/coffm049/papers/brainTemplates/Conte69.R.inflated.32k_fs
 OUTDIR = ROOT / "results/summary/brain/SA"
 VMAX = 0.5  # fixed 0–0.5 heatmap scale, same as FC gordon/probaConns
 
-# SA networks as in 05-topoViz.R (index -> short name, 1-based)
+# SA networks: 17 Gordon networks (1..17). Short names from 05-topoViz.R
+# plus the three dropped in that topoViz filter (4,6,17) given generic names —
+# the wide file currently has all 17, so keep all.
 NETWORKS = {
-    1: "DMN", 2: "VIS", 3: "FP", 5: "DAN", 7: "VAN",
+    1: "DMN", 2: "VIS", 3: "FP", 4: "NET4", 5: "DAN", 6: "NET6", 7: "VAN",
     8: "SAL", 9: "CO", 10: "SMD", 11: "SML", 12: "AUD",
-    13: "Tpole", 14: "MTL", 15: "PMN", 16: "PON",
+    13: "Tpole", 14: "MTL", 15: "PMN", 16: "PON", 17: "NET17",
 }
-# The SA dlabel used here has 14 distinct network values (1..14 after the
-# filtering in 03b). Keep N as the max network index present.
 
 
 def sa_region_from_pheno(pheno: str) -> int | None:
@@ -141,5 +141,4 @@ for method, mapping in sa.items():
     plot_sa_surface(tex_l, tex_r, SURF_L, SURF_R, OUTDIR, f"SA_{method}", VMAX)
 
 print(f"Done. Outputs in {OUTDIR}")
-print("Note: if your SA wide has 17 phenos 1..17, extend NETWORKS and the dlabel mapping accordingly;"
-      " see 03b-topoh2Ests2Brain.py and 05-topoViz.R for the 14-network filtering.")
+print("To reproduce the 14-network topo figure (05-topoViz.R), filter NETWORKS to 1,2,3,5,7,8,9,10,11,12,13,14,15,16 before mapping.")
