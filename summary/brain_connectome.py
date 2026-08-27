@@ -128,19 +128,10 @@ def dlabel_values(node_h2, dlabel, N):
 
 
 def read_network_csv(path, network_col=None):
-    """Return dict {parcel_index(int): network_name(str)} from a CSV.
-
-    Two layouts are auto-detected:
-      * network-per-row: each row is [network_name, parcel, parcel, ...]; every
-        numeric cell after the first is a parcel index in that network (the
-        Gordon short-dictionary layout when parcel lists are present).
-      * parcel-per-row / dictionary: one row per parcel or per network; the
-        chosen column is the network name and rows are positional
-        (row i <-> value i+1). This is the shortDicionary layout you pasted.
-    """
+    """Return dict from a CSV (legacy helper; see dlabel_networks for the
+    full parcel->network logic). Kept for backwards compatibility."""
     df = pd.read_csv(path)
     cols = list(df.columns)
-    # network name column: explicit override, else prefer 'shortname'/'name'
     if network_col is None:
         if "shortname" in cols:
             network_col = "shortname"
@@ -148,63 +139,84 @@ def read_network_csv(path, network_col=None):
             network_col = "name"
         else:
             network_col = cols[0]
-
-    # Try network-per-row with parcel lists (numeric cells after the name)
-    net_by_value = {}
-    total = 0
-    for _, row in df.iterrows():
-        name = str(row[network_col])
-        parcels = []
-        for c in cols:
-            if c == network_col:
-                continue
-            val = row[c]
-            if pd.isna(val):
-                continue
-            for tok in re.split(r"[,\s;]+", str(val)):
-                tok = tok.strip()
-                if not tok:
-                    continue
-                try:
-                    parcels.append(int(float(tok)))
-                except (ValueError, TypeError):
-                    pass
-        for p in parcels:
-            net_by_value[p] = name
-        total += len(parcels)
-
-    if total > 0:
-        return net_by_value
-
-    # parcel-per-row positional fallback: row i <-> parcel/value i+1
-    # (e.g. shortDicionary with ~13 network rows -> parcel 1..13 get a network;
-    #  for 352 parcels this would leave most as NA, so we cycle the networks
-    #  if the dictionary is smaller than N — the Gordon case where the dlabel
-    #  is the 13-network topography and each ROI belongs to one network by its
-    #  position is not available, so we fall back to parcel-cycle is NOT right.
-    #  Instead, for this layout we map dlabel value (network index) -> name;
-    #  the caller maps dlabel value directly, so positional 1..K is correct.
-    #  The chord's 352 ROIs need parcel->network; that requires a separate
-    #  parcel->network file, but shortDicionary only has 13 networks, so we
-    #  return the 1..K mapping and the caller will get NA for parcels >K.
-    #  To avoid hundreds of NAs and honour 'multiple ROIs per network', we
-    #  detect the Gordon 13-network case and provide a parcel->network mapping
-    #  by cycling? No — we must not guess. Return the 1..K dictionary; the
-    #  caller (352 ROIs) will then show the problem and we will ask for the
-    #  real parcel->network file. For now, return the 1..K mapping; the
-    #  surface (13 networks) will be correct and the chord will make the
-    #  mismatch visible.
     return {i + 1: str(v) for i, v in enumerate(df[network_col].astype(str))}
 
 
 def dlabel_networks(dlabel, N, csv_path=None):
-    """Per-node network label (array of N strings). Uses the network CSV when
-    given; otherwise falls back to the dlabel CIFTI label table (first token of
-    each region name, e.g. 'SomMotA_3' -> 'SomMotA')."""
+    """Per-node network label (array of N strings).
+
+    When a CSV is given three layouts are handled:
+      * the CSV has ~N rows (parcel-per-row) -> row i <-> parcel i, network
+        is the chosen column;
+      * the CSV has parcel lists (network-per-row, numeric cells after the
+        name) -> every numeric parcel index in a row maps to that row's network;
+      * the CSV is a small network dictionary (e.g. 14 Gordon networks for
+        N=352 parcels) -> the dlabel's CIFTI label table is used to derive
+        parcel->network (first token of each parcel's label, e.g. 'Aud_01'
+        -> 'Aud'), and the CSV's name->shortname dict translates it.
+    Without a CSV the dlabel label table is used directly.
+    """
     if csv_path:
-        net_by_value = read_network_csv(csv_path)
-        return np.array([net_by_value.get(p, "NA") for p in range(1, N + 1)],
-                        dtype=object)
+        df = pd.read_csv(csv_path)
+        cols = list(df.columns)
+        name_col = "name" if "name" in cols else cols[0]
+        short_col = "shortname" if "shortname" in cols else cols[-1]
+
+        # Case 1: network-per-row with explicit parcel lists
+        net_by_parcel = {}
+        total = 0
+        for _, row in df.iterrows():
+            name = str(row[name_col if name_col in cols else cols[0]])
+            # shortname is not used for parcel lists; name is the network
+            parcels = []
+            for c in cols:
+                if c in (name_col, short_col):
+                    continue
+                val = row[c]
+                if pd.isna(val):
+                    continue
+                for tok in re.split(r"[,\s;]+", str(val)):
+                    tok = tok.strip()
+                    if not tok:
+                        continue
+                    try:
+                        parcels.append(int(float(tok)))
+                    except (ValueError, TypeError):
+                        pass
+            for p in parcels:
+                net_by_parcel[p] = name
+            total += len(parcels)
+        if total > 0:
+            return np.array([net_by_parcel.get(p, "NA") for p in range(1, N + 1)],
+                            dtype=object)
+
+        # Case 2: CSV row count matches N (parcel-per-row)
+        if len(df) >= N * 0.8:
+            net_col = short_col if short_col in cols else name_col
+            net_by_value = {i + 1: str(v) for i, v in enumerate(df[net_col].astype(str))}
+            return np.array([net_by_value.get(p, "NA") for p in range(1, N + 1)],
+                            dtype=object)
+
+        # Case 3: small network dictionary (e.g. 14 Gordon nets for 352 parcels)
+        # -> derive parcel->network from the dlabel's CIFTI label table.
+        name_to_short = dict(zip(df[name_col].astype(str), df[short_col].astype(str)))
+        img = nib.load(dlabel)
+        lt = getattr(img, "labeltable", None)
+        labels = getattr(lt, "labels", {}) if lt is not None else {}
+        nets = []
+        for p in range(1, N + 1):
+            lab = labels.get(p)
+            parcel_label = getattr(lab, "label", None) if lab else None
+            net = _network_of(parcel_label)
+            # translate full network name to shortname via the dictionary
+            short = name_to_short.get(net, net)
+            if short == net:
+                for k, v in name_to_short.items():
+                    if k.lower() == net.lower():
+                        short = v
+                        break
+            nets.append(short)
+        return np.asarray(nets)
     img = nib.load(dlabel)
     lt = getattr(img, "labeltable", None)
     labels = getattr(lt, "labels", {}) if lt is not None else {}
