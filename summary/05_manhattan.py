@@ -157,7 +157,7 @@ def manhattan_for_df(df, atlas, method, out_path):
     group_stats = df.groupby("connection").agg(
         median_h2=("h2", "median"),
         size=("h2", "size")
-    ).sort_values("h2", ascending=False)  # Sort by median h2 descending
+    ).sort_values("median_h2", ascending=False)  # Sort by median h2 descending
     
     # Identify small groups (< 1.5% of total edges)
     group_sizes = df.groupby("connection").size()
