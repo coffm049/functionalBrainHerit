@@ -186,13 +186,13 @@ def manhattan_for_df(df, atlas, method, out_path):
     fig, ax = plt.subplots(1, figsize=(12, 3.8))
     
     # divider is start of first small group
-    small_starts = [g["index"].min() for name, g in grouped if (len(g) / total) < 0.015]
+    small_starts = [g["index"].min() for name, g in grouped if (len(g) / total_edges) < 0.015]
     divider = min(small_starts) if small_starts else None
     
     # Color mapping: top 30 get TABLEAU colors, rest grey
     color_idx = 0
     for idx, (name, group) in enumerate(grouped):
-        is_small = (len(group) / total) < 0.015
+        is_small = (len(group) / total_edges) < 0.015
         if is_small and divider is not None:
             # Compress 100x on x-axis, place on RIGHT
             group["index"] = (group["index"] - divider) / 100 + divider
@@ -231,7 +231,7 @@ def manhattan_for_df(df, atlas, method, out_path):
     
     plt.savefig(out_path, dpi=300, bbox_inches="tight", pad_inches=0)
     plt.close(fig)
-    n_small = sum((len(g) / total) < 0.015 for _, g in grouped)
+    n_small = sum((len(g) / total_edges) < 0.015 for _, g in grouped)
     print(f"  wrote {out_path}  n={len(df)} groups={len(grouped)} small={n_small}")
 
 
