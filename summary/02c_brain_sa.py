@@ -65,9 +65,15 @@ def _display_tag(tag: str) -> str:
 # --------------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parents[1]
 WIDE = ROOT / "results/summary/mash_twin_wide.csv"
-DLABEL = Path("/users/4/coffm049/papers/brainTemplates/Gordon.networks.32k_fs_LR.dlabel.nii")
-SURF_L = Path("/users/4/coffm049/papers/brainTemplates/Conte69.L.inflated.32k_fs_LR.surf.gii")
-SURF_R = Path("/users/4/coffm049/papers/brainTemplates/Conte69.R.inflated.32k_fs_LR.surf.gii")
+def _resolve(rel, abs_path):
+    p = Path(rel)
+    return p if p.exists() else Path(abs_path)
+DLABEL = _resolve(ROOT.parent / "brainTemplates" / "Gordon.networks.32k_fs_LR.dlabel.nii",
+                  "/users/4/coffm049/papers/brainTemplates/Gordon.networks.32k_fs_LR.dlabel.nii")
+SURF_L = _resolve(ROOT.parent / "brainTemplates" / "Conte69.L.inflated.32k_fs_LR.surf.gii",
+                  "/users/4/coffm049/papers/brainTemplates/Conte69.L.inflated.32k_fs_LR.surf.gii")
+SURF_R = _resolve(ROOT.parent / "brainTemplates" / "Conte69.R.inflated.32k_fs_LR.surf.gii",
+                  "/users/4/coffm049/papers/brainTemplates/Conte69.R.inflated.32k_fs_LR.surf.gii")
 OUTDIR = ROOT / "results/summary/brain/SA"
 VMAX = 0.5  # fixed 0–0.5 heatmap scale, same as FC gordon/probaConns
 

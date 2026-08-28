@@ -28,14 +28,26 @@ WIDE = ROOT / "results/summary/mash_twin_wide.csv"
 PLOT_DIR = ROOT / "results/summary/plots"
 PLOT_DIR.mkdir(parents=True, exist_ok=True)
 
-GORDON_DLABEL = Path(
-    "/users/4/coffm049/papers/brainTemplates/Gordon.subcortical.32k_fs_LR.dlabel.nii"
+def _resolve(rel, abs_path):
+    p = Path(rel)
+    return p if p.exists() else Path(abs_path)
+
+GORDON_DLABEL = _resolve(
+    Path(__file__).resolve().parents[1].parent / "brainTemplates" / "Gordon.subcortical.32k_fs_LR.dlabel.nii",
+    "/users/4/coffm049/papers/brainTemplates/Gordon.subcortical.32k_fs_LR.dlabel.nii",
 )
-PROBA_DLABEL = Path(
-    "/projects/standard/faird/shared/data/Probabilitic_network_ROIs_small_package/"
-    "ABCD/combined_clusters/combined_clusters_thresh0.8.dlabel.nii"
+PROBA_DLABEL = _resolve(
+    Path(__file__).resolve().parents[1] / "brainTemplate" / "combined_clusters_thresh0.8.dlabel.nii",
+    "/projects/standard/faird/shared/data/Probabilitic_network_ROIs_small_package/ABCD/combined_clusters/combined_clusters_thresh0.8.dlabel.nii",
 )
-SHORT_DICT = Path("/users/4/coffm049/papers/brainTemplates/shortDicionary.csv")
+PROBA_DLABEL = _resolve(
+    Path(__file__).resolve().parents[1].parent / "brainTemplates" / "combined_clusters_thresh0.8.dlabel.nii",
+    str(PROBA_DLABEL),
+) if not PROBA_DLABEL.exists() else PROBA_DLABEL
+SHORT_DICT = _resolve(
+    Path(__file__).resolve().parents[1].parent / "brainTemplates" / "shortDicionary.csv",
+    "/users/4/coffm049/papers/brainTemplates/shortDicionary.csv",
+)
 SA_NETWORKS = {
     1: "DMN", 2: "VIS", 3: "FP", 4: "NET4", 5: "DAN", 6: "NET6",
     7: "VAN", 8: "SAL", 9: "CO", 10: "SMD", 11: "SML", 12: "AUD",

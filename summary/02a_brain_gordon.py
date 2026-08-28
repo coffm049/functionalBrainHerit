@@ -24,10 +24,18 @@ import nilearn.plotting as niplot
 # --------------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parents[1]
 WIDE = ROOT / "results/summary/mash_twin_wide.csv"
-DLABEL = Path("/users/4/coffm049/papers/brainTemplates/Gordon.subcortical.32k_fs_LR.dlabel.nii")
-SURF_L = Path("/users/4/coffm049/papers/brainTemplates/Conte69.L.inflated.32k_fs_LR.surf.gii")
-SURF_R = Path("/users/4/coffm049/papers/brainTemplates/Conte69.R.inflated.32k_fs_LR.surf.gii")
-NETWORKS_CSV = Path("/users/4/coffm049/papers/brainTemplates/shortDicionary.csv")
+# Portable: try relative ../brainTemplates first (local Windows), fallback to HPC absolute
+def _resolve(rel, abs_path):
+    p = Path(rel)
+    return p if p.exists() else Path(abs_path)
+DLABEL = _resolve(ROOT.parent / "brainTemplates" / "Gordon.subcortical.32k_fs_LR.dlabel.nii",
+                  "/users/4/coffm049/papers/brainTemplates/Gordon.subcortical.32k_fs_LR.dlabel.nii")
+SURF_L = _resolve(ROOT.parent / "brainTemplates" / "Conte69.L.inflated.32k_fs_LR.surf.gii",
+                  "/users/4/coffm049/papers/brainTemplates/Conte69.L.inflated.32k_fs_LR.surf.gii")
+SURF_R = _resolve(ROOT.parent / "brainTemplates" / "Conte69.R.inflated.32k_fs_LR.surf.gii",
+                  "/users/4/coffm049/papers/brainTemplates/Conte69.R.inflated.32k_fs_LR.surf.gii")
+NETWORKS_CSV = _resolve(ROOT.parent / "brainTemplates" / "shortDicionary.csv",
+                        "/users/4/coffm049/papers/brainTemplates/shortDicionary.csv")
 OUTDIR = ROOT / "results/summary/brain/gordon"
 N = 352
 NODE_PCT = 90

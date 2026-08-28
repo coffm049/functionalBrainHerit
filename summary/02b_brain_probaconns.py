@@ -22,9 +22,17 @@ import nilearn.plotting as niplot
 # --------------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parents[1]
 WIDE = ROOT / "results/summary/mash_twin_wide.csv"
-DLABEL = Path("/projects/standard/faird/shared/data/Probabilitic_network_ROIs_small_package/ABCD/combined_clusters/combined_clusters_thresh0.8.dlabel.nii")
-SURF_L = Path("/users/4/coffm049/papers/brainTemplates/Conte69.L.inflated.32k_fs_LR.surf.gii")
-SURF_R = Path("/users/4/coffm049/papers/brainTemplates/Conte69.R.inflated.32k_fs_LR.surf.gii")
+def _resolve(rel, abs_path):
+    p = Path(rel)
+    return p if p.exists() else Path(abs_path)
+DLABEL = _resolve(ROOT / "brainTemplate" / "combined_clusters_thresh0.8.dlabel.nii",
+                  "/projects/standard/faird/shared/data/Probabilitic_network_ROIs_small_package/ABCD/combined_clusters/combined_clusters_thresh0.8.dlabel.nii")
+# Try local ../brainTemplates first, fallback to HPC absolute
+DLABEL = _resolve(ROOT.parent / "brainTemplates" / "combined_clusters_thresh0.8.dlabel.nii", str(DLABEL)) if not DLABEL.exists() else DLABEL
+SURF_L = _resolve(ROOT.parent / "brainTemplates" / "Conte69.L.inflated.32k_fs_LR.surf.gii",
+                  "/users/4/coffm049/papers/brainTemplates/Conte69.L.inflated.32k_fs_LR.surf.gii")
+SURF_R = _resolve(ROOT.parent / "brainTemplates" / "Conte69.R.inflated.32k_fs_LR.surf.gii",
+                  "/users/4/coffm049/papers/brainTemplates/Conte69.R.inflated.32k_fs_LR.surf.gii")
 OUTDIR = ROOT / "results/summary/brain/probaConns"
 N = 80
 NODE_PCT = 90
