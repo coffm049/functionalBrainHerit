@@ -1,0 +1,15 @@
+name: brainHerit
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy>=1.24
+  - pandas>=2.0
+  - scipy
+  - matplotlib>=3.7
+  - seaborn
+  - pip
+  - pip:
+    - nibabel>=5.0
+    - nilearn>=0.10
+    - matplotlib>=3.7

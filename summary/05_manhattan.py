@@ -122,8 +122,7 @@ def build_long_for_set(wide, atlas, N, h2_col):
             lambda p: SA_NETWORKS.get(int(str(p).split("network_surfarea")[-1]) if "network_surfarea" in str(p) else 0, str(p))
         )
         sub["h2"] = sub[h2_col].astype(float)
-        sub["signif"] = sub["h2"] > 0.2
-        return sub[["connection", "h2", "signif"]]
+        return sub[["connection", "h2"]]
     networks = load_networks_for_atlas(atlas, N)
     rows = []
     for _, r in sub.iterrows():
@@ -135,78 +134,42 @@ def build_long_for_set(wide, atlas, N, h2_col):
             conn = f"{ni}-{nj}"
         except Exception:
             conn = str(pheno)
-        rows.append((conn, h2, h2 > 0.2))
-    return pd.DataFrame(rows, columns=["connection", "h2", "signif"])
+        rows.append((conn, h2))
+    return pd.DataFrame(rows, columns=["connection", "h2"])
 
 
 def manhattan_for_df(df, atlas, method, out_path):
-    """
-    Single-panel Manhattan y=h2 (0-1) — groups by network-pair.
+    # median h2 and size per Sys-Sys group
+    stats = df.groupby("connection")["h2"].agg(median="median", size="size")
+    # largest 20 by number of connections — plotted normally with alternating colours
+    largest_20 = stats.sort_values("size", ascending=False).head(20).index.tolist()
+    # order: large 20 sorted by median h2 desc, then remaining sorted by median h2 desc
+    large_order = stats.loc[stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
+    small_order = stats.loc[~stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
+    connection_order = large_order + small_order
 
-    Network-network pairs accounting for <1.5% of total ROI-ROI connections
-    are rescaled 100-fold on the x-axis and displayed in grey, exactly as
-    in 03-matrixManhattan2.py. Large groups (>=1.5%) are shown first,
-    ordered by median h2 descending; small groups are appended at the right
-    and compressed, so the grey squished tail is on the right with no blank
-    gaps between large groups.
-    """
-    total_edges = len(df)
-    small_thresh = total_edges * 0.015  # 1.5% threshold
-    
-    # Calculate group statistics
-    group_stats = df.groupby("connection").agg(
-        median_h2=("h2", "median"),
-        size=("h2", "size")
-    ).sort_values("median_h2", ascending=False)  # Sort by median h2 descending
-    
-    # Identify small groups (< 1.5% of total edges)
-    group_sizes = df.groupby("connection").size()
-    is_small = {name: size < total_edges * 0.015 for name, size in group_sizes.items()}
-    
-    # connection_order: by median h2 descending (already sorted in group_stats)
-    connection_order = group_stats.index.tolist()
-    
     df["connection"] = pd.Categorical(df["connection"], categories=connection_order, ordered=True)
     df = df.sort_values("connection").reset_index(drop=True).reset_index(drop=False).rename(columns={"index": "idx"})
     df["index"] = df["idx"]
     grouped = df.groupby("connection", observed=True)
-    total_edges = len(df)
-    
-    # Find divider: first index of first small group in the sorted data
-    small_starts = [g["index"].min() for name, g in df.groupby("connection", observed=True) 
-                    if (len(g) / total_edges) < 0.015]
-    divider = min(small_starts) if small_starts else None
-    
-    # Top 30 groups get TABLEAU colors, rest grey
-    nlabels = 30
-    colors_large = np.fromiter(mcolors.TABLEAU_COLORS.values(), dtype="<U7")
-    colors_large = np.tile(colors_large, math.ceil(nlabels / len(colors_large)))[:nlabels]
-    colors_large = np.append(colors_large, np.repeat("grey", max(0, len(grouped) - nlabels)))
-    
+
     fig, ax = plt.subplots(1, figsize=(12, 3.8))
-    
-    # divider is start of first small group
-    small_starts = [g["index"].min() for name, g in grouped if (len(g) / total_edges) < 0.015]
+
+    # divider is start of first small group (all small groups are at the right)
+    small_starts = [g["index"].min() for name, g in grouped if name not in largest_20]
     divider = min(small_starts) if small_starts else None
-    
-    # Color mapping: top 30 get TABLEAU colors, rest grey
-    color_idx = 0
-    for idx, (name, group) in enumerate(grouped):
-        is_small = (len(group) / total_edges) < 0.015
-        if is_small and divider is not None:
-            # Compress 100x on x-axis, place on RIGHT
+
+    alt_colors = ["#1f77b4", "#ff7f0e"]
+    for name, group in grouped:
+        is_large = name in largest_20
+        if not is_large and divider is not None:
             group["index"] = (group["index"] - divider) / 100 + divider
-            color = "grey"
-            alpha, sz = 0.3, 6
+            col, alpha, sz = "grey", 0.35, 6
         else:
-            color = plt.get_cmap("tab20").colors[color_idx % 20]
-            color_idx = (color_idx + 1) % 20
-            alpha, sz = 0.9, 10
-        
-        ax.scatter(group["index"], group["h2"], color=color, s=10 if not is_small else 6,
-                   alpha=0.9 if not is_small else 0.4, zorder=10, 
-                   linewidths=0.3, edgecolors="black")
-    
+            col = alt_colors[large_order.index(name) % 2] if is_large else "grey"
+            alpha, sz = 0.9, 9
+        ax.scatter(group["index"], group["h2"], color=col, s=sz, alpha=alpha, zorder=10, linewidths=0.3, edgecolors="black" if is_large else "none")
+
     ax.set_xlabel("")
     ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
     try:
@@ -220,19 +183,16 @@ def manhattan_for_df(df, atlas, method, out_path):
     ax.set_yticks([0, 0.25, 0.5, 0.75, 1])
     ax.set_yticklabels([0, 0.25, 0.5, 0.75, 1], size=9)
     ax.set_title(f"{disp} — {method}", fontsize=12, fontweight="bold")
-    
-    # Legend
     from matplotlib.lines import Line2D
     handles = [
-        Line2D([0], [0], marker="o", color="w", markerfacecolor="tab:blue", markersize=7, label="Large groups (top 30)"),
-        Line2D([0], [0], marker="o", color="w", markerfacecolor="grey", markersize=7, label="Small groups (<1.5%, 100× compressed)"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=alt_colors[0], markersize=7, label="Top 20 Sys-Sys (alternating)"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="grey", markersize=7, label="Remaining (100× compressed)"),
     ]
     ax.legend(handles=handles, loc="upper right", fontsize=7, frameon=False)
-    
+
     plt.savefig(out_path, dpi=300, bbox_inches="tight", pad_inches=0)
     plt.close(fig)
-    n_small = sum((len(g) / total_edges) < 0.015 for _, g in grouped)
-    print(f"  wrote {out_path}  n={len(df)} groups={len(grouped)} small={n_small}")
+    print(f"  wrote {out_path}  n={len(df)} groups={len(grouped)} large20={len(largest_20)}")
 
 
 wide = pd.read_csv(WIDE)
