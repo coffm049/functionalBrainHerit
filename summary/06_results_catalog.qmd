@@ -1,0 +1,289 @@
+---
+title: "Functional Brain Heritability — Results Catalog"
+subtitle: "Surfaces + Chords · Manhattans · Five-Number Summaries · Correlations"
+author: "MASH + Twin (30 PCs)"
+date: today
+date-format: long
+format:
+  revealjs:
+    theme: white
+    slide-number: true
+    transition: fade
+    embed-resources: true
+    self-contained: true
+    width: 1600
+    height: 900
+    margin: 0.04
+    code-fold: true
+    code-tools: true
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(knitr)
+ROOT <- "/users/4/coffm049/papers/functionalBrainHerit"
+# For local render (Windows) the same relative paths work; ROOT not needed for images
+WIDE <- file.path(ROOT, "results/summary/mash_twin_wide.csv")
+wide <- tryCatch(read_csv(WIDE, show_col_types = FALSE), error = function(e) tibble())
+
+fivenum_tbl <- function(x) {
+  x <- x[is.finite(x)]
+  if (length(x)==0) return(tibble(min=NA, q1=NA, median=NA, mean=NA, q3=NA, max=NA, n=0, sd=NA))
+  tibble(
+    min = min(x), q1 = quantile(x, 0.25), median = median(x),
+    mean = mean(x), q3 = quantile(x, 0.75), max = max(x),
+    n = length(x), sd = sd(x)
+  )
+}
+```
+
+# Overview
+
+* **FC Gordon 352** — Gordon subcortical dlabel (96854 greyordinates), `0–0.5` surface, `h2>0.35` chord (`0.35–0.5 → lw/alpha 0.1–1.0`), networks via `shortDicionary.csv` (parcel→network from label table)
+* **FC ProbaConns 80** — combined_clusters 0.8 dlabel, label-table networks
+* **SA 17** — `network_surfarea1..17`, wo_total (`02c`) and w_total (`02d`, total surface controlled)
+
+All PNGs below are already rendered by `01 → 02a-d → 05`. This catalog embeds them.
+
+---
+
+## Gordon — Surfaces & Chords {style="text-align:center;"}
+
+::: {layout="[[1,1],[1,1],[1,1]]" style="text-align:center;"}
+
+![Gordon Twin Surface — 0–0.5, Right colorbar only](../results/summary/brain/gordon/gordon_twin_surface.png){width="95%" style="max-height:285px; object-fit:contain;"}
+
+![Gordon AdjHE-RE Surface](../results/summary/brain/gordon/gordon_AdjHE_surface.png){width="95%" style="max-height:285px; object-fit:contain;"}
+
+![Gordon Networks Topography](../results/summary/brain/gordon/gordon_networks_surface.png){width="95%" style="max-height:285px; object-fit:contain;"}
+
+![Gordon Twin Circular — h2>0.35, thickness/alpha 0.1–1](../results/summary/brain/gordon/gordon_twin_circular.png){width="95%" style="max-height:285px; object-fit:contain;"}
+
+![Gordon AdjHE-RE Circular](../results/summary/brain/gordon/gordon_AdjHE_circular.png){width="95%" style="max-height:285px; object-fit:contain;"}
+
+:::
+*Left/Right hemispheres share one colourbar on the Right. Chord nodes coloured by network (shared palette).*
+
+---
+
+## Gordon — Manhattans {style="text-align:center;"}
+
+::: {layout="[[1,1]]" style="text-align:center;"}
+
+![Gordon Twin Manhattan — Sys-Sys pairs, y 0–1, <1.5% grey 100× compressed on right](../results/summary/plots/manhattan_gordon_Twin.png){width="95%" style="max-height:520px; object-fit:contain;"}
+
+![Gordon AdjHE-RE Manhattan](../results/summary/plots/manhattan_gordon_AdjHERE.png){width="95%" style="max-height:520px; object-fit:contain;"}
+
+:::
+*Ordered by largest median h² within Sys-Sys group; 20 largest groups (by #connections) plotted normally with alternating colours, remainder (<1.5% of total edges) compressed 100× on x and grey. Overview `manhattan_overview.png` faceted 3×2.*
+
+---
+
+## Gordon — Five-Number Summaries & Correlations
+
+```{r gordon-stats}
+#| fig-width: 14
+#| fig-height: 5
+if (nrow(wide)>0) {
+  gordon_wide <- wide %>% filter(Set=="gordon")
+  # Twin vs AdjHE-RE comparison for fivenum
+  gordon_long <- gordon_wide %>%
+    select(Pheno, Twin_h2, h2_gordon_AdjHE_RE) %>%
+    pivot_longer(c(Twin_h2, h2_gordon_AdjHE_RE), names_to="Method", values_to="h2") %>%
+    mutate(Method = recode(Method, Twin_h2="Twin", h2_gordon_AdjHE_RE="AdjHE-RE"))
+  # fivenum per Method
+  fivenum_gordon <- gordon_long %>%
+    group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
+    mutate(across(where(is.numeric), ~round(.x,3)))
+  kable(fivenum_gordon, caption="Gordon — h2 five-number summary (Twin vs AdjHE-RE, 30 PCs)")
+} else { cat("mash_twin_wide.csv not found — run 01_compare_mash_twin.R"); cat("\n") }
+```
+
+```{r gordon-corr}
+if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
+  corr <- read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE)
+  kable(corr %>% filter(Set=="gordon"), caption="Gordon — Twin vs MASH correlations")
+} else if (nrow(wide)>0) {
+  # fallback: compute from wide
+  tmp <- gordon_wide %>% select(Twin_h2, h2_gordon_AdjHE_RE) %>% drop_na()
+  if (nrow(tmp)>2) {
+    kable(tibble(
+      Set="gordon", Method="h2_gordon_AdjHE_RE", n=nrow(tmp),
+      Pearson_r=cor(tmp$Twin_h2, tmp$h2_gordon_AdjHE_RE),
+      Spearman_rho=cor(tmp$Twin_h2, tmp$h2_gordon_AdjHE_RE, method="spearman"),
+      R2_pearson=cor(tmp$Twin_h2, tmp$h2_gordon_AdjHE_RE)^2
+    ) %>% mutate(across(where(is.numeric), ~round(.x,3))), caption="Gordon — Twin vs AdjHE-RE (computed)")
+  }
+}
+```
+
+---
+
+## ProbaConns — Surfaces & Chords {style="text-align:center;"}
+
+::: {layout="[[1,1],[1,1],[1,1]]" style="text-align:center;"}
+
+![ProbaConns Twin Surface](../results/summary/brain/probaConns/probaConns_twin_surface.png){width="95%" style="max-height:285px; object-fit:contain;"}
+
+![ProbaConns AdjHE-RE Surface](../results/summary/brain/probaConns/probaConns_AdjHE_surface.png){width="95%" style="max-height:285px; object-fit:contain;"}
+
+![ProbaConns Networks Topography](../results/summary/brain/probaConns/probaConns_networks_surface.png){width="95%" style="max-height:285px; object-fit:contain;"}
+
+![ProbaConns Twin Circular](../results/summary/brain/probaConns/probaConns_twin_circular.png){width="95%" style="max-height:285px; object-fit:contain;"}
+
+![ProbaConns AdjHE-RE Circular](../results/summary/brain/probaConns/probaConns_AdjHE_circular.png){width="95%" style="max-height:285px; object-fit:contain;"}
+
+:::
+
+---
+
+## ProbaConns — Manhattans {style="text-align:center;"}
+
+::: {layout="[[1,1]]" style="text-align:center;"}
+
+![ProbaConns Twin Manhattan](../results/summary/plots/manhattan_probaConns_Twin.png){width="95%" style="max-height:520px; object-fit:contain;"}
+
+![ProbaConns AdjHE-RE Manhattan](../results/summary/plots/manhattan_probaConns_AdjHERE.png){width="95%" style="max-height:520px; object-fit:contain;"}
+
+:::
+
+---
+
+## ProbaConns — Five-Number Summaries & Correlations
+
+```{r proba-stats}
+if (nrow(wide)>0) {
+  proba_long <- wide %>% filter(Set=="probaConns") %>%
+    select(Pheno, Twin_h2, h2_proba_AdjHE_RE) %>%
+    pivot_longer(c(Twin_h2, h2_proba_AdjHE_RE), names_to="Method", values_to="h2") %>%
+    mutate(Method = recode(Method, Twin_h2="Twin", h2_proba_AdjHE_RE="AdjHE-RE"))
+  fivenum_proba <- proba_long %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
+    mutate(across(where(is.numeric), ~round(.x,3)))
+  kable(fivenum_proba, caption="ProbaConns — h2 five-number summary")
+}
+```
+
+```{r proba-corr}
+if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
+  kable(read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="probaConns"), caption="ProbaConns — Twin vs MASH correlations")
+}
+```
+
+---
+
+## SA — Surfaces & Chords {style="text-align:center;"}
+
+*SA is per-network (17 `network_surfarea*`), not pairwise — surfaces only.*
+
+::: {layout="[[1,1]]" style="text-align:center;"}
+
+![SA Twin Surface (wo_total)](../results/summary/brain/SA/SA_twin_surface.png){width="95%" style="max-height:420px; object-fit:contain;"}
+
+![SA AdjHE-RE Surface (wo_total)](../results/summary/brain/SA/SA_AdjHE_surface.png){width="95%" style="max-height:420px; object-fit:contain;"}
+
+:::
+
+---
+
+## SA — Manhattans {style="text-align:center;"}
+
+::: {layout="[[1,1]]" style="text-align:center;"}
+
+![SA Twin Manhattan](../results/summary/plots/manhattan_SA_Twin.png){width="95%" style="max-height:520px; object-fit:contain;"}
+
+![SA AdjHE-RE Manhattan](../results/summary/plots/manhattan_SA_AdjHERE.png){width="95%" style="max-height:520px; object-fit:contain;"}
+
+:::
+
+---
+
+## SA — Five-Number Summaries & Correlations
+
+```{r sa-stats}
+if (nrow(wide)>0) {
+  sa_long <- wide %>% filter(Set=="SA") %>%
+    select(Pheno, Twin_h2, h2_SA_AdjHE_RE) %>%
+    pivot_longer(c(Twin_h2, h2_SA_AdjHE_RE), names_to="Method", values_to="h2") %>%
+    mutate(Method = recode(Method, Twin_h2="Twin", h2_SA_AdjHE_RE="AdjHE-RE"))
+  fivenum_sa <- sa_long %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
+    mutate(across(where(is.numeric), ~round(.x,3)))
+  kable(fivenum_sa, caption="SA (wo_total, 17 networks) — h2 five-number summary")
+}
+```
+
+```{r sa-corr}
+if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
+  kable(read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="SA"), caption="SA — Twin vs MASH correlations (wo_total)")
+}
+```
+
+---
+
+## SA w_total — Surfaces Controlling for Total Surface Area {style="text-align:center;"}
+
+*Identical networks, but `totalNetworkSurface` included as `qcovar` (AdjHE-RE) and `twinlm` covariate (Twin). See `SA/SLURM_AdjHE_RE_with_total.sh` and `SA/twinEsts/SLURM_twin_with_total.sh`.*
+
+::: {layout="[[1,1]]" style="text-align:center;"}
+
+![SA w_total Twin Surface](../results/summary/brain/SA_w_total/SA_w_total_twin_surface.png){width="95%" style="max-height:420px; object-fit:contain;"}
+
+![SA w_total AdjHE-RE Surface](../results/summary/brain/SA_w_total/SA_w_total_AdjHE_surface.png){width="95%" style="max-height:420px; object-fit:contain;"}
+
+:::
+
+*If w_total PNGs are missing, run the two SLURMs above and re-run `01_compare_mash_twin.R` with the `w_total` pattern, then `python summary/02d_brain_sa_total.py`.*
+
+---
+
+## SA w_total — Five-Number Summaries & Correlations
+
+```{r sa-wtotal-stats}
+# Try w_total columns if 01_compare_mash_twin.R has been updated to include them;
+# otherwise this gracefully falls back to wo_total with a note.
+wcols <- grep("w_total", names(wide), value=TRUE)
+if (length(wcols)>0) {
+  sa_w <- wide %>% filter(Set=="SA") %>% select(Pheno, all_of(wcols), Twin_h2) %>%
+    pivot_longer(cols = all_of(wcols), names_to="Method", values_to="h2") %>%
+    mutate(Method = gsub("h2_SA_|_w_total", "", Method))
+  fivenum_saw <- sa_w %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
+    mutate(across(where(is.numeric), ~round(.x,3)))
+  kable(fivenum_saw, caption="SA w_total — h2 five-number summary (if w_total columns present)")
+} else {
+  cat("No w_total columns in mash_twin_wide.csv yet — run w_total SLURMs and rebuild 01_compare_mash_twin.R with w_total pattern.\n")
+  if (file.exists(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"))) {
+    kable(read_csv(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"), show_col_types=FALSE), caption="SA w_total vs wo_total R² (from 04_compare_r2.R)")
+  }
+}
+```
+
+```{r sa-wtotal-corr}
+if (file.exists(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"))) {
+  kable(read_csv(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"), show_col_types=FALSE), caption="SA w_total vs wo_total — Twin and AdjHE-RE R²")
+}
+```
+
+---
+
+## Manhattan Overview — Ordered by h² Magnitude {style="text-align:center;"}
+
+![Overview — all Sets × Methods, ordered by h² magnitude, y 0–1, <1.5% grey 100× on right](../results/summary/plots/manhattan_overview.png){width="95%" style="max-height:700px; object-fit:contain;"}
+
+---
+
+## Run Order
+
+```bash
+Rscript summary/01_compare_mash_twin.R          # 01 → mash_twin_wide.csv
+bash summary/02_run_brain_viz.sh                # 02a-d → Gordon/ProbaConns/SA surfaces+chords
+Rscript summary/03_plot_sa_horizontal.R         # SA barplot
+Rscript summary/04_compare_r2.R                 # R² per Set + SA w/wo
+python summary/05_manhattan.py                  # 05 → manhattans
+quarto render summary/06_results_catalog.qmd --to html
+```
+
+*All PNGs scale with `max-height` + `object-fit:contain` and `layout` so they fit within slides.*
+
