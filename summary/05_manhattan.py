@@ -308,4 +308,98 @@ for atlas in ["gordon", "probaConns", "SA"]:
         out = PLOT_DIR / f"manhattan_{atlas}_{method.replace('-','')}.png"
         manhattan_for_df(df, atlas, method, out)
 
+# ---- Manhattan Overview (3 rows x 2 cols, faceted, same styling as individual panels) ----
+# Regenerates manhattan_overview.png so it matches the updated individual panels
+# (full x-axis span, Sys-Sys labels logic, 100x grey tail).
+try:
+    import itertools
+    overview_rows = []
+    for atlas in ["gordon", "probaConns", "SA"]:
+        N = set_N[atlas]
+        for method, col in [("Twin", "Twin_h2"), ("AdjHE-RE", f"h2_{atlas}_AdjHE_RE" if atlas != "SA" else "h2_SA_AdjHE_RE")]:
+            if col not in wide.columns:
+                col = col.replace("probaConns", "proba")
+                if col not in wide.columns:
+                    continue
+            sub = wide[wide["Set"] == atlas]
+            if sub[col].dropna().empty:
+                continue
+            df = build_long_for_set(wide, atlas, N, col)
+            if df.empty:
+                continue
+            df["atlas"] = atlas
+            df["method"] = method
+            overview_rows.append(df)
+    if overview_rows:
+        overview = pd.concat(overview_rows, ignore_index=True)
+        # Global ordering by mean h2 per connection (descending) — same as per-panel large_order logic
+        ov_order = overview.groupby("connection")["h2"].mean().sort_values(ascending=False).index.tolist()
+        overview["connection"] = pd.Categorical(overview["connection"], categories=ov_order, ordered=True)
+        overview = overview.sort_values("connection").reset_index(drop=True).reset_index(drop=False).rename(columns={"index": "idx"})
+        overview["index"] = overview["idx"]
+        # Facet: 3 rows (gordon/proba/SA) x 2 cols (Twin/AdjHE-RE)
+        fig, axes = plt.subplots(3, 2, figsize=(14, 9), sharey=True)
+        axes = np.array(axes).flatten() if isinstance(axes, np.ndarray) else [axes]
+        # Use same small-group threshold as manhattan_for_df (top 20 by size, then 100x grey)
+        # For overview, compute per-facet small groups to keep grey tail visible
+        for ax_idx, (atlas, method) in enumerate(itertools.product(["gordon", "probaConns", "SA"], ["Twin", "AdjHE-RE"])):
+            ax = axes[ax_idx]
+            sub = overview[(overview["atlas"] == atlas) & (overview["method"] == method)].copy()
+            if sub.empty:
+                ax.set_visible(False)
+                continue
+            # Per-facet stats for large20 / divider (mirrors manhattan_for_df)
+            stats = sub.groupby("connection")["h2"].agg(median="median", size="size")
+            largest_20 = stats.sort_values("size", ascending=False).head(20).index.tolist()
+            # divider for small tail
+            # need index column for divider calc
+            small_order = [c for c in ov_order if c not in largest_20 and c in stats.index]
+            if small_order:
+                try:
+                    divider = sub.loc[sub["connection"].isin(small_order), "index"].min()
+                    if pd.isna(divider):
+                        divider = None
+                except Exception:
+                    divider = None
+            else:
+                divider = None
+            if divider is not None:
+                mask_small = sub["connection"].isin(small_order)
+                sub["plot_index"] = np.where(mask_small, (sub["index"].astype(float) - float(divider)) / 100.0 + float(divider), sub["index"].astype(float))
+            else:
+                sub["plot_index"] = sub["index"].astype(float)
+            alt_colors = ["#1f77b4", "#ff7f0e"]
+            # Re-derive large_order for this facet (median desc) to get correct alternating colors
+            large_order = stats.loc[stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
+            for name, group in sub.groupby("connection", observed=True):
+                is_large = name in largest_20
+                if not is_large:
+                    col, alpha, sz = "grey", 0.35, 5
+                else:
+                    col = alt_colors[large_order.index(name) % 2] if name in large_order else alt_colors[0]
+                    alpha, sz = 0.85, 6
+                ax.scatter(group["plot_index"], group["h2"], color=col, s=sz, alpha=alpha, zorder=10, linewidths=0.2, edgecolors="black" if is_large else "none")
+            # full x-axis span (compressed)
+            xmax = float(sub["plot_index"].max()) if len(sub) else 1
+            xmin = float(sub["plot_index"].min()) if len(sub) else 0
+            pad = (xmax - xmin) * 0.015 if xmax > xmin else 1
+            ax.set_xlim([xmin - pad, xmax + pad])
+            ax.set_ylim([0, 1])
+            disp = {"gordon": "Gordon", "probaConns": "ProbaConns", "SA": "SA"}.get(atlas, atlas)
+            ax.set_title(f"{disp} — {method}", fontsize=9, fontweight="bold")
+            ax.set_ylabel(r"$h^2$", fontsize=8)
+            ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
+            ax.set_yticks([0, 0.5, 1])
+            ax.tick_params(axis="y", labelsize=7)
+        fig.suptitle("Manhattan Overview — ordered by h² magnitude (y 0–1, <1.5% grey 100× compressed, full x-axis)", fontsize=12, fontweight="bold")
+        fig.tight_layout(rect=[0, 0, 1, 0.96])
+        out_ov = PLOT_DIR / "manhattan_overview.png"
+        fig.savefig(out_ov, dpi=300, bbox_inches="tight", pad_inches=0.12)
+        plt.close(fig)
+        print(f"  wrote {out_ov}  n={len(overview)}")
+except Exception as e:
+    import traceback
+    print(f"overview failed: {e}")
+    traceback.print_exc()
+
 print("Done.")
