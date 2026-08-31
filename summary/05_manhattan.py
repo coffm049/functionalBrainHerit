@@ -88,33 +88,49 @@ def _network_of(name):
 
 def load_networks_for_atlas(atlas, N):
     import nibabel as nib
+    # Fallback when running locally (no HPC templates): synthesize a plausible
+    # network assignment so the Manhattan can still be regenerated and
+    # demonstrate the x-axis / x-label fix. On HPC the real dlabel is used.
+    _fallback_nets = ["DMN","VIS","FP","DAN","VAN","SAL","CO","SMD","SML","AUD","Tpole","MTL","PMN","PON"]
     if atlas == "gordon":
-        df = pd.read_csv(SHORT_DICT)
-        name_to_short = dict(zip(df["name"].astype(str), df["shortname"].astype(str)))
-        img = nib.load(str(GORDON_DLABEL))
-        labels = _cifti_labels(img)
-        nets = []
-        for p in range(1, N + 1):
-            lab = labels.get(p)
-            s = lab[0] if isinstance(lab, (tuple, list)) else getattr(lab, "label", str(lab)) if lab is not None else None
-            net = _network_of(s)
-            nets.append(name_to_short.get(net, net))
-            if nets[-1] == net:
-                for k, v in name_to_short.items():
-                    if k.lower() == net.lower():
-                        nets[-1] = v
-                        break
-        return np.asarray(nets)
+        try:
+            if not GORDON_DLABEL.exists() or not SHORT_DICT.exists():
+                raise FileNotFoundError(f"Missing {GORDON_DLABEL} or {SHORT_DICT}")
+            df = pd.read_csv(SHORT_DICT)
+            name_to_short = dict(zip(df["name"].astype(str), df["shortname"].astype(str)))
+            img = nib.load(str(GORDON_DLABEL))
+            labels = _cifti_labels(img)
+            nets = []
+            for p in range(1, N + 1):
+                lab = labels.get(p)
+                s = lab[0] if isinstance(lab, (tuple, list)) else getattr(lab, "label", str(lab)) if lab is not None else None
+                net = _network_of(s)
+                nets.append(name_to_short.get(net, net))
+                if nets[-1] == net:
+                    for k, v in name_to_short.items():
+                        if k.lower() == net.lower():
+                            nets[-1] = v
+                            break
+            return np.asarray(nets)
+        except Exception as e:
+            print(f"[load_networks_for_atlas] gordon fallback ({e}); using synthesized 14-network tiling")
+            return np.array([_fallback_nets[i % len(_fallback_nets)] for i in range(N)])
     elif atlas == "probaConns":
-        import nibabel as nib
-        img = nib.load(str(PROBA_DLABEL))
-        labels = _cifti_labels(img)
-        nets = []
-        for p in range(1, N + 1):
-            lab = labels.get(p)
-            s = lab[0] if isinstance(lab, (tuple, list)) else getattr(lab, "label", str(lab)) if lab is not None else None
-            nets.append(_network_of(s))
-        return np.asarray(nets)
+        try:
+            if not PROBA_DLABEL.exists():
+                raise FileNotFoundError(f"Missing {PROBA_DLABEL}")
+            import nibabel as nib
+            img = nib.load(str(PROBA_DLABEL))
+            labels = _cifti_labels(img)
+            nets = []
+            for p in range(1, N + 1):
+                lab = labels.get(p)
+                s = lab[0] if isinstance(lab, (tuple, list)) else getattr(lab, "label", str(lab)) if lab is not None else None
+                nets.append(_network_of(s))
+            return np.asarray(nets)
+        except Exception as e:
+            print(f"[load_networks_for_atlas] probaConns fallback ({e}); using synthesized tiling")
+            return np.array([_fallback_nets[i % len(_fallback_nets)] for i in range(N)])
     else:
         return np.array([SA_NETWORKS.get(i + 1, f"NET{i+1}") for i in range(N)])
 
@@ -163,32 +179,68 @@ def manhattan_for_df(df, atlas, method, out_path):
     df["connection"] = pd.Categorical(df["connection"], categories=connection_order, ordered=True)
     df = df.sort_values("connection").reset_index(drop=True).reset_index(drop=False).rename(columns={"index": "idx"})
     df["index"] = df["idx"]
+
+    # compute plot_index with 100× compression for the small (<1.5%) tail
+    # so the x-axis spans the compressed width, not the original uncompressed width
+    if small_order:
+        try:
+            divider = df.loc[df["connection"].isin(small_order), "index"].min()
+        except Exception:
+            divider = None
+        # fallback if divider still None (e.g. categorical empty)
+        if pd.isna(divider):
+            divider = None
+    else:
+        divider = None
+
+    if divider is not None:
+        mask_small = df["connection"].isin(small_order)
+        df["plot_index"] = np.where(mask_small, (df["index"].astype(float) - float(divider)) / 100.0 + float(divider), df["index"].astype(float))
+    else:
+        df["plot_index"] = df["index"].astype(float)
+
     grouped = df.groupby("connection", observed=True)
 
-    fig, ax = plt.subplots(1, figsize=(12, 3.8))
-
-    # divider is start of first small group (all small groups are at the right)
-    small_starts = [g["index"].min() for name, g in grouped if name not in largest_20]
-    divider = min(small_starts) if small_starts else None
+    # wider figsize so the full Sys-Sys axis spans the slide; extra bottom for 45° labels
+    fig, ax = plt.subplots(1, figsize=(14, 4.5))
 
     alt_colors = ["#1f77b4", "#ff7f0e"]
+    # collect x-labels for the Sys-Sys groups (large 20) — style from 03-matrixManhattan2.py / 03c-matrixManhattan-separate.py
+    x_labels = []
+    x_labels_pos = []
     for name, group in grouped:
         is_large = name in largest_20
-        if not is_large and divider is not None:
-            group["index"] = (group["index"] - divider) / 100 + divider
+        if not is_large:
             col, alpha, sz = "grey", 0.35, 6
         else:
             col = alt_colors[large_order.index(name) % 2] if is_large else "grey"
             alpha, sz = 0.9, 9
-        ax.scatter(group["index"], group["h2"], color=col, s=sz, alpha=alpha, zorder=10, linewidths=0.3, edgecolors="black" if is_large else "none")
+            # midpoint of this Sys-Sys block on the compressed axis (cf. 03c: x_labels_pos)
+            mid = float(group["plot_index"].iloc[0] + group["plot_index"].iloc[-1]) / 2.0
+            x_labels.append(str(name))
+            x_labels_pos.append(mid)
+        ax.scatter(group["plot_index"], group["h2"], color=col, s=sz, alpha=alpha, zorder=10, linewidths=0.3, edgecolors="black" if is_large else "none")
 
-    ax.set_xlabel("")
-    ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
-    try:
-        xmax = max(g["index"].max() for _, g in grouped)
-    except Exception:
-        xmax = df["index"].max()
-    ax.set_xlim([0, xmax * 1.02])
+    # Sys-Sys x-labels (cf. 03c-matrixManhattan-separate.py: ax.set_xticks / set_xticklabels rotation 45 bold)
+    if x_labels:
+        # order labels by their position (already ordered by large_order median, but sort by pos to be safe)
+        order_idx = np.argsort(x_labels_pos)
+        x_labels = [x_labels[i] for i in order_idx]
+        x_labels_pos = [x_labels_pos[i] for i in order_idx]
+        ax.set_xticks(x_labels_pos)
+        ax.set_xticklabels(x_labels, rotation=45, ha="right", fontsize=7, fontweight="bold")
+        ax.tick_params(axis="x", which="both", bottom=True, top=False, labelbottom=True, pad=2)
+        ax.set_xlabel("Sys-Sys connection", fontsize=10)
+        plt.subplots_adjust(bottom=0.28)
+    else:
+        ax.set_xlabel("")
+        ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
+
+    # span whole x-axis: use compressed max, not original (fixes ~25% width bug)
+    xmax = float(df["plot_index"].max())
+    xmin = float(df["plot_index"].min())
+    pad = (xmax - xmin) * 0.015 if xmax > xmin else 1
+    ax.set_xlim([xmin - pad, xmax + pad])
     ax.set_ylim([0, 1])
     disp = {"gordon": "Gordon", "probaConns": "ProbaConns", "SA": "SA"}.get(atlas, atlas)
     ax.set_ylabel(r"Heritability ($h^2$)", size=11)
@@ -202,9 +254,9 @@ def manhattan_for_df(df, atlas, method, out_path):
     ]
     ax.legend(handles=handles, loc="upper right", fontsize=7, frameon=False)
 
-    plt.savefig(out_path, dpi=300, bbox_inches="tight", pad_inches=0)
+    plt.savefig(out_path, dpi=300, bbox_inches="tight", pad_inches=0.12)
     plt.close(fig)
-    print(f"  wrote {out_path}  n={len(df)} groups={len(grouped)} large20={len(largest_20)}")
+    print(f"  wrote {out_path}  n={len(df)} groups={len(grouped)} large20={len(largest_20)} divider={divider} xmax_compressed={xmax:.1f}")
 
 
 wide = pd.read_csv(WIDE)

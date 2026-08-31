@@ -51,35 +51,51 @@ All PNGs below are already rendered by `01 → 02a-d → 05`. This catalog embed
 
 ---
 
-## Gordon — Surfaces & Chords {style="text-align:center;"}
+## Gordon — Network Topography {style="text-align:center;" .scrollable}
 
-::: {layout="[[1,1],[1,1],[1,1]]" style="text-align:center;"}
+::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
-![Gordon Twin Surface — 0–0.5, Right colorbar only](../results/summary/brain/gordon/gordon_twin_surface.png){width="95%" style="max-height:285px; object-fit:contain;"}
-
-![Gordon AdjHE-RE Surface](../results/summary/brain/gordon/gordon_AdjHE_surface.png){width="95%" style="max-height:285px; object-fit:contain;"}
-
-![Gordon Networks Topography](../results/summary/brain/gordon/gordon_networks_surface.png){width="95%" style="max-height:285px; object-fit:contain;"}
-
-![Gordon Twin Circular — h2>0.35, thickness/alpha 0.1–1](../results/summary/brain/gordon/gordon_twin_circular.png){width="95%" style="max-height:285px; object-fit:contain;"}
-
-![Gordon AdjHE-RE Circular](../results/summary/brain/gordon/gordon_AdjHE_circular.png){width="95%" style="max-height:285px; object-fit:contain;"}
+![Gordon Networks — parcel → network assignment (categorical, `shortDicionary.csv` via dlabel label-table)](../results/summary/brain/gordon/gordon_networks_surface.png){width="100%" style="object-fit:contain;"}
 
 :::
-*Left/Right hemispheres share one colourbar on the Right. Chord nodes coloured by network (shared palette).*
+
+*Preceding slide: regional coloring / network parcellation. Each Gordon parcel (1–352) coloured by network; shared palette with chord nodes. See `summary/02a_brain_gordon.py:load_gordon_networks()`.*
+
+---
+
+## Gordon — Surfaces & Chords {.scrollable style="text-align:center;"}
+
+::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
+
+::: {layout="[[1,1],[1,1]]" style="text-align:center;"}
+
+![Gordon Twin Surface — 0–0.5, Right colorbar only](../results/summary/brain/gordon/gordon_twin_surface.png){width="100%" style="object-fit:contain;"}
+
+![Gordon AdjHE-RE Surface](../results/summary/brain/gordon/gordon_AdjHE_surface.png){width="100%" style="object-fit:contain;"}
+
+![Gordon Twin Circular — h2>0.35, thickness/alpha 0.1–1](../results/summary/brain/gordon/gordon_twin_circular.png){width="100%" style="object-fit:contain;"}
+
+![Gordon AdjHE-RE Circular](../results/summary/brain/gordon/gordon_AdjHE_circular.png){width="100%" style="object-fit:contain;"}
+
+:::
+
+:::
+
+*Left/Right hemispheres share one colourbar on the Right. Chord nodes coloured by network (shared palette with topography). Twin vs AdjHE-RE at 90th-percentile node summary. Scroll to see all four panels.*
 
 ---
 
 ## Gordon — Manhattans {style="text-align:center;"}
 
-::: {layout="[[1,1]]" style="text-align:center;"}
+::: {layout="[[1],[1]]" style="text-align:center;"}
 
-![Gordon Twin Manhattan — Sys-Sys pairs, y 0–1, <1.5% grey 100× compressed on right](../results/summary/plots/manhattan_gordon_Twin.png){width="95%" style="max-height:520px; object-fit:contain;"}
+![Gordon Twin Manhattan — Sys-Sys pairs, y 0–1, x spans full axis, Sys-Sys labels at bottom (20 largest by #connections, alternating colours; remainder grey 100× compressed on right)](../results/summary/plots/manhattan_gordon_Twin.png){width="100%" style="object-fit:contain;"}
 
-![Gordon AdjHE-RE Manhattan](../results/summary/plots/manhattan_gordon_AdjHERE.png){width="95%" style="max-height:520px; object-fit:contain;"}
+![Gordon AdjHE-RE Manhattan](../results/summary/plots/manhattan_gordon_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
 :::
-*Ordered by largest median h² within Sys-Sys group; 20 largest groups (by #connections) plotted normally with alternating colours, remainder (<1.5% of total edges) compressed 100× on x and grey. Overview `manhattan_overview.png` faceted 3×2.*
+
+*Ordered by largest median h² within Sys-Sys group; 20 largest groups (by #connections) plotted normally with alternating colours, remainder (<1.5% of total edges) compressed 100× on x and grey — now with `plot_index` compression and `xmax` on compressed axis so the full x-axis is spanned (cf. `summary/05_manhattan.py:manhattan_for_df()`), and Sys-Sys x-labels at group midpoints (rotation 45°, bold, cf. `03-matrixManhattan2.py` / `03c-matrixManhattan-separate.py`).*
 
 ---
 
@@ -123,33 +139,51 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 
 ---
 
-## ProbaConns — Surfaces & Chords {style="text-align:center;"}
+## ProbaConns — Network Topography {style="text-align:center;" .scrollable}
 
-::: {layout="[[1,1],[1,1],[1,1]]" style="text-align:center;"}
+::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
-![ProbaConns Twin Surface](../results/summary/brain/probaConns/probaConns_twin_surface.png){width="95%" style="max-height:285px; object-fit:contain;"}
-
-![ProbaConns AdjHE-RE Surface](../results/summary/brain/probaConns/probaConns_AdjHE_surface.png){width="95%" style="max-height:285px; object-fit:contain;"}
-
-![ProbaConns Networks Topography](../results/summary/brain/probaConns/probaConns_networks_surface.png){width="95%" style="max-height:285px; object-fit:contain;"}
-
-![ProbaConns Twin Circular](../results/summary/brain/probaConns/probaConns_twin_circular.png){width="95%" style="max-height:285px; object-fit:contain;"}
-
-![ProbaConns AdjHE-RE Circular](../results/summary/brain/probaConns/probaConns_AdjHE_circular.png){width="95%" style="max-height:285px; object-fit:contain;"}
+![ProbaConns Networks — parcel → network assignment (label-table)](../results/summary/brain/probaConns/probaConns_networks_surface.png){width="100%" style="object-fit:contain;"}
 
 :::
+
+*Preceding slide: regional coloring / network parcellation for ProbaConns 80 (combined_clusters 0.8).*
+
+---
+
+## ProbaConns — Surfaces & Chords {.scrollable style="text-align:center;"}
+
+::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
+
+::: {layout="[[1,1],[1,1]]" style="text-align:center;"}
+
+![ProbaConns Twin Surface](../results/summary/brain/probaConns/probaConns_twin_surface.png){width="100%" style="object-fit:contain;"}
+
+![ProbaConns AdjHE-RE Surface](../results/summary/brain/probaConns/probaConns_AdjHE_surface.png){width="100%" style="object-fit:contain;"}
+
+![ProbaConns Twin Circular](../results/summary/brain/probaConns/probaConns_twin_circular.png){width="100%" style="object-fit:contain;"}
+
+![ProbaConns AdjHE-RE Circular](../results/summary/brain/probaConns/probaConns_AdjHE_circular.png){width="100%" style="object-fit:contain;"}
+
+:::
+
+:::
+
+*Scroll to see all four panels. Networks topography on preceding slide.*
 
 ---
 
 ## ProbaConns — Manhattans {style="text-align:center;"}
 
-::: {layout="[[1,1]]" style="text-align:center;"}
+::: {layout="[[1],[1]]" style="text-align:center;"}
 
-![ProbaConns Twin Manhattan](../results/summary/plots/manhattan_probaConns_Twin.png){width="95%" style="max-height:520px; object-fit:contain;"}
+![ProbaConns Twin Manhattan](../results/summary/plots/manhattan_probaConns_Twin.png){width="100%" style="object-fit:contain;"}
 
-![ProbaConns AdjHE-RE Manhattan](../results/summary/plots/manhattan_probaConns_AdjHERE.png){width="95%" style="max-height:520px; object-fit:contain;"}
+![ProbaConns AdjHE-RE Manhattan](../results/summary/plots/manhattan_probaConns_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
 :::
+
+*Same Manhattan logic as Gordon: full x-axis span with compressed tail, Sys-Sys labels (cf. `03c-matrixManhattan-separate.py:253-259`).*
 
 ---
 
@@ -175,29 +209,37 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 
 ---
 
-## SA — Surfaces & Chords {style="text-align:center;"}
+## SA — Surfaces & Chords {.scrollable style="text-align:center;"}
 
 *SA is per-network (17 `network_surfarea*`), not pairwise — surfaces only.*
 
+::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
+
 ::: {layout="[[1,1]]" style="text-align:center;"}
 
-![SA Twin Surface (wo_total)](../results/summary/brain/SA/SA_twin_surface.png){width="95%" style="max-height:420px; object-fit:contain;"}
+![SA Twin Surface (wo_total)](../results/summary/brain/SA/SA_twin_surface.png){width="100%" style="object-fit:contain;"}
 
-![SA AdjHE-RE Surface (wo_total)](../results/summary/brain/SA/SA_AdjHE_surface.png){width="95%" style="max-height:420px; object-fit:contain;"}
+![SA AdjHE-RE Surface (wo_total)](../results/summary/brain/SA/SA_AdjHE_surface.png){width="100%" style="object-fit:contain;"}
 
 :::
+
+:::
+
+*Scroll if needed. SA values mapped per-network via Gordon.networks dlabel (cf. `summary/02c_brain_sa.py`).*
 
 ---
 
 ## SA — Manhattans {style="text-align:center;"}
 
-::: {layout="[[1,1]]" style="text-align:center;"}
+::: {layout="[[1],[1]]" style="text-align:center;"}
 
-![SA Twin Manhattan](../results/summary/plots/manhattan_SA_Twin.png){width="95%" style="max-height:520px; object-fit:contain;"}
+![SA Twin Manhattan](../results/summary/plots/manhattan_SA_Twin.png){width="100%" style="object-fit:contain;"}
 
-![SA AdjHE-RE Manhattan](../results/summary/plots/manhattan_SA_AdjHERE.png){width="95%" style="max-height:520px; object-fit:contain;"}
+![SA AdjHE-RE Manhattan](../results/summary/plots/manhattan_SA_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
 :::
+
+*SA Manhattan is per-network (17 points) — still ordered by median h² and labelled at midpoints; no compressed tail (all groups in top-20). Full x-axis span.*
 
 ---
 
@@ -223,15 +265,19 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 
 ---
 
-## SA w_total — Surfaces Controlling for Total Surface Area {style="text-align:center;"}
+## SA w_total — Surfaces Controlling for Total Surface Area {.scrollable style="text-align:center;"}
 
 *Identical networks, but `totalNetworkSurface` included as `qcovar` (AdjHE-RE) and `twinlm` covariate (Twin). See `SA/SLURM_AdjHE_RE_with_total.sh` and `SA/twinEsts/SLURM_twin_with_total.sh`.*
 
+::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
+
 ::: {layout="[[1,1]]" style="text-align:center;"}
 
-![SA w_total Twin Surface](../results/summary/brain/SA_w_total/SA_w_total_twin_surface.png){width="95%" style="max-height:420px; object-fit:contain;"}
+![SA w_total Twin Surface](../results/summary/brain/SA_w_total/SA_w_total_twin_surface.png){width="100%" style="object-fit:contain;"}
 
-![SA w_total AdjHE-RE Surface](../results/summary/brain/SA_w_total/SA_w_total_AdjHE_surface.png){width="95%" style="max-height:420px; object-fit:contain;"}
+![SA w_total AdjHE-RE Surface](../results/summary/brain/SA_w_total/SA_w_total_AdjHE_surface.png){width="100%" style="object-fit:contain;"}
+
+:::
 
 :::
 
@@ -270,7 +316,9 @@ if (file.exists(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"))) {
 
 ## Manhattan Overview — Ordered by h² Magnitude {style="text-align:center;"}
 
-![Overview — all Sets × Methods, ordered by h² magnitude, y 0–1, <1.5% grey 100× on right](../results/summary/plots/manhattan_overview.png){width="95%" style="max-height:700px; object-fit:contain;"}
+![Overview — all Sets × Methods, ordered by h² magnitude, y 0–1, <1.5% grey 100× on right](../results/summary/plots/manhattan_overview.png){width="100%" style="object-fit:contain;"}
+
+*Note: overview is a faceted 3×2 snapshot; individual `manhattan_*.png` above are now full-width with Sys-Sys labels.*
 
 ---
 
@@ -281,9 +329,8 @@ Rscript summary/01_compare_mash_twin.R          # 01 → mash_twin_wide.csv
 bash summary/02_run_brain_viz.sh                # 02a-d → Gordon/ProbaConns/SA surfaces+chords
 Rscript summary/03_plot_sa_horizontal.R         # SA barplot
 Rscript summary/04_compare_r2.R                 # R² per Set + SA w/wo
-python summary/05_manhattan.py                  # 05 → manhattans
+python summary/05_manhattan.py                  # 05 → manhattans (full x-axis, Sys-Sys labels; cf. 03-matrixManhattan2.py:174-249, 03c-matrixManhattan-separate.py:253-259)
 quarto render summary/06_results_catalog.qmd --to html
 ```
 
-*All PNGs scale with `max-height` + `object-fit:contain` and `layout` so they fit within slides.*
-
+*Brain + chord slides are `.scrollable` with `overflow-y:auto` wrappers so all panels are accessible by scrolling; network topography (region coloring) is on a preceding slide per atlas.*
