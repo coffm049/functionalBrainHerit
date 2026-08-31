@@ -43,15 +43,10 @@ fivenum_tbl <- function(x) {
 
 # Overview
 
-* **FC Gordon 352** — Gordon subcortical dlabel (96854 greyordinates), `0–0.5` surface, `h2>0.35` chord (`0.35–0.5 → lw/alpha 0.1–1.0`), networks via `shortDicionary.csv` (parcel→network from label table)
-* **FC ProbaConns 80** — combined_clusters 0.8 dlabel, label-table networks
-* **SA 17** — `network_surfarea1..17`, wo_total (`02c`) and w_total (`02d`, total surface controlled)
+- Heritability from FCs- Gordon and Probabilistic atlas (thresholded at 0.8) comparing SNP (AdjHE-RE) to twin
+- Heritability of 17 network surface areas
 
-All PNGs below are already rendered by `01 → 02a-d → 05`. This catalog embeds them.
-
----
-
-## Gordon — Network Topography {style="text-align:center;" .scrollable}
+## Gordon {style="text-align:center;" .scrollable}
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
@@ -59,49 +54,37 @@ All PNGs below are already rendered by `01 → 02a-d → 05`. This catalog embed
 
 :::
 
-*Preceding slide: regional coloring / network parcellation. Each Gordon parcel (1–352) coloured by network; shared palette with chord nodes. See `summary/02a_brain_gordon.py:load_gordon_networks()`.*
-
----
-
-## Gordon — Surfaces & Chords {.scrollable style="text-align:center;"}
+## Gordon — Heritability surface & Chords {.scrollable style="text-align:center;"}
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
 ::: {layout="[[1,1],[1,1]]" style="text-align:center;"}
 
-![Gordon Twin Surface — 0–0.5, Right colorbar only](../results/summary/brain/gordon/gordon_twin_surface.png){width="100%" style="object-fit:contain;"}
+![Gordon Twin Surface. 90th percentile heritability for each ROI.](../results/summary/brain/gordon/gordon_twin_surface.png){width="100%" style="object-fit:contain;"}
 
-![Gordon AdjHE-RE Surface](../results/summary/brain/gordon/gordon_AdjHE_surface.png){width="100%" style="object-fit:contain;"}
+![Gordon AdjHE-RE Surface. 90th percentile heritability for each ROI.](../results/summary/brain/gordon/gordon_AdjHE_surface.png){width="100%" style="object-fit:contain;"}
 
-![Gordon Twin Circular — h2>0.35, thickness/alpha 0.1–1](../results/summary/brain/gordon/gordon_twin_circular.png){width="100%" style="object-fit:contain;"}
+![Gordon Twin chords](../results/summary/brain/gordon/gordon_twin_circular.png){width="100%" style="object-fit:contain;"}
 
-![Gordon AdjHE-RE Circular](../results/summary/brain/gordon/gordon_AdjHE_circular.png){width="100%" style="object-fit:contain;"}
-
-:::
+![Gordon AdjHE-RE chords](../results/summary/brain/gordon/gordon_AdjHE_circular.png){width="100%" style="object-fit:contain;"}
 
 :::
 
-*Left/Right hemispheres share one colourbar on the Right. Chord nodes coloured by network (shared palette with topography). Twin vs AdjHE-RE at 90th-percentile node summary. Scroll to see all four panels.*
+:::
 
----
-
-## Gordon — Manhattans {.scrollable style="text-align:center;"}
+## Gordon — "Manhattans" {.scrollable style="text-align:center;"}
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
 ::: {layout="[[1],[1]]" style="text-align:center;"}
 
-![Gordon Twin Manhattan — Sys-Sys pairs, y 0–1, x spans full axis, Sys-Sys labels at bottom (20 largest by #connections, alternating colours; remainder grey 100× compressed on right)](../results/summary/plots/manhattan_gordon_Twin.png){width="100%" style="object-fit:contain;"}
+![Gordon Twin "Manhattan" — Sys-Sys pairs, (20 largest by #connections, alternating colours; remainder grey 100× compressed on right)](../results/summary/plots/manhattan_gordon_Twin.png){width="100%" style="object-fit:contain;"}
 
 ![Gordon AdjHE-RE Manhattan](../results/summary/plots/manhattan_gordon_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
 :::
 
 :::
-
-*Ordered by largest median h² within Sys-Sys group; 20 largest groups (by #connections) plotted normally with alternating colours, remainder (<1.5% of total edges) compressed 100× on x and grey — now with `plot_index` compression and `xmax` on compressed axis so the full x-axis is spanned (cf. `summary/05_manhattan.py:manhattan_for_df()`), and Sys-Sys x-labels at group midpoints (rotation 45°, bold, cf. `03-matrixManhattan2.py` / `03c-matrixManhattan-separate.py`).*
-
----
 
 ## Gordon — Five-Number Summaries & Correlations
 
@@ -151,10 +134,6 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 
 :::
 
-*Preceding slide: regional coloring / network parcellation for ProbaConns 80 (combined_clusters 0.8).*
-
----
-
 ## ProbaConns — Surfaces & Chords {.scrollable style="text-align:center;"}
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
@@ -165,17 +144,14 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 
 ![ProbaConns AdjHE-RE Surface](../results/summary/brain/probaConns/probaConns_AdjHE_surface.png){width="100%" style="object-fit:contain;"}
 
-![ProbaConns Twin Circular](../results/summary/brain/probaConns/probaConns_twin_circular.png){width="100%" style="object-fit:contain;"}
+![ProbaConns Twin Chords](../results/summary/brain/probaConns/probaConns_twin_circular.png){width="100%" style="object-fit:contain;"}
 
-![ProbaConns AdjHE-RE Circular](../results/summary/brain/probaConns/probaConns_AdjHE_circular.png){width="100%" style="object-fit:contain;"}
-
-:::
+![ProbaConns AdjHE-RE Chords](../results/summary/brain/probaConns/probaConns_AdjHE_circular.png){width="100%" style="object-fit:contain;"}
 
 :::
 
-*Scroll to see all four panels. Networks topography on preceding slide.*
+:::
 
----
 
 ## ProbaConns — Manhattans {.scrollable style="text-align:center;"}
 
@@ -190,10 +166,6 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 :::
 
 :::
-
-*Same Manhattan logic as Gordon: full x-axis span with compressed tail, Sys-Sys labels (cf. `03c-matrixManhattan-separate.py:253-259`).*
-
----
 
 ## ProbaConns — Five-Number Summaries & Correlations
 
@@ -217,37 +189,13 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 
 ---
 
-## SA — Surface Area Heritability (Barplots, wo_total) {.scrollable style="text-align:center;"}
-
-*SA is per-network (17 `network_surfarea*`), not pairwise — barplots with Twin vs AdjHE-RE dodged.*
+## SA — Surface Area Heritability {.scrollable style="text-align:center;"}
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
 ![SA Surface Area — Twin vs AdjHE-RE (wo_total), geom_col + position_dodge2, 17 networks ordered by Twin h2](../results/summary/plots/SA_horizontal_barplot.png){width="100%" style="object-fit:contain; max-height:720px;"}
 
 :::
-
-*Horizontal dodged barplot (`summary/03_plot_sa_horizontal.R:61-63` `geom_col(position=position_dodge2)`): Twin (blue `#1f77b4`) vs AdjHE-RE (orange `#ff7f0e`) side-by-side per network, x = $h^2$ (0–0.6), y ordered by max Twin $h^2$. SA brain surfaces (per-network mapping via `Gordon.networks` dlabel) moved to supplemental; see `brain/SA/` PNGs if needed.*
-
----
-
-## SA — Manhattans {.scrollable style="text-align:center;"}
-
-::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
-
-::: {layout="[[1],[1]]" style="text-align:center;"}
-
-![SA Twin Manhattan](../results/summary/plots/manhattan_SA_Twin.png){width="100%" style="object-fit:contain;"}
-
-![SA AdjHE-RE Manhattan](../results/summary/plots/manhattan_SA_AdjHERE.png){width="100%" style="object-fit:contain;"}
-
-:::
-
-:::
-
-*SA Manhattan is per-network (17 points) — still ordered by median h² and labelled at midpoints; no compressed tail (all groups in top-20). Full x-axis span.*
-
----
 
 ## SA — Five-Number Summaries & Correlations
 
@@ -271,19 +219,15 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 
 ---
 
-## SA w_total — Surface Area Heritability (Barplots, w_total) {.scrollable style="text-align:center;"}
+## SA w_total — Surface Area Heritability (w_total) {.scrollable style="text-align:center;"}
 
-*Identical 17 networks but `totalNetworkSurface` as `qcovar` (AdjHE-RE) and `twinlm` covariate (Twin). Twin vs AdjHE-RE dodged barplot, same style as wo_total. See `SA/SLURM_AdjHE_RE_with_total.sh` + `SA/twinEsts/SLURM_twin_with_total.sh`.*
+- Controlling for total surface area
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
 ![SA Surface Area — Twin vs AdjHE-RE (w_total, total surface controlled), geom_col + position_dodge2](../results/summary/plots/SA_w_total_horizontal_barplot.png){width="100%" style="object-fit:contain; max-height:720px;"}
 
 :::
-
-*Generated by `summary/03_plot_sa_horizontal.R` w_total branch (fallback to direct `results/SA/twinEsts/herit_w_total.Rds` + `results/SA/AdjHE_RE.csv` if WIDE lacks `w_total` columns). Brain surfaces for w_total remain in `brain/SA_w_total/` as supplemental.*
-
----
 
 ## SA w_total — Five-Number Summaries & Correlations
 
@@ -312,20 +256,6 @@ if (file.exists(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"))) {
 }
 ```
 
----
-
-## Manhattan Overview — Ordered by h² Magnitude {.scrollable style="text-align:center;"}
-
-::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
-
-![Overview — all Sets × Methods, ordered by h² magnitude, y 0–1, <1.5% grey 100× compressed, full x-axis (regenerated to match individual panels)](../results/summary/plots/manhattan_overview.png){width="100%" style="object-fit:contain;"}
-
-:::
-
-*Updated overview (faceted 3×2, `summary/05_manhattan.py` overview block): same per-facet `plot_index` 100× grey tail + full x-axis span + `pad_inches=0.12` as individual `manhattan_*.png`; regenerated 2026-08-31 to match the Sys-Sys label update (previously 2026-08-28 outdated).*
-
----
-
 ## Run Order
 
 ```bash
@@ -337,4 +267,4 @@ python summary/05_manhattan.py                  # 05 → manhattans + overview (
 quarto render summary/06_results_catalog.qmd --to html
 ```
 
-*Brain + chord + Manhattan slides are `.scrollable` with `overflow-y:auto` wrappers; network topography (region coloring) is on a preceding slide per atlas. SA surface areas now shown as dodged barplots (Twin `#1f77b4` vs AdjHE-RE `#ff7f0e`) rather than brain surfaces.*
+Twin `#1f77b4` vs AdjHE-RE `#ff7f0e`
