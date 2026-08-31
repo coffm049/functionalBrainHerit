@@ -25,10 +25,43 @@ WIDE = ROOT / "results/summary/mash_twin_wide.csv"
 def _resolve(rel, abs_path):
     p = Path(rel)
     return p if p.exists() else Path(abs_path)
-DLABEL = _resolve(ROOT / "brainTemplate" / "combined_clusters_thresh0.8.dlabel.nii",
-                  "/projects/standard/faird/shared/data/Probabilitic_network_ROIs_small_package/ABCD/combined_clusters/combined_clusters_thresh0.8.dlabel.nii")
-# Try local ../brainTemplates first, fallback to HPC absolute
-DLABEL = _resolve(ROOT.parent / "brainTemplates" / "combined_clusters_thresh0.8.dlabel.nii", str(DLABEL)) if not DLABEL.exists() else DLABEL
+
+def _find_proba_dlabel():
+    """Find proba dlabel with correct parcel count (80) — tries 0.8 then 0.75,
+    and both combined_clusters and abcd_template naming."""
+    candidates = [
+        ROOT / "brainTemplate" / "combined_clusters_thresh0.8.dlabel.nii",
+        ROOT / "brainTemplate" / "combined_clusters_thresh0.75.dlabel.nii",
+        ROOT.parent / "brainTemplates" / "combined_clusters_thresh0.8.dlabel.nii",
+        ROOT.parent / "brainTemplates" / "combined_clusters_thresh0.75.dlabel.nii",
+        Path(r"C:\Users\coffm049\brainTemplates\combined_clusters_thresh0.8.dlabel.nii"),
+        Path(r"C:\Users\coffm049\brainTemplates\combined_clusters_thresh0.75.dlabel.nii"),
+        Path(r"C:\Users\coffm049\brainTemplates\abcd_template_matching_combined_clusters_thresh0.8.dlabel.nii"),
+        Path(r"C:\Users\coffm049\brainTemplates\abcd_template_matching_combined_clusters_thresh0.75.dlabel.nii"),
+        Path("/projects/standard/faird/shared/data/Probabilitic_network_ROIs_small_package/ABCD/combined_clusters/combined_clusters_thresh0.8.dlabel.nii"),
+        Path("/projects/standard/faird/shared/data/Probabilitic_network_ROIs_small_package/ABCD/combined_clusters/combined_clusters_thresh0.75.dlabel.nii"),
+        Path("/users/4/coffm049/papers/brainTemplates/combined_clusters_thresh0.8.dlabel.nii"),
+        Path("/users/4/coffm049/papers/brainTemplates/combined_clusters_thresh0.75.dlabel.nii"),
+    ]
+    # Prefer file with N parcels (=80) to avoid 63-parcel mismatch
+    for p in candidates:
+        if p.exists():
+            try:
+                img = nib.load(str(p))
+                ax0 = img.header.get_axis(0)
+                n_lab = len(ax0.get_element(0)[1]) - 1  # minus background ??? label
+                if n_lab == N:
+                    return p
+            except Exception:
+                pass
+    # fallback to first existing
+    for p in candidates:
+        if p.exists():
+            return p
+    # last resort: original HPC 0.8
+    return Path("/projects/standard/faird/shared/data/Probabilitic_network_ROIs_small_package/ABCD/combined_clusters/combined_clusters_thresh0.8.dlabel.nii")
+
+DLABEL = _find_proba_dlabel()
 SURF_L = _resolve(ROOT.parent / "brainTemplates" / "Conte69.L.inflated.32k_fs_LR.surf.gii",
                   "/users/4/coffm049/papers/brainTemplates/Conte69.L.inflated.32k_fs_LR.surf.gii")
 SURF_R = _resolve(ROOT.parent / "brainTemplates" / "Conte69.R.inflated.32k_fs_LR.surf.gii",
@@ -71,23 +104,28 @@ def dlabel_values(node_h2, dlabel, N):
             full[label_data == p] = v
     ax = img.header.get_axis(1)
     va = np.asarray(ax.vertex, dtype=int)
-    nv = ax.nvertices
     tex_left = tex_right = None
-    pos = 0
-    for structure, count in nv.items():
+    # Use iter_structures for correct slice boundaries: proba's nvertices (32492)
+    # mismatches actual BrainModel slices (29696/29716 for medial-wall-excluded 32k),
+    # causing a ~2796-vertex shift for the right hemisphere if nvertices is used.
+    for structure, sl, _ in ax.iter_structures():
         s = str(structure).upper()
-        c = int(count)
-        if c == 0:
-            continue
-        blk = va[pos:pos + c]
-        seg = full[pos:pos + c]
-        if "LEFT" in s:
-            tex_left = np.full(int(blk.max()) + 1, np.nan)
-            tex_left[blk] = seg
-        elif "RIGHT" in s:
-            tex_right = np.full(int(blk.max()) + 1, np.nan)
-            tex_right[blk] = seg
-        pos += c
+        if sl.stop is None:
+            sl = slice(sl.start, len(va))
+        blk = va[sl]
+        seg = full[sl]
+        if "CORTEX_LEFT" in s:
+            # Conte69 surfaces are 32492 vertices; proba dlabels have 29696/29716
+            # valid vertices, so allocate full 32492 and fill valid indices.
+            tex_left = np.full(32492, np.nan)
+            valid = blk >= 0
+            # blk values are 0..32491 for valid cortex vertices
+            tex_left[blk[valid]] = seg[valid]
+        elif "CORTEX_RIGHT" in s:
+            tex_right = np.full(32492, np.nan)
+            valid = blk >= 0
+            tex_right[blk[valid]] = seg[valid]
+        # non-cortical structures ignored for surface PNGs
     return tex_left, tex_right
 
 
@@ -175,22 +213,29 @@ def dlabel_network_values(dlabel, N, net_id):
         full[label_data == p] = int(net_id[p - 1])
     ax = img.header.get_axis(1)
     va = np.asarray(ax.vertex, dtype=int)
-    nv = ax.nvertices
     tex_left = tex_right = None
-    pos = 0
-    for structure, count in nv.items():
+    for structure, sl, _ in ax.iter_structures():
         s = str(structure).upper()
-        c = int(count)
-        if c == 0:
-            continue
-        blk = va[pos:pos + c]
-        seg = full[pos:pos + c].astype(float)
+        if sl.stop is None:
+            sl = slice(sl.start, len(va))
+        blk = va[sl]
+        seg = full[sl].astype(float)
         seg[seg < 0] = np.nan
-        if "LEFT" in s:
-            tex_left = seg
-        elif "RIGHT" in s:
-            tex_right = seg
-        pos += c
+        if "CORTEX_LEFT" in s:
+            tex_left = np.full(32492, np.nan)
+            valid = blk >= 0
+            # map via vertex indices to full 32492 surface
+            # need to create texture of size 32492, fill valid positions
+            tmp = np.full(32492, np.nan)
+            # seg[valid] holds net_id for valid vertices; blk[valid] is target index
+            tmp[blk[valid]] = seg[valid]
+            tex_left = tmp
+        elif "CORTEX_RIGHT" in s:
+            tex_right = np.full(32492, np.nan)
+            valid = blk >= 0
+            tmp = np.full(32492, np.nan)
+            tmp[blk[valid]] = seg[valid]
+            tex_right = tmp
     return tex_left, tex_right
 
 

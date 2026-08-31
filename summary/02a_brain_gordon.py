@@ -74,23 +74,25 @@ def dlabel_values(node_h2, dlabel, N):
             full[label_data == p] = v
     ax = img.header.get_axis(1)
     va = np.asarray(ax.vertex, dtype=int)
-    nv = ax.nvertices
     tex_left = tex_right = None
-    pos = 0
-    for structure, count in nv.items():
+    # Use iter_structures (not nvertices) for correct slice boundaries;
+    # proba's nvertices (32492) mismatches actual slices (29696/29716),
+    # causing right-hemisphere shift if nvertices is used. Gordon matches
+    # but we use robust method for both.
+    for structure, sl, _ in ax.iter_structures():
         s = str(structure).upper()
-        c = int(count)
-        if c == 0:
-            continue
-        blk = va[pos:pos + c]
-        seg = full[pos:pos + c]
-        if "LEFT" in s:
-            tex_left = np.full(int(blk.max()) + 1, np.nan)
-            tex_left[blk] = seg
-        elif "RIGHT" in s:
-            tex_right = np.full(int(blk.max()) + 1, np.nan)
-            tex_right[blk] = seg
-        pos += c
+        if sl.stop is None:
+            sl = slice(sl.start, len(va))
+        blk = va[sl]
+        seg = full[sl]
+        if "CORTEX_LEFT" in s:
+            tex_left = np.full(32492, np.nan)
+            valid = blk >= 0
+            tex_left[blk[valid]] = seg[valid]
+        elif "CORTEX_RIGHT" in s:
+            tex_right = np.full(32492, np.nan)
+            valid = blk >= 0
+            tex_right[blk[valid]] = seg[valid]
     return tex_left, tex_right
 
 
@@ -198,22 +200,26 @@ def dlabel_network_values(dlabel, N, net_id):
         full[label_data == p] = int(net_id[p - 1])
     ax = img.header.get_axis(1)
     va = np.asarray(ax.vertex, dtype=int)
-    nv = ax.nvertices
     tex_left = tex_right = None
-    pos = 0
-    for structure, count in nv.items():
+    for structure, sl, _ in ax.iter_structures():
         s = str(structure).upper()
-        c = int(count)
-        if c == 0:
-            continue
-        blk = va[pos:pos + c]
-        seg = full[pos:pos + c].astype(float)
+        if sl.stop is None:
+            sl = slice(sl.start, len(va))
+        blk = va[sl]
+        seg = full[sl].astype(float)
         seg[seg < 0] = np.nan
-        if "LEFT" in s:
-            tex_left = seg
-        elif "RIGHT" in s:
-            tex_right = seg
-        pos += c
+        if "CORTEX_LEFT" in s:
+            tex_left = np.full(32492, np.nan)
+            valid = blk >= 0
+            tmp = np.full(32492, np.nan)
+            tmp[blk[valid]] = seg[valid]
+            tex_left = tmp
+        elif "CORTEX_RIGHT" in s:
+            tex_right = np.full(32492, np.nan)
+            valid = blk >= 0
+            tmp = np.full(32492, np.nan)
+            tmp[blk[valid]] = seg[valid]
+            tex_right = tmp
     return tex_left, tex_right
 
 

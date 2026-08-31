@@ -36,14 +36,40 @@ GORDON_DLABEL = _resolve(
     Path(__file__).resolve().parents[1].parent / "brainTemplates" / "Gordon.subcortical.32k_fs_LR.dlabel.nii",
     "/users/4/coffm049/papers/brainTemplates/Gordon.subcortical.32k_fs_LR.dlabel.nii",
 )
-PROBA_DLABEL = _resolve(
-    Path(__file__).resolve().parents[1] / "brainTemplate" / "combined_clusters_thresh0.8.dlabel.nii",
-    "/projects/standard/faird/shared/data/Probabilitic_network_ROIs_small_package/ABCD/combined_clusters/combined_clusters_thresh0.8.dlabel.nii",
-)
-PROBA_DLABEL = _resolve(
-    Path(__file__).resolve().parents[1].parent / "brainTemplates" / "combined_clusters_thresh0.8.dlabel.nii",
-    str(PROBA_DLABEL),
-) if not PROBA_DLABEL.exists() else PROBA_DLABEL
+
+def _find_proba_dlabel():
+    candidates = [
+        Path(__file__).resolve().parents[1] / "brainTemplate" / "combined_clusters_thresh0.8.dlabel.nii",
+        Path(__file__).resolve().parents[1] / "brainTemplate" / "combined_clusters_thresh0.75.dlabel.nii",
+        Path(__file__).resolve().parents[1].parent / "brainTemplates" / "combined_clusters_thresh0.8.dlabel.nii",
+        Path(__file__).resolve().parents[1].parent / "brainTemplates" / "combined_clusters_thresh0.75.dlabel.nii",
+        Path(r"C:\Users\coffm049\brainTemplates\combined_clusters_thresh0.8.dlabel.nii"),
+        Path(r"C:\Users\coffm049\brainTemplates\combined_clusters_thresh0.75.dlabel.nii"),
+        Path(r"C:\Users\coffm049\brainTemplates\abcd_template_matching_combined_clusters_thresh0.8.dlabel.nii"),
+        Path(r"C:\Users\coffm049\brainTemplates\abcd_template_matching_combined_clusters_thresh0.75.dlabel.nii"),
+        Path("/projects/standard/faird/shared/data/Probabilitic_network_ROIs_small_package/ABCD/combined_clusters/combined_clusters_thresh0.8.dlabel.nii"),
+        Path("/projects/standard/faird/shared/data/Probabilitic_network_ROIs_small_package/ABCD/combined_clusters/combined_clusters_thresh0.75.dlabel.nii"),
+        Path("/users/4/coffm049/papers/brainTemplates/combined_clusters_thresh0.8.dlabel.nii"),
+        Path("/users/4/coffm049/papers/brainTemplates/combined_clusters_thresh0.75.dlabel.nii"),
+    ]
+    # Prefer 80-parcel file (N=80) to avoid 63-parcel mismatch
+    for p in candidates:
+        if p.exists():
+            try:
+                import nibabel as _nib
+                img = _nib.load(str(p))
+                ax0 = img.header.get_axis(0)
+                n_lab = len(ax0.get_element(0)[1]) - 1
+                if n_lab == 80:
+                    return p
+            except Exception:
+                pass
+    for p in candidates:
+        if p.exists():
+            return p
+    return Path("/projects/standard/faird/shared/data/Probabilitic_network_ROIs_small_package/ABCD/combined_clusters/combined_clusters_thresh0.8.dlabel.nii")
+
+PROBA_DLABEL = _find_proba_dlabel()
 SHORT_DICT = _resolve(
     Path(__file__).resolve().parents[1].parent / "brainTemplates" / "shortDicionary.csv",
     "/users/4/coffm049/papers/brainTemplates/shortDicionary.csv",
