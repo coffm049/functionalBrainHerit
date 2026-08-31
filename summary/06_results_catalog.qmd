@@ -85,13 +85,17 @@ All PNGs below are already rendered by `01 → 02a-d → 05`. This catalog embed
 
 ---
 
-## Gordon — Manhattans {style="text-align:center;"}
+## Gordon — Manhattans {.scrollable style="text-align:center;"}
+
+::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
 ::: {layout="[[1],[1]]" style="text-align:center;"}
 
 ![Gordon Twin Manhattan — Sys-Sys pairs, y 0–1, x spans full axis, Sys-Sys labels at bottom (20 largest by #connections, alternating colours; remainder grey 100× compressed on right)](../results/summary/plots/manhattan_gordon_Twin.png){width="100%" style="object-fit:contain;"}
 
 ![Gordon AdjHE-RE Manhattan](../results/summary/plots/manhattan_gordon_AdjHERE.png){width="100%" style="object-fit:contain;"}
+
+:::
 
 :::
 
@@ -173,13 +177,17 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 
 ---
 
-## ProbaConns — Manhattans {style="text-align:center;"}
+## ProbaConns — Manhattans {.scrollable style="text-align:center;"}
+
+::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
 ::: {layout="[[1],[1]]" style="text-align:center;"}
 
 ![ProbaConns Twin Manhattan](../results/summary/plots/manhattan_probaConns_Twin.png){width="100%" style="object-fit:contain;"}
 
 ![ProbaConns AdjHE-RE Manhattan](../results/summary/plots/manhattan_probaConns_AdjHERE.png){width="100%" style="object-fit:contain;"}
+
+:::
 
 :::
 
@@ -229,13 +237,17 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 
 ---
 
-## SA — Manhattans {style="text-align:center;"}
+## SA — Manhattans {.scrollable style="text-align:center;"}
+
+::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
 ::: {layout="[[1],[1]]" style="text-align:center;"}
 
 ![SA Twin Manhattan](../results/summary/plots/manhattan_SA_Twin.png){width="100%" style="object-fit:contain;"}
 
 ![SA AdjHE-RE Manhattan](../results/summary/plots/manhattan_SA_AdjHERE.png){width="100%" style="object-fit:contain;"}
+
+:::
 
 :::
 
@@ -314,9 +326,13 @@ if (file.exists(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"))) {
 
 ---
 
-## Manhattan Overview — Ordered by h² Magnitude {style="text-align:center;"}
+## Manhattan Overview — Ordered by h² Magnitude {.scrollable style="text-align:center;"}
+
+::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
 ![Overview — all Sets × Methods, ordered by h² magnitude, y 0–1, <1.5% grey 100× on right](../results/summary/plots/manhattan_overview.png){width="100%" style="object-fit:contain;"}
+
+:::
 
 *Note: overview is a faceted 3×2 snapshot; individual `manhattan_*.png` above are now full-width with Sys-Sys labels.*
 
