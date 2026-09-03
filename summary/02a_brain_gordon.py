@@ -249,20 +249,65 @@ def dlabel_network_values(dlabel, N, net_id):
     return tex_left, tex_right
 
 
-def _network_palette(net_names):
+def _network_palette(net_names, dlabel=None):
+    """Return network -> color mapping, using dlabel's true colors when available.
+
+    This fixes the mismatched legend/cortex colors reported (VIS peach vs light purple,
+    DMN light green vs dark blue, duplicates DMN/SMl both dark green, etc.) which were
+    caused by tab20 insertion-order palette. When a dlabel is provided, we use its
+    label-table RGBA for each network (the colors that correctly paint the cortex in
+    wb_view), giving distinct, anatomy-matched colors and no overlap with the
+    nilearn dark-grey background.
+    """
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.colors as mcolors
     import matplotlib.pyplot as plt
+    # Try to use dlabel's true network colors
+    if dlabel is not None:
+        try:
+            img = nib.load(str(dlabel))
+            labels = _cifti_labels(img)
+            # Map network shortname -> rgba from label table (first parcel with that network)
+            net_to_rgba = {}
+            # For Gordon via gordon_modules.csv, map via labelDictionary to find a representative parcel
+            # For fallback, use _network_of on label strings
+            for p, lab in labels.items():
+                if p == 0:
+                    continue
+                raw = lab[0] if isinstance(lab, (tuple, list)) else getattr(lab, "label", str(lab))
+                net = _network_of(raw)
+                # Translate via shortDicionary if possible to match net_names casing
+                # net_names are shortnames like DMN, Vis, etc.
+                # Find matching net_names entry case-insensitively
+                for target in net_names:
+                    if target.lower() == net.lower():
+                        if target not in net_to_rgba:
+                            rgba = lab[1] if isinstance(lab, (tuple, list)) and len(lab) > 1 else (0.5, 0.5, 0.5, 1.0)
+                            # lab[1] is (r,g,b,a) in 0..1
+                            if isinstance(rgba, (list, tuple)) and len(rgba) >= 3:
+                                net_to_rgba[target] = tuple(float(x) for x in rgba[:3])
+                        break
+            if len(net_to_rgba) == len(net_names):
+                # All networks found in dlabel — use those colors directly
+                color_of = {n: net_to_rgba[n] for n in net_names}
+                cmap = mcolors.ListedColormap([color_of[n] for n in net_names])
+                return cmap, color_of
+        except Exception:
+            pass
+    # Fallback: tab20 in canonical sorted order (not insertion order) to avoid shift
+    # Sort net_names alphabetically for stable, distinct colors; then override Sal/SMl per user
     base = plt.get_cmap("tab20").colors
-    color_of = {net: base[i % len(base)] for i, net in enumerate(net_names)}
-    if "Sal" in color_of:
-        color_of["Sal"] = base[5]  # brown for Salience (insula)
-    if "SMl" in color_of:
-        color_of["SMl"] = base[4]  # purple for somatomotor lateral
-    if "SMl" in color_of and "Sal" in color_of:
-        # Ensure distinct after swap
-        pass
+    # Use sorted order for color assignment to avoid DAN-first insertion-order shift
+    sorted_nets = sorted(net_names, key=lambda x: x.lower())
+    tmp_color = {net: base[i % len(base)] for i, net in enumerate(sorted_nets)}
+    # Ensure Sal brown, SMl purple as requested (insula = Sal brown)
+    if "Sal" in tmp_color:
+        tmp_color["Sal"] = base[5]  # brown
+    if "SMl" in tmp_color:
+        tmp_color["SMl"] = base[4]  # purple
+    # Reorder to original net_names order for display but with fixed colors
+    color_of = {n: tmp_color[n] for n in net_names}
     cmap = mcolors.ListedColormap([color_of[n] for n in net_names])
     return cmap, color_of
 
@@ -337,7 +382,7 @@ def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.35):
         lw = 0.1 + norm * (1.0 - 0.1)
         alpha = 0.1 + norm * (1.0 - 0.1)
         ax.plot([xy[pa, 0], xy[pb, 0]], [xy[pa, 1], xy[pb, 1]], color="red", alpha=alpha, linewidth=lw)
-    _, color_of = _network_palette(net_names)
+    _, color_of = _network_palette(net_names, DLABEL)
     node_colors = [color_of.get(net_ordered[i], "#999999") for i in range(N)]
     ax.scatter(xy[:, 0], xy[:, 1], s=20, c=node_colors, zorder=5, edgecolors="black", linewidths=0.3)
     handles = [plt.Line2D([0], [0], marker="o", linestyle="", color=color_of[net], label=net) for net in net_names]
@@ -356,14 +401,14 @@ def plot_surface_networks(net_left, net_right, net_names, surf_l, surf_r, outdir
     sides = [("left", surf_l, net_left), ("right", surf_r, net_right)]
     sides = [(n, s, v) for n, s, v in sides if v is not None]
     K = len(net_names)
-    cmap, color_of = _network_palette(net_names)
+    cmap, color_of = _network_palette(net_names, DLABEL)
     png = outdir / f"{tag}_networks_surface.png"
     fig = plt.figure(figsize=(6 * len(sides), 5))
     for i, (hemi, surf, val) in enumerate(sides, start=1):
         ax = fig.add_subplot(1, len(sides), i, projection="3d")
         niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
-                                  cmap=cmap, colorbar=False, threshold=None,
-                                  vmin=0.0, vmax=max(K - 1, 1), title=f"{_display_tag(tag)} Networks ({hemi})")
+                                   cmap=cmap, colorbar=False, threshold=None,
+                                   vmin=0.0, vmax=max(K - 1, 1), title=f"{_display_tag(tag)} Networks ({hemi})")
     handles = [plt.Line2D([0], [0], marker="o", linestyle="", color=color_of[net], label=net) for net in net_names]
     fig.legend(handles=handles, loc="lower center", ncol=4, fontsize=7, frameon=False)
     fig.savefig(png, dpi=150, bbox_inches="tight")
