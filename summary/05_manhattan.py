@@ -99,7 +99,7 @@ def _cifti_labels(img):
 
 def _network_of(name):
     if not name:
-        return "NA"
+        return "SUB"
     s = str(name)
     s = re.sub(r"^\d{1,3}_[LR]_", "", s)
     _map = {
@@ -111,7 +111,10 @@ def _network_of(name):
         "RetrosplenialTemporal": "Tpole",
     }
     s = _map.get(s, s)
-    return s.split("_")[0] if "_" in s else s
+    s = s.split("_")[0] if "_" in s else s
+    if s.upper() == "NA" or s == "???" or s == "":
+        return "SUB"
+    return s
 
 
 def load_networks_for_atlas(atlas, N):
@@ -120,12 +123,17 @@ def load_networks_for_atlas(atlas, N):
     # network assignment so the Manhattan can still be regenerated and
     # demonstrate the x-axis / x-label fix. On HPC the real dlabel is used.
     _fallback_nets = ["DMN","VIS","FP","DAN","VAN","SAL","CO","SMD","SML","AUD","Tpole","MTL","PMN","PON"]
+    CORTICAL = {"DMN","VIS","Vis","FP","DAN","VAN","SAL","Sal","CO","SMD","SMd","SML","SMl","AUD","Aud","Tpole","MTL","PMN","PON","SUB"}
+    CORTICAL_LOWER = {c.lower(): c for c in CORTICAL}
+    CANON = {"vis":"Vis","aud":"Aud","sal":"Sal","smd":"SMd","sml":"SMl","van":"VAN","dan":"DAN","dmn":"DMN","fp":"FP","co":"CO","mtl":"MTL","pmn":"PMN","pon":"PON","tpole":"Tpole","sub":"SUB"}
     if atlas == "gordon":
         try:
             if not GORDON_DLABEL.exists() or not SHORT_DICT.exists():
                 raise FileNotFoundError(f"Missing {GORDON_DLABEL} or {SHORT_DICT}")
             df = pd.read_csv(SHORT_DICT)
             name_to_short = dict(zip(df["name"].astype(str), df["shortname"].astype(str)))
+            cortical = set(name_to_short.values()) | {"SUB"}
+            cortical_lower = {c.lower(): c for c in cortical}
             img = nib.load(str(GORDON_DLABEL))
             labels = _cifti_labels(img)
             nets = []
@@ -133,12 +141,16 @@ def load_networks_for_atlas(atlas, N):
                 lab = labels.get(p)
                 s = lab[0] if isinstance(lab, (tuple, list)) else getattr(lab, "label", str(lab)) if lab is not None else None
                 net = _network_of(s)
-                nets.append(name_to_short.get(net, net))
-                if nets[-1] == net:
+                short = name_to_short.get(net, net)
+                if short == net:
                     for k, v in name_to_short.items():
                         if k.lower() == net.lower():
-                            nets[-1] = v
+                            short = v
                             break
+                # Collapse subcortical / unknown to SUB
+                if short not in cortical and short.lower() not in cortical_lower:
+                    short = "SUB"
+                nets.append(short)
             return np.asarray(nets)
         except Exception as e:
             print(f"[load_networks_for_atlas] gordon fallback ({e}); using synthesized 14-network tiling")
@@ -154,7 +166,12 @@ def load_networks_for_atlas(atlas, N):
             for p in range(1, N + 1):
                 lab = labels.get(p)
                 s = lab[0] if isinstance(lab, (tuple, list)) else getattr(lab, "label", str(lab)) if lab is not None else None
-                nets.append(_network_of(s))
+                net = _network_of(s)
+                if net not in CORTICAL and net.lower() not in CORTICAL_LOWER:
+                    net = "SUB"
+                else:
+                    net = CANON.get(net.lower(), net)
+                nets.append(net)
             return np.asarray(nets)
         except Exception as e:
             print(f"[load_networks_for_atlas] probaConns fallback ({e}); using synthesized tiling")

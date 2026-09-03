@@ -98,7 +98,7 @@ def dlabel_values(node_h2, dlabel, N):
 
 def _network_of(name):
     if not name:
-        return "NA"
+        return "SUB"
     s = str(name)
     # Gordon label is like "1_L_Default" -> "Default" (per 03b: re.sub r"^\d{1,3}_._")
     s = re.sub(r"^\d{1,3}_[LR]_", "", s)
@@ -116,7 +116,11 @@ def _network_of(name):
         "SMmouth": "SMl",
         "RetrosplenialTemporal": "Tpole",
     }
-    return _map.get(s, s)
+    s = _map.get(s, s)
+    s = s.split("_")[0] if "_" in s else s
+    if s.upper() == "NA" or s == "???" or s == "":
+        return "SUB"
+    return s
 
 
 def _cifti_labels(img):
@@ -164,10 +168,13 @@ def load_gordon_networks(dlabel, csv_path, N):
     shortDicionary.csv is a 14-row network dictionary: columns name,shortname.
     Parcel->network comes from the dlabel's CIFTI label table (e.g.
     '1_L_Default' -> 'Default' -> 'DMN' via 03b mapping), translated via
-    name->shortname.
+    name->shortname. Subcortical / unknown parcels are collapsed to SUB.
     """
     df = pd.read_csv(csv_path)
     name_to_short = dict(zip(df["name"].astype(str), df["shortname"].astype(str)))
+    cortical = set(name_to_short.values())
+    # also accept case variants (e.g., Vis vs VIS)
+    cortical_lower = {c.lower(): c for c in cortical}
     img = nib.load(str(dlabel))
     labels = _cifti_labels(img)
     nets = []
@@ -188,6 +195,11 @@ def load_gordon_networks(dlabel, csv_path, N):
                 if k.lower() == net.lower():
                     short = v
                     break
+        # Collapse subcortical / unknown (e.g., ACCUMBENS, THALAMUS) and NA to SUB
+        if short not in cortical and short.lower() not in cortical_lower:
+            # also handle bare SUB from _network_of
+            if short.upper() != "SUB":
+                short = "SUB"
         nets.append(short)
     return np.asarray(nets)
 

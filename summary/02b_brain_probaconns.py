@@ -131,7 +131,7 @@ def dlabel_values(node_h2, dlabel, N):
 
 def _network_of(name):
     if not name:
-        return "NA"
+        return "SUB"
     s = str(name)
     s = re.sub(r"^\d{1,3}_[LR]_", "", s)
     _map = {
@@ -148,7 +148,11 @@ def _network_of(name):
         "RetrosplenialTemporal": "Tpole",
     }
     s = _map.get(s, s)
-    return s.split("_")[0] if "_" in s else s
+    s = s.split("_")[0] if "_" in s else s
+    # Collapse subcortical / unknown to SUB (instead of NA) for display
+    if s.upper() == "NA" or s == "???" or s == "":
+        return "SUB"
+    return s
 
 
 def _cifti_labels(img):
@@ -187,7 +191,14 @@ def _cifti_labels(img):
 
 
 def load_probaconns_networks(dlabel, N):
-    """Parcel (1..N) -> network from the CIFTI label table (first token)."""
+    """Parcel (1..N) -> network from the CIFTI label table (first token).
+
+    Subcortical / unknown parcels are collapsed to SUB (instead of NA).
+    """
+    CORTICAL = {"DMN","Vis","VIS","FP","Aud","AUD","Tpole","PMN","PON","MTL","CO","Sal","SAL","SMd","SMD","SMl","SML","VAN","DAN"}
+    CORTICAL_LOWER = {c.lower(): c for c in CORTICAL}
+    # canonicalize to the shortDicionary-style casing where possible
+    CANON = {"vis":"Vis","aud":"Aud","sal":"Sal","smd":"SMd","sml":"SMl","van":"VAN","dan":"DAN","dmn":"DMN","fp":"FP","co":"CO","mtl":"MTL","pmn":"PMN","pon":"PON","tpole":"Tpole"}
     img = nib.load(str(dlabel))
     labels = _cifti_labels(img)
     nets = []
@@ -201,7 +212,15 @@ def load_probaconns_networks(dlabel, N):
             parcel_label = getattr(lab, "label", None) or getattr(lab, "key", None)
             if parcel_label is None:
                 parcel_label = str(lab)
-        nets.append(_network_of(parcel_label))
+        net = _network_of(parcel_label)
+        # Collapse NA / subcortical to SUB
+        if net.upper() == "SUB" or net == "???" or net.upper() == "NA":
+            nets.append("SUB")
+        elif net not in CORTICAL and net.lower() not in CORTICAL_LOWER:
+            nets.append("SUB")
+        else:
+            # canonicalize casing
+            nets.append(CANON.get(net.lower(), net))
     return np.asarray(nets)
 
 
