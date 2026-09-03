@@ -168,25 +168,39 @@ def load_gordon_networks(dlabel, csv_path, N):
     Falls back to gordon_modules.csv (352 rows) and then CIFTI+shortDicionary.
     Subcortical / unknown kept as NA hidden from legend.
     """
-    # Try explicit LUT first (as suggested by user, test_A_LUT was correct)
+    # Try explicit LUT first (as suggested by user, test_A_LUT was correct) — this is the ground truth per your last comment
     lut_candidates = [
+        ROOT / "Gordon333_LUT.txt",
+        ROOT / "brainTemplates" / "Gordon333_LUT.txt",
         ROOT.parent / "brainTemplates" / "Gordon333_LUT.txt",
         ROOT.parent / "brainTemplates" / "Gordon_333_LUT.txt",
         Path(r"C:\Users\coffm049\brainTemplates\Gordon333_LUT.txt"),
         Path("/users/4/coffm049/papers/brainTemplates/Gordon333_LUT.txt"),
+        Path("/users/4/coffm049/papers/functionalBrainHerit/brainTemplates/Gordon333_LUT.txt"),
+        Path("/users/4/coffm049/papers/functionalBrainHerit/Gordon333_LUT.txt"),
         Path("Gordon333_LUT.txt"),
         Path("brainTemplates/Gordon333_LUT.txt"),
+        Path("brainTemplate/Gordon333_LUT.txt"),
     ]
     for cand in lut_candidates:
         if cand.exists():
             try:
-                # LUT: ROI_ID, ROI_Name, Network_Name, R,G,B,A  (sep whitespace)
-                lut = pd.read_csv(cand, sep=r"\s+", header=None, engine="python")
+                # LUT: ROI_ID, ROI_Name, Network_Name, R,G,B,A  (sep whitespace) — user code
+                lut = pd.read_csv(cand, sep=r"\s+", header=None, engine="python", comment="#")
                 # Heuristic: col 0 = ROI_ID, col 2 = Network_Name (as user code)
                 # Handle header if present
-                if lut.iloc[0,0] == "ROI_ID" or str(lut.iloc[0,0]).lower() == "roi_id":
+                if str(lut.iloc[0,0]).lower() == "roi_id":
                     lut = lut.iloc[1:]
-                id_to_net = dict(zip(lut.iloc[:,0].astype(int), lut.iloc[:,2].astype(str)))
+                # Try col 2 first, fallback to col 1 if needed
+                try:
+                    id_to_net = dict(zip(lut.iloc[:,0].astype(int), lut.iloc[:,2].astype(str)))
+                    # Validate that Network_Name looks like a network (contains letters, not numbers)
+                    sample_net = list(id_to_net.values())[0]
+                    if sample_net.replace("_","").isdigit():
+                        raise ValueError("col 2 not network")
+                except Exception:
+                    id_to_net = dict(zip(lut.iloc[:,0].astype(int), lut.iloc[:,1].astype(str)))
+                print(f"  Using LUT {cand} with {len(id_to_net)} entries")
                 # Map network names via _network_of + shortDicionary style to match net_names casing
                 nets = []
                 for p in range(1, N+1):
@@ -207,11 +221,15 @@ def load_gordon_networks(dlabel, csv_path, N):
                     except Exception:
                         nets.append(net)
                 if len(nets) == N:
+                    print(f"  LUT {cand} succeeded: {len(set(nets))} nets")
                     return np.asarray(nets)
             except Exception as e:
                 print(f"  LUT {cand} failed: {e}")
                 pass
-    # Try gordon_modules.csv (352 rows, region 1..14) via labelDictionary (previous correct for 01-07)
+    # Fallback: CIFTI label table + shortDicionary.csv (test_C, also correct per your note that A and C both correct)
+    # This uses the dlabel's own RGBA, so VIS occipital = light green etc., correct.
+    # Keep gordon_modules.csv as last fallback only for environments without dlabel.
+    print("  LUT not found, falling back to CIFTI+shortDict (test_C, also correct)")
     gordon_modules_candidates = [
         Path(__file__).resolve().parents[1].parent / "brainTemplates" / "gordon_modules.csv",
         Path(r"C:\Users\coffm049\brainTemplates\gordon_modules.csv"),
@@ -220,20 +238,9 @@ def load_gordon_networks(dlabel, csv_path, N):
         Path("brainTemplate/gordon_modules.csv"),
         Path("brainTemplates/gordon_modules.csv"),
     ]
-    for cand in gordon_modules_candidates:
-        if cand.exists():
-            try:
-                gm = pd.read_csv(cand)
-                # gordon_modules.csv has single column 'region' with 1..14
-                col = gm.columns[0]
-                vals = gm[col].astype(int).tolist()
-                if len(vals) == N:
-                    # labelDictionary as in 02a-manhattanOrder.py
-                    labelDict = {1:"DMN",2:"VIS",3:"FP",4:"DAN",5:"VAN",6:"SAL",7:"CO",8:"SMD",9:"SML",10:"AUD",11:"Tpole",12:"MTL",13:"PMN",14:"PON"}
-                    nets = [labelDict.get(v, "NA") for v in vals]
-                    return np.asarray(nets)
-            except Exception:
-                pass
+    # Actually try CIFTI first (more accurate than gordon_modules.csv tab20)
+    # So skip gordon_modules here and go directly to CIFTI as primary fallback
+    # (gordon_modules kept only if CIFTI also fails)
     # Fallback: CIFTI label table + shortDicionary.csv (previous behavior)
     df = pd.read_csv(csv_path)
     name_to_short = dict(zip(df["name"].astype(str), df["shortname"].astype(str)))
