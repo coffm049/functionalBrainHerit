@@ -123,16 +123,16 @@ def load_networks_for_atlas(atlas, N):
     # network assignment so the Manhattan can still be regenerated and
     # demonstrate the x-axis / x-label fix. On HPC the real dlabel is used.
     _fallback_nets = ["DMN","VIS","FP","DAN","VAN","SAL","CO","SMD","SML","AUD","Tpole","MTL","PMN","PON"]
-    CORTICAL = {"DMN","VIS","Vis","FP","DAN","VAN","SAL","Sal","CO","SMD","SMd","SML","SMl","AUD","Aud","Tpole","MTL","PMN","PON","SUB"}
+    CORTICAL = {"DMN","VIS","Vis","FP","DAN","VAN","SAL","Sal","CO","SMD","SMd","SML","SMl","AUD","Aud","Tpole","MTL","PMN","PON"}
     CORTICAL_LOWER = {c.lower(): c for c in CORTICAL}
-    CANON = {"vis":"Vis","aud":"Aud","sal":"Sal","smd":"SMd","sml":"SMl","van":"VAN","dan":"DAN","dmn":"DMN","fp":"FP","co":"CO","mtl":"MTL","pmn":"PMN","pon":"PON","tpole":"Tpole","sub":"SUB"}
+    CANON = {"vis":"Vis","aud":"Aud","sal":"Sal","smd":"SMd","sml":"SMl","van":"VAN","dan":"DAN","dmn":"DMN","fp":"FP","co":"CO","mtl":"MTL","pmn":"PMN","pon":"PON","tpole":"Tpole"}
     if atlas == "gordon":
         try:
             if not GORDON_DLABEL.exists() or not SHORT_DICT.exists():
                 raise FileNotFoundError(f"Missing {GORDON_DLABEL} or {SHORT_DICT}")
             df = pd.read_csv(SHORT_DICT)
             name_to_short = dict(zip(df["name"].astype(str), df["shortname"].astype(str)))
-            cortical = set(name_to_short.values()) | {"SUB"}
+            cortical = set(name_to_short.values())
             cortical_lower = {c.lower(): c for c in cortical}
             img = nib.load(str(GORDON_DLABEL))
             labels = _cifti_labels(img)
@@ -147,9 +147,9 @@ def load_networks_for_atlas(atlas, N):
                         if k.lower() == net.lower():
                             short = v
                             break
-                # Collapse subcortical / unknown to SUB
+                # Keep subcortical/unknown as NA (hidden from legend, not SUB)
                 if short not in cortical and short.lower() not in cortical_lower:
-                    short = "SUB"
+                    short = "NA"
                 nets.append(short)
             return np.asarray(nets)
         except Exception as e:
@@ -168,7 +168,7 @@ def load_networks_for_atlas(atlas, N):
                 s = lab[0] if isinstance(lab, (tuple, list)) else getattr(lab, "label", str(lab)) if lab is not None else None
                 net = _network_of(s)
                 if net not in CORTICAL and net.lower() not in CORTICAL_LOWER:
-                    net = "SUB"
+                    net = "NA"
                 else:
                     net = CANON.get(net.lower(), net)
                 nets.append(net)

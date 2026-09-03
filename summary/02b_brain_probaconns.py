@@ -131,7 +131,7 @@ def dlabel_values(node_h2, dlabel, N):
 
 def _network_of(name):
     if not name:
-        return "SUB"
+        return "NA"
     s = str(name)
     s = re.sub(r"^\d{1,3}_[LR]_", "", s)
     _map = {
@@ -149,9 +149,6 @@ def _network_of(name):
     }
     s = _map.get(s, s)
     s = s.split("_")[0] if "_" in s else s
-    # Collapse subcortical / unknown to SUB (instead of NA) for display
-    if s.upper() == "NA" or s == "???" or s == "":
-        return "SUB"
     return s
 
 
@@ -191,14 +188,7 @@ def _cifti_labels(img):
 
 
 def load_probaconns_networks(dlabel, N):
-    """Parcel (1..N) -> network from the CIFTI label table (first token).
-
-    Subcortical / unknown parcels are collapsed to SUB (instead of NA).
-    """
-    CORTICAL = {"DMN","Vis","VIS","FP","Aud","AUD","Tpole","PMN","PON","MTL","CO","Sal","SAL","SMd","SMD","SMl","SML","VAN","DAN"}
-    CORTICAL_LOWER = {c.lower(): c for c in CORTICAL}
-    # canonicalize to the shortDicionary-style casing where possible
-    CANON = {"vis":"Vis","aud":"Aud","sal":"Sal","smd":"SMd","sml":"SMl","van":"VAN","dan":"DAN","dmn":"DMN","fp":"FP","co":"CO","mtl":"MTL","pmn":"PMN","pon":"PON","tpole":"Tpole"}
+    """Parcel (1..N) -> network from the CIFTI label table (first token)."""
     img = nib.load(str(dlabel))
     labels = _cifti_labels(img)
     nets = []
@@ -212,15 +202,7 @@ def load_probaconns_networks(dlabel, N):
             parcel_label = getattr(lab, "label", None) or getattr(lab, "key", None)
             if parcel_label is None:
                 parcel_label = str(lab)
-        net = _network_of(parcel_label)
-        # Collapse NA / subcortical to SUB
-        if net.upper() == "SUB" or net == "???" or net.upper() == "NA":
-            nets.append("SUB")
-        elif net not in CORTICAL and net.lower() not in CORTICAL_LOWER:
-            nets.append("SUB")
-        else:
-            # canonicalize casing
-            nets.append(CANON.get(net.lower(), net))
+        nets.append(_network_of(parcel_label))
     return np.asarray(nets)
 
 
@@ -391,9 +373,12 @@ for method, col in [("twin", "Twin_h2"), ("AdjHE", "h2_proba_AdjHE_RE")]:
     print(f"[probaConns_{method}] edges={int(np.isfinite(M).sum() // 2)} nodes={N}")
 
 networks = load_probaconns_networks(DLABEL, N)
-net_names = list(dict.fromkeys(networks.tolist()))
-net_id = np.array([net_names.index(s) for s in networks], dtype=int)
-print(f"[networks] {len(net_names)} groups: {net_names}")
+net_names_all = list(dict.fromkeys(networks.tolist()))
+# Hide NA (subcortical/unknown) from legend — keep NA for data but not displayed
+net_names = [n for n in net_names_all if n not in ("NA", "SUB", "???")]
+# For display, map NA/SUB to -1 so they become NaN on surface and grey in circular
+net_id = np.array([net_names.index(s) if s in net_names else -1 for s in networks], dtype=int)
+print(f"[networks] {len(net_names_all)} groups (incl. NA): {net_names_all} -> display {len(net_names)}: {net_names}")
 
 dL, dR = dlabel_values(node_vals["AdjHE"], DLABEL, N)
 print(f"[dlabel] left assigned={int(np.count_nonzero(~np.isnan(dL)))} right assigned={int(np.count_nonzero(~np.isnan(dR)))} (N={N})")

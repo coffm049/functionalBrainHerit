@@ -98,7 +98,7 @@ def dlabel_values(node_h2, dlabel, N):
 
 def _network_of(name):
     if not name:
-        return "SUB"
+        return "NA"
     s = str(name)
     # Gordon label is like "1_L_Default" -> "Default" (per 03b: re.sub r"^\d{1,3}_._")
     s = re.sub(r"^\d{1,3}_[LR]_", "", s)
@@ -118,8 +118,6 @@ def _network_of(name):
     }
     s = _map.get(s, s)
     s = s.split("_")[0] if "_" in s else s
-    if s.upper() == "NA" or s == "???" or s == "":
-        return "SUB"
     return s
 
 
@@ -168,13 +166,10 @@ def load_gordon_networks(dlabel, csv_path, N):
     shortDicionary.csv is a 14-row network dictionary: columns name,shortname.
     Parcel->network comes from the dlabel's CIFTI label table (e.g.
     '1_L_Default' -> 'Default' -> 'DMN' via 03b mapping), translated via
-    name->shortname. Subcortical / unknown parcels are collapsed to SUB.
+    name->shortname. Subcortical / unknown parcels are kept as NA and hidden from legend.
     """
     df = pd.read_csv(csv_path)
     name_to_short = dict(zip(df["name"].astype(str), df["shortname"].astype(str)))
-    cortical = set(name_to_short.values())
-    # also accept case variants (e.g., Vis vs VIS)
-    cortical_lower = {c.lower(): c for c in cortical}
     img = nib.load(str(dlabel))
     labels = _cifti_labels(img)
     nets = []
@@ -195,11 +190,6 @@ def load_gordon_networks(dlabel, csv_path, N):
                 if k.lower() == net.lower():
                     short = v
                     break
-        # Collapse subcortical / unknown (e.g., ACCUMBENS, THALAMUS) and NA to SUB
-        if short not in cortical and short.lower() not in cortical_lower:
-            # also handle bare SUB from _network_of
-            if short.upper() != "SUB":
-                short = "SUB"
         nets.append(short)
     return np.asarray(nets)
 
@@ -368,9 +358,12 @@ for method, col in [("twin", "Twin_h2"), ("AdjHE", "h2_gordon_AdjHE_RE")]:
     print(f"[gordon_{method}] edges={int(np.isfinite(M).sum() // 2)} nodes={N}")
 
 networks = load_gordon_networks(DLABEL, NETWORKS_CSV, N)
-net_names = list(dict.fromkeys(networks.tolist()))
-net_id = np.array([net_names.index(s) for s in networks], dtype=int)
-print(f"[networks] {len(net_names)} groups: {net_names}")
+net_names_all = list(dict.fromkeys(networks.tolist()))
+# Hide NA (subcortical/unknown) from legend — keep NA for data but not displayed per user request (remove SUB, keep NA hidden)
+net_names = [n for n in net_names_all if n not in ("NA", "SUB", "???")]
+# For display, map NA to -1 so they become NaN on surface and grey in circular
+net_id = np.array([net_names.index(s) if s in net_names else -1 for s in networks], dtype=int)
+print(f"[networks] {len(net_names_all)} groups (incl. NA): {net_names_all} -> display {len(net_names)}: {net_names}")
 
 dL, dR = dlabel_values(node_vals["AdjHE"], DLABEL, N)
 print(f"[dlabel] left assigned={int(np.count_nonzero(~np.isnan(dL)))} right assigned={int(np.count_nonzero(~np.isnan(dR)))} (N={N})")
