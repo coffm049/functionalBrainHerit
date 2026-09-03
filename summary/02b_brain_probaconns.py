@@ -339,7 +339,8 @@ def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.35):
         alpha = 0.1 + norm * (1.0 - 0.1)
         ax.plot([xy[pa, 0], xy[pb, 0]], [xy[pa, 1], xy[pb, 1]], color="red", alpha=alpha, linewidth=lw)
     _, color_of = _network_palette(net_names)
-    node_colors = [color_of[net_ordered[i]] for i in range(N)]
+    # Handle NA/SUB nodes (e.g., when dlabel has 63 parcels but N=80) — color grey and hide from legend
+    node_colors = [color_of.get(net_ordered[i], "#999999") for i in range(N)]
     ax.scatter(xy[:, 0], xy[:, 1], s=20, c=node_colors, zorder=5, edgecolors="black", linewidths=0.3)
     handles = [plt.Line2D([0], [0], marker="o", linestyle="", color=color_of[net], label=net) for net in net_names]
     ax.legend(handles=handles, loc="center left", bbox_to_anchor=(1.02, 0.5), fontsize=7, frameon=False)
