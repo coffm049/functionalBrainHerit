@@ -163,12 +163,55 @@ def _cifti_labels(img):
 def load_gordon_networks(dlabel, csv_path, N):
     """Parcel (1..N) -> network shortname for Gordon.
 
-    Per user request, Gordon uses gordon_modules.csv (352 rows, region 1..14)
-    via labelDictionary (as in 02a-manhattanOrder.py), not the CIFTI label table.
-    shortDicionary.csv path is kept for compatibility but gordon_modules.csv is preferred
-    when present (352 rows). Subcortical / unknown kept as NA hidden from legend.
+    Recreates the correct solution from test_A_LUT (user confirmed): explicit
+    LUT Gordon333_LUT.txt ROI_ID -> Network_Name (col 0 -> col 2) is ground truth.
+    Falls back to gordon_modules.csv (352 rows) and then CIFTI+shortDicionary.
+    Subcortical / unknown kept as NA hidden from legend.
     """
-    # Try gordon_modules.csv first (user requested, matches 01-07)
+    # Try explicit LUT first (as suggested by user, test_A_LUT was correct)
+    lut_candidates = [
+        ROOT.parent / "brainTemplates" / "Gordon333_LUT.txt",
+        ROOT.parent / "brainTemplates" / "Gordon_333_LUT.txt",
+        Path(r"C:\Users\coffm049\brainTemplates\Gordon333_LUT.txt"),
+        Path("/users/4/coffm049/papers/brainTemplates/Gordon333_LUT.txt"),
+        Path("Gordon333_LUT.txt"),
+        Path("brainTemplates/Gordon333_LUT.txt"),
+    ]
+    for cand in lut_candidates:
+        if cand.exists():
+            try:
+                # LUT: ROI_ID, ROI_Name, Network_Name, R,G,B,A  (sep whitespace)
+                lut = pd.read_csv(cand, sep=r"\s+", header=None, engine="python")
+                # Heuristic: col 0 = ROI_ID, col 2 = Network_Name (as user code)
+                # Handle header if present
+                if lut.iloc[0,0] == "ROI_ID" or str(lut.iloc[0,0]).lower() == "roi_id":
+                    lut = lut.iloc[1:]
+                id_to_net = dict(zip(lut.iloc[:,0].astype(int), lut.iloc[:,2].astype(str)))
+                # Map network names via _network_of + shortDicionary style to match net_names casing
+                nets = []
+                for p in range(1, N+1):
+                    raw = id_to_net.get(p, "NA")
+                    net = _network_of(raw)
+                    # For Gordon, the LUT's Network_Name is already like "Default", "Visual" etc., map to short
+                    # Use shortDicionary if available to canonicalize
+                    try:
+                        df_lut = pd.read_csv(csv_path)
+                        name_to_short = dict(zip(df_lut["name"].astype(str), df_lut["shortname"].astype(str)))
+                        short = name_to_short.get(net, net)
+                        if short == net:
+                            for k,v in name_to_short.items():
+                                if k.lower() == net.lower():
+                                    short = v
+                                    break
+                        nets.append(short)
+                    except Exception:
+                        nets.append(net)
+                if len(nets) == N:
+                    return np.asarray(nets)
+            except Exception as e:
+                print(f"  LUT {cand} failed: {e}")
+                pass
+    # Try gordon_modules.csv (352 rows, region 1..14) via labelDictionary (previous correct for 01-07)
     gordon_modules_candidates = [
         Path(__file__).resolve().parents[1].parent / "brainTemplates" / "gordon_modules.csv",
         Path(r"C:\Users\coffm049\brainTemplates\gordon_modules.csv"),

@@ -125,8 +125,44 @@ def load_networks_for_atlas(atlas, N):
     CORTICAL_LOWER = {c.lower(): c for c in CORTICAL}
     CANON = {"vis":"Vis","aud":"Aud","sal":"Sal","smd":"SMd","sml":"SMl","van":"VAN","dan":"DAN","dmn":"DMN","fp":"FP","co":"CO","mtl":"MTL","pmn":"PMN","pon":"PON","tpole":"Tpole"}
     if atlas == "gordon":
-        # User requested: Gordon uses gordon_modules.csv (352 rows, 1..14) via labelDictionary, not CIFTI+shortDicionary
-        # Try gordon_modules.csv first, as in 02a_brain_gordon.py
+        # Recreate test_A_LUT correct solution: explicit Gordon333_LUT.txt ROI_ID->Network_Name
+        lut_candidates = [
+            ROOT.parent / "brainTemplates" / "Gordon333_LUT.txt",
+            ROOT.parent / "brainTemplates" / "Gordon_333_LUT.txt",
+            Path(r"C:\Users\coffm049\brainTemplates\Gordon333_LUT.txt"),
+            Path("/users/4/coffm049/papers/brainTemplates/Gordon333_LUT.txt"),
+            Path("Gordon333_LUT.txt"),
+        ]
+        for cand in lut_candidates:
+            if cand.exists():
+                try:
+                    lut = pd.read_csv(cand, sep=r"\s+", header=None, engine="python")
+                    if str(lut.iloc[0,0]).lower() == "roi_id":
+                        lut = lut.iloc[1:]
+                    id_to_net = dict(zip(lut.iloc[:,0].astype(int), lut.iloc[:,2].astype(str)))
+                    nets = []
+                    for p in range(1, N+1):
+                        raw = id_to_net.get(p, "NA")
+                        net = _network_of(raw)
+                        # canonicalize via shortDicionary if possible
+                        try:
+                            df_lut = pd.read_csv(SHORT_DICT)
+                            name_to_short = dict(zip(df_lut["name"].astype(str), df_lut["shortname"].astype(str)))
+                            short = name_to_short.get(net, net)
+                            if short == net:
+                                for k,v in name_to_short.items():
+                                    if k.lower() == net.lower():
+                                        short = v
+                                        break
+                            nets.append(short)
+                        except Exception:
+                            nets.append(net)
+                    if len(nets) == N:
+                        return np.asarray(nets)
+                except Exception as e:
+                    print(f"  LUT {cand} failed: {e}")
+                    pass
+        # Fallback: gordon_modules.csv (352 rows, region 1..14) via labelDictionary (previous correct for 01-07)
         gordon_modules_candidates = [
             Path(__file__).resolve().parents[1].parent / "brainTemplates" / "gordon_modules.csv",
             Path(r"C:\Users\coffm049\brainTemplates\gordon_modules.csv"),
