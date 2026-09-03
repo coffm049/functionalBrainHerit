@@ -99,7 +99,7 @@ def _cifti_labels(img):
 
 def _network_of(name):
     if not name:
-        return "SUB"
+        return "NA"
     s = str(name)
     s = re.sub(r"^\d{1,3}_[LR]_", "", s)
     _map = {
@@ -112,8 +112,6 @@ def _network_of(name):
     }
     s = _map.get(s, s)
     s = s.split("_")[0] if "_" in s else s
-    if s.upper() == "NA" or s == "???" or s == "":
-        return "SUB"
     return s
 
 
@@ -127,6 +125,28 @@ def load_networks_for_atlas(atlas, N):
     CORTICAL_LOWER = {c.lower(): c for c in CORTICAL}
     CANON = {"vis":"Vis","aud":"Aud","sal":"Sal","smd":"SMd","sml":"SMl","van":"VAN","dan":"DAN","dmn":"DMN","fp":"FP","co":"CO","mtl":"MTL","pmn":"PMN","pon":"PON","tpole":"Tpole"}
     if atlas == "gordon":
+        # User requested: Gordon uses gordon_modules.csv (352 rows, 1..14) via labelDictionary, not CIFTI+shortDicionary
+        # Try gordon_modules.csv first, as in 02a_brain_gordon.py
+        gordon_modules_candidates = [
+            Path(__file__).resolve().parents[1].parent / "brainTemplates" / "gordon_modules.csv",
+            Path(r"C:\Users\coffm049\brainTemplates\gordon_modules.csv"),
+            Path("/users/4/coffm049/papers/brainTemplates/gordon_modules.csv"),
+            ROOT.parent / "brainTemplates" / "gordon_modules.csv",
+            Path("brainTemplate/gordon_modules.csv"),
+        ]
+        for cand in gordon_modules_candidates:
+            if cand.exists():
+                try:
+                    gm = pd.read_csv(cand)
+                    col = gm.columns[0]
+                    vals = gm[col].astype(int).tolist()
+                    if len(vals) == N:
+                        labelDict = {1:"DMN",2:"VIS",3:"FP",4:"DAN",5:"VAN",6:"SAL",7:"CO",8:"SMD",9:"SML",10:"AUD",11:"Tpole",12:"MTL",13:"PMN",14:"PON"}
+                        nets = [labelDict.get(v, "NA") for v in vals]
+                        return np.asarray(nets)
+                except Exception:
+                    pass
+        # Fallback: CIFTI label table + shortDicionary.csv
         try:
             if not GORDON_DLABEL.exists() or not SHORT_DICT.exists():
                 raise FileNotFoundError(f"Missing {GORDON_DLABEL} or {SHORT_DICT}")
@@ -147,7 +167,6 @@ def load_networks_for_atlas(atlas, N):
                         if k.lower() == net.lower():
                             short = v
                             break
-                # Keep subcortical/unknown as NA (hidden from legend, not SUB)
                 if short not in cortical and short.lower() not in cortical_lower:
                     short = "NA"
                 nets.append(short)

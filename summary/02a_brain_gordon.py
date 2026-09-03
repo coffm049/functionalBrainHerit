@@ -163,11 +163,35 @@ def _cifti_labels(img):
 def load_gordon_networks(dlabel, csv_path, N):
     """Parcel (1..N) -> network shortname for Gordon.
 
-    shortDicionary.csv is a 14-row network dictionary: columns name,shortname.
-    Parcel->network comes from the dlabel's CIFTI label table (e.g.
-    '1_L_Default' -> 'Default' -> 'DMN' via 03b mapping), translated via
-    name->shortname. Subcortical / unknown parcels are kept as NA and hidden from legend.
+    Per user request, Gordon uses gordon_modules.csv (352 rows, region 1..14)
+    via labelDictionary (as in 02a-manhattanOrder.py), not the CIFTI label table.
+    shortDicionary.csv path is kept for compatibility but gordon_modules.csv is preferred
+    when present (352 rows). Subcortical / unknown kept as NA hidden from legend.
     """
+    # Try gordon_modules.csv first (user requested, matches 01-07)
+    gordon_modules_candidates = [
+        Path(__file__).resolve().parents[1].parent / "brainTemplates" / "gordon_modules.csv",
+        Path(r"C:\Users\coffm049\brainTemplates\gordon_modules.csv"),
+        Path("/users/4/coffm049/papers/brainTemplates/gordon_modules.csv"),
+        ROOT.parent / "brainTemplates" / "gordon_modules.csv",
+        Path("brainTemplate/gordon_modules.csv"),
+        Path("brainTemplates/gordon_modules.csv"),
+    ]
+    for cand in gordon_modules_candidates:
+        if cand.exists():
+            try:
+                gm = pd.read_csv(cand)
+                # gordon_modules.csv has single column 'region' with 1..14
+                col = gm.columns[0]
+                vals = gm[col].astype(int).tolist()
+                if len(vals) == N:
+                    # labelDictionary as in 02a-manhattanOrder.py
+                    labelDict = {1:"DMN",2:"VIS",3:"FP",4:"DAN",5:"VAN",6:"SAL",7:"CO",8:"SMD",9:"SML",10:"AUD",11:"Tpole",12:"MTL",13:"PMN",14:"PON"}
+                    nets = [labelDict.get(v, "NA") for v in vals]
+                    return np.asarray(nets)
+            except Exception:
+                pass
+    # Fallback: CIFTI label table + shortDicionary.csv (previous behavior)
     df = pd.read_csv(csv_path)
     name_to_short = dict(zip(df["name"].astype(str), df["shortname"].astype(str)))
     img = nib.load(str(dlabel))
