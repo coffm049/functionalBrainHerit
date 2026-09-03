@@ -75,10 +75,12 @@ SHORT_DICT = _resolve(
     "/users/4/coffm049/papers/brainTemplates/shortDicionary.csv",
 )
 SA_NETWORKS = {
-    1: "DMN", 2: "VIS", 3: "FP", 4: "NET4", 5: "DAN", 6: "NET6",
-    7: "VAN", 8: "SAL", 9: "CO", 10: "SMD", 11: "SML", 12: "AUD",
-    13: "Tpole", 14: "MTL", 15: "PMN", 16: "PON", 17: "NET17",
+    1: "DMN", 2: "VIS", 3: "FP", 5: "DAN", 7: "VAN",
+    8: "SAL", 9: "CO", 10: "SMD", 11: "SML", 12: "AUD",
+    13: "Tpole", 14: "MTL", 15: "PMN", 16: "PON",
 }
+# 4,6,17 are null per Gordon (no parcels) — per 01-07 labeling (05-topoViz.R, 03b range(1,15))
+# excluded to avoid index shift; see 02c_brain_sa.py
 
 
 def _cifti_labels(img):
@@ -172,9 +174,16 @@ def build_long_for_set(wide, atlas, N, h2_col):
     sub = wide[wide["Set"] == atlas][["Pheno", h2_col]].dropna()
     sub = sub.copy()
     if atlas == "SA":
-        sub["connection"] = sub["Pheno"].apply(
-            lambda p: SA_NETWORKS.get(int(str(p).split("network_surfarea")[-1]) if "network_surfarea" in str(p) else 0, str(p))
-        )
+        # Per 01-07 labeling (05-topoViz.R, 03b), only 14 SA networks are non-null:
+        # 1,2,3,5,7,8,9,10,11,12,13,14,15,16 — 4,6,17 are null and excluded to avoid shift.
+        def _sa_conn(p):
+            try:
+                num = int(str(p).split("network_surfarea")[-1]) if "network_surfarea" in str(p) else int(str(p))
+                return SA_NETWORKS.get(num)  # None for 4,6,17 -> dropped
+            except Exception:
+                return None
+        sub["connection"] = sub["Pheno"].apply(_sa_conn)
+        sub = sub.dropna(subset=["connection"])
         sub["h2"] = sub[h2_col].astype(float)
         return sub[["connection", "h2"]]
     networks = load_networks_for_atlas(atlas, N)

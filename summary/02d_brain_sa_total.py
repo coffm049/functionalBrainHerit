@@ -70,10 +70,11 @@ OUTDIR = ROOT / "results/summary/brain/SA_w_total"
 VMAX = 0.5
 
 NETWORKS = {
-    1: "DMN", 2: "VIS", 3: "FP", 4: "NET4", 5: "DAN", 6: "NET6", 7: "VAN",
+    1: "DMN", 2: "VIS", 3: "FP", 5: "DAN", 7: "VAN",
     8: "SAL", 9: "CO", 10: "SMD", 11: "SML", 12: "AUD",
-    13: "Tpole", 14: "MTL", 15: "PMN", 16: "PON", 17: "NET17",
+    13: "Tpole", 14: "MTL", 15: "PMN", 16: "PON",
 }
+# 4,6,17 are null per 01-07 labeling (05-topoViz.R, 03b) — excluded to avoid shift
 
 def _cifti_labels(img):
     try:
@@ -133,8 +134,7 @@ def sa_values_to_textures(sa_h2: dict[int, float], dlabel: Path):
             continue
         net_name = NETWORKS.get(region)
         if net_name is None:
-            if np.any(label_data == region):
-                full[label_data == region] = value
+            # 4,6,17 null per 01-07 labeling — skip to avoid shift
             continue
         parcels = net_to_parcels.get(net_name, [])
         for p in parcels:

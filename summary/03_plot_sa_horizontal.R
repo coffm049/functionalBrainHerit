@@ -14,13 +14,14 @@ OUT  <- file.path(ROOT, "results/summary/plots/SA_horizontal_barplot.png")
 OUT_W <- file.path(ROOT, "results/summary/plots/SA_w_total_horizontal_barplot.png")
 dir.create(dirname(OUT), recursive = TRUE, showWarnings = FALSE)
 
-# 17 networks — short names from 05-topoViz.R plus placeholders for 4,6,17
+# 14 networks — from 05-topoViz.R (excludes NET4, NET6, NET17 which are null in Gordon)
+# Old 01-07 labeling (03b-topoh2Ests2Brain.py: range(1,15), 05-topoViz.R networks) kept 14 after filtering 1,2,3,5,7,8,9,10,11,12,13,14,15,16
 networks <- c(
-  "1" = "DMN", "2" = "VIS", "3" = "FP", "4" = "NET4",
-  "5" = "DAN", "6" = "NET6", "7" = "VAN", "8" = "SAL",
-  "9" = "CO", "10" = "SMD", "11" = "SML", "12" = "AUD",
-  "13" = "Tpole", "14" = "MTL", "15" = "PMN", "16" = "PON", "17" = "NET17"
+  "1" = "DMN", "2" = "VIS", "3" = "FP", "5" = "DAN", "7" = "VAN",
+  "8" = "SAL", "9" = "CO", "10" = "SMD", "11" = "SML", "12" = "AUD",
+  "13" = "Tpole", "14" = "MTL", "15" = "PMN", "16" = "PON"
 )
+# For display, keep 17 labels but mark 4/6/17 as excluded (null) — see SA brain scripts
 
 wide <- tryCatch(read_csv(WIDE, show_col_types = FALSE), error = function(e) tibble())
 

@@ -44,7 +44,7 @@ fivenum_tbl <- function(x) {
 # Overview
 
 - Heritability from FCs- Gordon and Probabilistic atlas (thresholded at 0.8) comparing SNP (AdjHE-RE) to twin
-- Heritability of 17 network surface areas
+- Heritability of 14 network surface areas (17 phenos, but 4/6/17 are null per Gordon; 01-07 labeling `05-topoViz.R` keeps 1,2,3,5,7,8,9,10,11,12,13,14,15,16 — see `03b-topoh2Ests2Brain.py:range(1,15)`)
 
 ## Gordon {style="text-align:center;" .scrollable}
 
@@ -193,7 +193,7 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
-![SA Surface Area — Twin vs AdjHE-RE (wo_total), geom_col + position_dodge2, 17 networks ordered by Twin h2](../results/summary/plots/SA_horizontal_barplot.png){width="100%" style="object-fit:contain; max-height:720px;"}
+![SA Surface Area — Twin vs AdjHE-RE (wo_total), geom_col + position_dodge2, 14 networks (excludes 4/6/17 null) ordered by Twin h2](../results/summary/plots/SA_horizontal_barplot.png){width="100%" style="object-fit:contain; max-height:720px;"}
 
 :::
 
@@ -207,7 +207,7 @@ if (nrow(wide)>0) {
     mutate(Method = recode(Method, Twin_h2="Twin", h2_SA_AdjHE_RE="AdjHE-RE"))
   fivenum_sa <- sa_long %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
     mutate(across(where(is.numeric), ~round(.x,3)))
-  kable(fivenum_sa, caption="SA (wo_total, 17 networks) — h2 five-number summary")
+  kable(fivenum_sa, caption="SA (wo_total, 14 networks excl. 4/6/17 null) — h2 five-number summary")
 }
 ```
 
@@ -225,7 +225,7 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
-![SA Surface Area — Twin vs AdjHE-RE (w_total, total surface controlled), geom_col + position_dodge2](../results/summary/plots/SA_w_total_horizontal_barplot.png){width="100%" style="object-fit:contain; max-height:720px;"}
+![SA Surface Area — Twin vs AdjHE-RE (w_total, total surface controlled), geom_col + position_dodge2, 14 networks (excl. 4/6/17 null)](../results/summary/plots/SA_w_total_horizontal_barplot.png){width="100%" style="object-fit:contain; max-height:720px;"}
 
 :::
 

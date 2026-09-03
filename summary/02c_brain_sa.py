@@ -11,12 +11,12 @@ Produces:
 Run on the HPC where the dlabel / surfaces and .venv are available:
   /users/4/coffm049/papers/functionalBrainHerit/.venv/bin/python summary/brain_sa.py
 
-Notes (from 03a/03b/05-topoViz + HPC check 2026-08-27):
+Notes (from 03a/03b/05-topoViz + HPC check 2026-08-27, updated for 14-network fix):
   - SA Set in mash_twin_wide.csv has 17 phenos network_surfarea1..17
-    (grep "network_surfarea" -> 17 distinct). The 03b script hard-coded
-    range(1,15) and 05-topoViz.R kept 14 after filtering 1,2,3,5,7,8,9,10,
-    11,12,13,14,15,16 — but the current wide file retains all 17, so this
-    draft maps all 17. Filter to 14 if you want the topo subset.
+    (grep "network_surfarea" -> 17 distinct), but 4,6,17 are null per
+    Gordon (no parcels; 05-topoViz.R filters to 1,2,3,5,7,8,9,10,11,12,13,14,15,16).
+    Current code maps only the 14 non-null networks; 4/6/17 are excluded to avoid
+    index shift (see 01-07 labeling: case_when pheno>=7 -> -2, >=5 -> -1).
   - Template dlabel is Gordon.networks.32k_fs_LR.dlabel.nii.
   - Surfaces are Conte69 inflated 32k.
 """
@@ -77,13 +77,15 @@ SURF_R = _resolve(ROOT.parent / "brainTemplates" / "Conte69.R.inflated.32k_fs_LR
 OUTDIR = ROOT / "results/summary/brain/SA"
 VMAX = 0.5  # fixed 0–0.5 heatmap scale, same as FC gordon/probaConns
 
-# SA networks: 17 Gordon networks (1..17). Short names from 05-topoViz.R
-# plus the three dropped in that topoViz filter (4,6,17) given generic names —
-# the wide file currently has all 17, so keep all.
+# SA networks: 14 Gordon networks (excludes 4,6,17 which are null per 01-07 labeling)
+# 05-topoViz.R networks = 1,2,3,5,7,8,9,10,11,12,13,14,15,16 (14 after filtering)
+# 03b-topoh2Ests2Brain.py used range(1,15) for SA; 05-topoViz.R case_when adjusted
+# network_surfarea4/6/17 -> null (no parcels in Gordon.networks dlabel).
+# Keep mapping consistent: pheno numbers 4,6,17 will be dropped (null) to avoid index shift.
 NETWORKS = {
-    1: "DMN", 2: "VIS", 3: "FP", 4: "NET4", 5: "DAN", 6: "NET6", 7: "VAN",
+    1: "DMN", 2: "VIS", 3: "FP", 5: "DAN", 7: "VAN",
     8: "SAL", 9: "CO", 10: "SMD", 11: "SML", 12: "AUD",
-    13: "Tpole", 14: "MTL", 15: "PMN", 16: "PON", 17: "NET17",
+    13: "Tpole", 14: "MTL", 15: "PMN", 16: "PON",
 }
 
 
@@ -146,10 +148,12 @@ def sa_region_from_pheno(pheno: str) -> int | None:
 def sa_values_to_textures(sa_h2: dict[int, float], dlabel: Path):
     """Map per-network SA h2 (network index -> h2) onto per-vertex textures.
 
-    SA h2 is per Gordon network (1..17); the dlabel is parcel-level
-    (333 parcels like '1_L_Default'). For each SA network k with value v and
-    short name NETWORKS[k], find all parcels p whose network (via label table)
-    equals that short name, then set vertices where dlabel == p to v.
+    SA h2 is per Gordon network; per 01-07 labeling (05-topoViz.R, 03b range(1,15))
+    only 14 networks are non-null: 1,2,3,5,7,8,9,10,11,12,13,14,15,16. The dlabel
+    is parcel-level (333 parcels like '1_L_Default'). For each SA network k
+    with value v and short name NETWORKS[k], find all parcels p whose network
+    (via label table) equals that short name, then set vertices where dlabel == p to v.
+    Regions 4,6,17 are null and skipped to avoid index shift.
     """
     img = nib.load(str(dlabel))
     label_data = np.asarray(img.get_fdata()).astype(int).ravel()
@@ -171,9 +175,7 @@ def sa_values_to_textures(sa_h2: dict[int, float], dlabel: Path):
             continue
         net_name = NETWORKS.get(region)
         if net_name is None:
-            # fallback: use region as direct dlabel value (for 14-network files)
-            if np.any(label_data == region):
-                full[label_data == region] = value
+            # 4,6,17 are null per Gordon (no parcels) — skip to avoid shift
             continue
         parcels = net_to_parcels.get(net_name, [])
         for p in parcels:
