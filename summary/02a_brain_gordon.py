@@ -478,11 +478,13 @@ for method, col in [("twin", "Twin_h2"), ("AdjHE", "h2_gordon_AdjHE_RE")]:
 
 networks = load_gordon_networks(DLABEL, NETWORKS_CSV, N)
 net_names_all = list(dict.fromkeys(networks.tolist()))
-# Hide NA (subcortical/unknown) from legend — keep NA for data but not displayed per user request (remove SUB, keep NA hidden)
-net_names = [n for n in net_names_all if n not in ("NA", "SUB", "???")]
-# For display, map NA to -1 so they become NaN on surface and grey in circular
+# Hide subcortical/NA from legend — keep only the 14 cortical Gordon networks (as in test_B, 14 nets)
+# This fixes the duplicate legend entries (DMN/SMl both dark green, PON/Sal light green) and background overlap.
+CORTICAL_14 = {"DMN","VIS","Vis","FP","DAN","VAN","SAL","Sal","CO","SMD","SMd","SML","SMl","AUD","Aud","Tpole","MTL","PMN","PON"}
+net_names = [n for n in net_names_all if n in CORTICAL_14 or n.lower() in {c.lower() for c in CORTICAL_14}]
+# For display, map non-cortical (subcortical NA etc.) to -1 so they become NaN on surface and grey in circular
 net_id = np.array([net_names.index(s) if s in net_names else -1 for s in networks], dtype=int)
-print(f"[networks] {len(net_names_all)} groups (incl. NA): {net_names_all} -> display {len(net_names)}: {net_names}")
+print(f"[networks] {len(net_names_all)} groups (incl. subcortical): {net_names_all} -> display {len(net_names)} cortical: {net_names}")
 
 dL, dR = dlabel_values(node_vals["AdjHE"], DLABEL, N)
 print(f"[dlabel] left assigned={int(np.count_nonzero(~np.isnan(dL)))} right assigned={int(np.count_nonzero(~np.isnan(dR)))} (N={N})")
