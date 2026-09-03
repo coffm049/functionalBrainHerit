@@ -50,7 +50,7 @@ fivenum_tbl <- function(x) {
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
-![Gordon Networks — parcel → network assignment (categorical, `shortDicionary.csv` via dlabel label-table)](../results/summary/brain/gordon/gordon_networks_surface.png){width="100%" style="object-fit:contain;"}
+![Gordon Networks — parcel → network assignment (categorical, `gordon_modules.csv:352` via `labelDict` 1:DMN…14:PON, 14 nets; subcortical `NA` hidden)](../results/summary/brain/gordon/gordon_networks_surface.png){width="100%" style="object-fit:contain;"}
 
 :::
 
@@ -130,7 +130,7 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
-![ProbaConns Networks — parcel → network assignment (label-table)](../results/summary/brain/probaConns/probaConns_networks_surface.png){width="100%" style="object-fit:contain;"}
+![ProbaConns Networks — parcel → network assignment (`abcd_template_matching_combined_clusters_thresh0.75:80` label-table, `Sal↔SMl` swapped for insula, `NA` hidden)](../results/summary/brain/probaConns/probaConns_networks_surface.png){width="100%" style="object-fit:contain;"}
 
 :::
 
