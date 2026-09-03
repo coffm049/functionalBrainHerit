@@ -50,7 +50,7 @@ fivenum_tbl <- function(x) {
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
-![Gordon Networks — parcel → network assignment (categorical, `gordon_modules.csv:352` via `labelDict` 1:DMN…14:PON, 14 nets; subcortical `NA` hidden)](../results/summary/brain/gordon/gordon_networks_surface.png){width="100%" style="object-fit:contain;"}
+![Gordon Networks — parcel → network assignment (categorical, `Gordon333_LUT.txt` `ROI_ID→Network_Name` as ground truth, 14 nets `DMN,VIS,FP,DAN,VAN,SAL,CO,SMD,SML,AUD,Tpole,MTL,PMN,PON`; subcortical `NA` hidden)](../results/summary/brain/gordon/gordon_networks_surface.png){width="100%" style="object-fit:contain;"}
 
 :::
 
