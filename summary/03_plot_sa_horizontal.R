@@ -50,7 +50,7 @@ plot_sa <- function(df, out_path, title_suffix) {
     ggplot(aes(y = pheno_label, x = h2, fill = Type)) +
     geom_col(position = position_dodge2(width = 0.8, preserve = "single"),
              width = 0.7) +
-    scale_x_continuous(limits = c(0, 0.6), breaks = seq(0, 0.6, 0.1)) +
+    scale_x_continuous(limits = c(0, 0.5), breaks = seq(0, 0.5, 0.1)) +
     scale_fill_manual(values = c("Twin" = "#1f77b4", "AdjHE_RE" = "#ff7f0e")) +
     labs(
       x = expression(paste("Heritability (", h^2, ")")),
