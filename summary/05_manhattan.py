@@ -186,6 +186,11 @@ def load_networks_for_atlas(atlas, N):
                 lab = labels.get(p)
                 s = lab[0] if isinstance(lab, (tuple, list)) else getattr(lab, "label", str(lab)) if lab is not None else None
                 net = _network_of(s)
+                # Swap Sal <-> SMl to match correct insula topography (see 02b)
+                if net == "Sal":
+                    net = "SMl"
+                elif net == "SMl":
+                    net = "Sal"
                 if net not in CORTICAL and net.lower() not in CORTICAL_LOWER:
                     net = "NA"
                 else:

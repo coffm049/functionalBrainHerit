@@ -256,6 +256,13 @@ def _network_palette(net_names):
     import matplotlib.pyplot as plt
     base = plt.get_cmap("tab20").colors
     color_of = {net: base[i % len(base)] for i, net in enumerate(net_names)}
+    if "Sal" in color_of:
+        color_of["Sal"] = base[5]  # brown for Salience (insula)
+    if "SMl" in color_of:
+        color_of["SMl"] = base[4]  # purple for somatomotor lateral
+    if "SMl" in color_of and "Sal" in color_of:
+        # Ensure distinct after swap
+        pass
     cmap = mcolors.ListedColormap([color_of[n] for n in net_names])
     return cmap, color_of
 

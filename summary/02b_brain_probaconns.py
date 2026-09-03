@@ -188,7 +188,12 @@ def _cifti_labels(img):
 
 
 def load_probaconns_networks(dlabel, N):
-    """Parcel (1..N) -> network from the CIFTI label table (first token)."""
+    """Parcel (1..N) -> network from the CIFTI label table (first token).
+
+    Fix 2024-08: Sal (Salience, insula) and SMl (somatomotor lateral) were swapped
+    in the dlabel (brown patch above insula showed SMl, purple ventral tip showed Sal).
+    Swap them back so insula brown = Sal and ventral tip grey/purple = SMl.
+    """
     img = nib.load(str(dlabel))
     labels = _cifti_labels(img)
     nets = []
@@ -202,7 +207,13 @@ def load_probaconns_networks(dlabel, N):
             parcel_label = getattr(lab, "label", None) or getattr(lab, "key", None)
             if parcel_label is None:
                 parcel_label = str(lab)
-        nets.append(_network_of(parcel_label))
+        net = _network_of(parcel_label)
+        # Swap Sal <-> SMl to match correct cortical topography (insula = Sal)
+        if net == "Sal":
+            net = "SMl"
+        elif net == "SMl":
+            net = "Sal"
+        nets.append(net)
     return np.asarray(nets)
 
 
@@ -247,6 +258,12 @@ def _network_palette(net_names):
     import matplotlib.pyplot as plt
     base = plt.get_cmap("tab20").colors
     color_of = {net: base[i % len(base)] for i, net in enumerate(net_names)}
+    # Fix Sal/SMl color swap per user: insula brown should be Sal, ventral tip purple SMl
+    # tab20[5]=#8c564b brown, tab20[4]=#9467bd purple
+    if "Sal" in color_of:
+        color_of["Sal"] = base[5]  # brown
+    if "SMl" in color_of:
+        color_of["SMl"] = base[4]  # purple
     cmap = mcolors.ListedColormap([color_of[n] for n in net_names])
     return cmap, color_of
 
