@@ -12,7 +12,17 @@ ROOT <- "/users/4/coffm049/papers/functionalBrainHerit"
 WIDE <- file.path(ROOT, "results/summary/mash_twin_wide.csv")
 OUT  <- file.path(ROOT, "results/summary/plots/SA_horizontal_barplot.png")
 OUT_W <- file.path(ROOT, "results/summary/plots/SA_w_total_horizontal_barplot.png")
+# Portable fallback for local Windows render (where /users/4/... does not exist)
+if (!file.exists(WIDE)) {
+  WIDE <- file.path("results", "summary", "mash_twin_wide.csv")
+  OUT  <- file.path("results", "summary", "plots", "SA_horizontal_barplot.png")
+  OUT_W <- file.path("results", "summary", "plots", "SA_w_total_horizontal_barplot.png")
+  ROOT <- normalizePath(".", winslash = "/")
+}
 dir.create(dirname(OUT), recursive = TRUE, showWarnings = FALSE)
+# Also make twin/adj paths portable for fallback
+twin_w_path_portable <- file.path("results", "SA", "twinEsts", "herit_w_total.Rds")
+adj_w_path_portable  <- file.path("results", "SA", "AdjHE_RE.csv")
 
 # 14 networks — from 05-topoViz.R (excludes NET4, NET6, NET17 which are null in Gordon)
 # Old 01-07 labeling (03b-topoh2Ests2Brain.py: range(1,15), 05-topoViz.R networks) kept 14 after filtering 1,2,3,5,7,8,9,10,11,12,13,14,15,16
@@ -87,12 +97,12 @@ if (nrow(wide) > 0 && "Twin_h2" %in% names(wide) && "h2_SA_AdjHE_RE" %in% names(
     mutate(
       Type = recode(Type, Twin_h2 = "Twin", h2_SA_AdjHE_RE = "AdjHE_RE"),
       pheno_num = parse_number(Pheno),
-      pheno_label = recode(as.character(pheno_num), !!!networks),
-      pheno_label = if_else(is.na(pheno_label), Pheno, pheno_label),
+      pheno_label = recode(as.character(pheno_num), !!!networks, .default = NA_character_),
+      # 4/6/17 are null per Gordon (no parcels) — intentionally NA and dropped to avoid shift
       h2 = if_else(is.na(h2) | h2 < 0, 0, h2)
     ) %>%
     drop_na(pheno_label)
-  plot_sa(df_wo, OUT, " (wo_total)")
+  plot_sa(df_wo, OUT, " (wo_total, 14 networks)")
 } else {
   message("WIDE missing wo_total columns — skipping wo_total barplot")
 }
@@ -111,8 +121,7 @@ if (nrow(wide) > 0) {
       mutate(
         Type = recode(Type, Twin_h2 = "Twin", h2_w = "AdjHE_RE"),
         pheno_num = parse_number(Pheno),
-        pheno_label = recode(as.character(pheno_num), !!!networks),
-        pheno_label = if_else(is.na(pheno_label), Pheno, pheno_label),
+        pheno_label = recode(as.character(pheno_num), !!!networks, .default = NA_character_),
         h2 = if_else(is.na(h2) | h2 < 0, 0, h2)
       ) %>%
       drop_na(pheno_label)
@@ -121,10 +130,12 @@ if (nrow(wide) > 0) {
 }
 # Fallback to direct files if WIDE w_total not available
 if (nrow(df_w) == 0) {
-  # Twin w_total from RDS (herit_w_total.Rds)
+  # Twin w_total from RDS (herit_w_total.Rds) — try HPC ROOT first, then portable
   twin_w_path <- file.path(ROOT, "results/SA/twinEsts/herit_w_total.Rds")
   adj_w_path  <- file.path(ROOT, "results/SA/AdjHE_RE.csv")
   adj_wo_path <- file.path(ROOT, "results/SA/AdjHE_RE_wo_total.csv")
+  if (!file.exists(twin_w_path) && file.exists(twin_w_path_portable)) twin_w_path <- twin_w_path_portable
+  if (!file.exists(adj_w_path) && file.exists(adj_w_path_portable))  adj_w_path  <- adj_w_path_portable
   # Try AdjHE w_total file (AdjHE_RE.csv is w_total when wo_total is separate)
   adj_file <- if (file.exists(adj_w_path)) adj_w_path else NA
   # If wo_total file was used for WIDE, w_total is the other file; heuristic: choose file not used for wo_total (check N)
@@ -157,8 +168,7 @@ if (nrow(df_w) == 0) {
         mutate(
           Type = recode(Type, Twin_h2 = "Twin", h2_w = "AdjHE_RE"),
           pheno_num = parse_number(Pheno),
-          pheno_label = recode(as.character(pheno_num), !!!networks),
-          pheno_label = if_else(is.na(pheno_label), Pheno, pheno_label),
+          pheno_label = recode(as.character(pheno_num), !!!networks, .default = NA_character_),
           h2 = if_else(is.na(h2) | h2 < 0, 0, h2)
         ) %>%
         drop_na(pheno_label)
