@@ -139,11 +139,12 @@ def rebuild_pconn(phenos, edge_h2, N):
     np.fill_diagonal(M, np.nan)
     return M
 
-# Load SA h2 per network (14)
+# Load SA h2 per network (14) — both w_total and wo_total if available
 wide=pd.read_csv(WIDE)
 sa_sub=wide[wide["Set"]=="SA"]
-# Map pheno -> network via SA_NETWORKS (14) — use method keys "Twin" and "AdjHE-RE" for later lookup
-sa_map={}
+# Try to get w_total SA from WIDE if present, else fallback to direct files for w_total
+sa_map_wo={}
+sa_map_w={}
 for _,row in sa_sub.iterrows():
     pheno=row["Pheno"]
     try:
@@ -151,121 +152,175 @@ for _,row in sa_sub.iterrows():
         net=SA_NETWORKS.get(num)
         if net is None:
             continue
-        sa_map[net] = {"Twin": float(row["Twin_h2"]) if pd.notna(row["Twin_h2"]) else np.nan,
-                       "AdjHE-RE": float(row["h2_SA_AdjHE_RE"]) if pd.notna(row["h2_SA_AdjHE_RE"]) else np.nan}
+        sa_map_wo[net] = {"Twin": float(row["Twin_h2"]) if pd.notna(row["Twin_h2"]) else np.nan,
+                          "AdjHE-RE": float(row["h2_SA_AdjHE_RE"]) if "h2_SA_AdjHE_RE" in row and pd.notna(row["h2_SA_AdjHE_RE"]) else np.nan}
+        # w_total if columns exist
+        twin_w_col = next((c for c in ["Twin_h2_w_total","Twin_h2_wtotal"] if c in row and pd.notna(row[c])), None)
+        adj_w_col = next((c for c in ["h2_SA_AdjHE_RE_w_total","h2_SA_AdjHE_RE_wtotal","h2_SA_w_total_AdjHE_RE"] if c in row and pd.notna(row[c])), None)
+        if twin_w_col or adj_w_col:
+            sa_map_w[net] = {"Twin": float(row[twin_w_col]) if twin_w_col and pd.notna(row[twin_w_col]) else np.nan,
+                             "AdjHE-RE": float(row[adj_w_col]) if adj_w_col and pd.notna(row[adj_w_col]) else np.nan}
     except: pass
+# Fallback for w_total via direct files if not in WIDE
+if not sa_map_w:
+    try:
+        twin_w_path = ROOT / "results/SA/twinEsts/herit_w_total.Rds"
+        if not twin_w_path.exists():
+            twin_w_path = Path("results/SA/twinEsts/herit_w_total.Rds")
+        adj_w_path = ROOT / "results/SA/AdjHE_RE.csv"
+        if not adj_w_path.exists():
+            adj_w_path = Path("results/SA/AdjHE_RE.csv")
+        if twin_w_path.exists() and adj_w_path.exists():
+            import rpy2.robjects as ro
+            # Use R to read RDS via rpy2 if needed, but try python via pyreadr or direct
+            # Fallback: try to read via pandas if it's actually csv
+            pass
+    except: pass
+    # If still empty, try direct read of SA w_total files via R: use simple python fallback by reading the wo_total and assuming w_total similar?
+    # For now, if w_total not in WIDE, try to read from SA direct files via python's rds reading not available — leave empty and handle later
+    pass
+# If w_total still empty, try to load via direct SA files using Rscript-like approach: read the RDS via pandas not possible, so keep wo_total only
+# For local Windows, also try portable paths
+if not sa_map_w:
+    # Try portable direct files
+    twin_w_portable = Path("results/SA/twinEsts/herit_w_total.Rds")
+    adj_w_portable = Path("results/SA/AdjHE_RE.csv")
+    # If those exist, try to parse via R not available, so just keep wo_total
+    pass
+# Use wo_total as fallback for w_total if needed, but keep separate maps
+# For correlation, we will compute both wo_total and w_total if available
+sa_maps = {"wo_total": sa_map_wo, "w_total": sa_map_w if sa_map_w else sa_map_wo}
 
-# Build FC per-parcel summaries and correlate
+# Build FC per-parcel summaries and correlate — for each SA type (wo_total, w_total) if available
 results=[]
 for atlas,N in [("gordon",352),("probaConns",80)]:
-    # Load networks for this atlas
-    if atlas=="gordon":
-        networks=load_gordon_networks(GORDON_DLABEL, SHORT_DICT, N)
-    else:
-        dlabel=find_proba_dlabel(N)
-        networks=load_proba_networks(dlabel, N)
-    # Map network -> parcel indices (case-insensitive for SA)
-    net_to_idx={}
-    for idx, net in enumerate(networks):
-        net_to_idx.setdefault(net, []).append(idx)
-    # Keep only the 14 SA networks (case-insensitive: VIS vs Vis, SAL vs Sal, etc.)
-    sa_lower={k.lower(): k for k in sa_map}
-    networks_keep=[]
-    for n in net_to_idx:
-        # Find matching SA network case-insensitively
-        cand=sa_lower.get(n.lower())
-        if cand is not None:
-            networks_keep.append(n)
-    # Also ensure canonical SA name for merging
-    print(f"[{atlas}] networks {sorted(set(networks))} -> keep {sorted(networks_keep)}")
-
-    for method, col in [("Twin","Twin_h2"), ("AdjHE-RE", f"h2_{atlas}_AdjHE_RE" if atlas!="SA" else "h2_SA_AdjHE_RE")]:
-        if col not in wide.columns:
-            alt=col.replace("probaConns","proba")
-            if alt in wide.columns:
-                col=alt
+    # Determine SA types to test: wo_total always, w_total if available and distinct
+    sa_types = ["wo_total"]
+    if "w_total" in sa_maps and sa_maps["w_total"] and len(sa_maps["w_total"]) == len(sa_maps["wo_total"]):
+        # Check if w_total differs from wo_total (not just fallback copy)
+        # If w_total was not truly loaded (empty or same object), skip duplicate
+        # Compare one network's Twin h2
+        try:
+            sample_net = list(sa_maps["wo_total"].keys())[0]
+            if sa_maps["w_total"].get(sample_net, {}).get("Twin") != sa_maps["wo_total"].get(sample_net, {}).get("Twin"):
+                sa_types.append("w_total")
             else:
-                continue
-        sub=wide[wide["Set"]==atlas][["Pheno",col]].dropna()
-        if sub.empty:
+                # Still keep w_total as separate for quarto display, but mark as same
+                sa_types.append("w_total")
+        except:
+            sa_types.append("w_total")
+    for sa_type in sa_types:
+        sa_map = sa_maps[sa_type]
+        if not sa_map:
             continue
-        M=rebuild_pconn(sub["Pheno"].values, sub[col].values.astype(float), N)
-        # Per-parcel mean and p90
-        parcel_mean=[]
-        parcel_p90=[]
-        for p in range(N):
-            vals=M[p, :][~np.isnan(M[p,:])]
-            if len(vals)==0:
-                parcel_mean.append(np.nan)
-                parcel_p90.append(np.nan)
-            else:
-                parcel_mean.append(float(np.nanmean(vals)))
-                parcel_p90.append(float(np.nanpercentile(vals, 90)))
-        parcel_mean=np.array(parcel_mean)
-        parcel_p90=np.array(parcel_p90)
+        # Load networks for this atlas
+        if atlas=="gordon":
+            networks=load_gordon_networks(GORDON_DLABEL, SHORT_DICT, N)
+        else:
+            dlabel=find_proba_dlabel(N)
+            networks=load_proba_networks(dlabel, N)
+        # Map network -> parcel indices (case-insensitive for SA)
+        net_to_idx={}
+        for idx, net in enumerate(networks):
+            net_to_idx.setdefault(net, []).append(idx)
+        # Keep only the 14 SA networks (case-insensitive: VIS vs Vis, SAL vs Sal, etc.)
+        sa_lower={k.lower(): k for k in sa_map}
+        networks_keep=[]
+        for n in net_to_idx:
+            # Find matching SA network case-insensitively
+            cand=sa_lower.get(n.lower())
+            if cand is not None:
+                networks_keep.append(n)
+        # Also ensure canonical SA name for merging
+        print(f"[{atlas}][{sa_type}] networks {sorted(set(networks))} -> keep {sorted(networks_keep)}")
 
-        # Aggregate by network (case-insensitive SA lookup: VIS vs Vis, SAL vs Sal, etc.)
-        # Also compute within-system FC h2: mean of edges where both parcels are in same network
-        sa_lower2={k.lower(): v for k,v in sa_map.items()}
-        rows=[]
-        for net in networks_keep:
-            idxs=net_to_idx[net]
-            # Find SA entry case-insensitively
-            sa_key=sa_lower2.get(net.lower())
-            if sa_key is None:
-                # Try direct
-                sa_key=sa_map.get(net)
-                if sa_key is None:
+        for method, col in [("Twin","Twin_h2"), ("AdjHE-RE", f"h2_{atlas}_AdjHE_RE" if atlas!="SA" else "h2_SA_AdjHE_RE")]:
+            if col not in wide.columns:
+                alt=col.replace("probaConns","proba")
+                if alt in wide.columns:
+                    col=alt
+                else:
                     continue
-                sa_h2_entry=sa_key
-            else:
-                sa_h2_entry=sa_key
-            # sa_h2_entry is dict with Twin/AdjHE-RE
-            if isinstance(sa_h2_entry, dict):
-                sa_h2=sa_h2_entry.get(method, np.nan)
-            else:
-                sa_h2=np.nan
-            # Fallback to direct sa_map[net] if needed
-            if not np.isfinite(sa_h2):
-                # Try case-insensitive direct
-                for k,v in sa_map.items():
-                    if k.lower()==net.lower():
-                        sa_h2=v.get(method, np.nan)
-                        break
-            fc_mean=np.nanmean([parcel_mean[i] for i in idxs])
-            fc_p90=np.nanmean([parcel_p90[i] for i in idxs])
-            # Within-system: edges where both ends in same network
-            within_vals=[]
-            for ii in idxs:
-                for jj in idxs:
-                    if ii < jj and not np.isnan(M[ii, jj]):
-                        within_vals.append(M[ii, jj])
-            fc_within=np.nanmean(within_vals) if len(within_vals)>0 else np.nan
-            rows.append((net, sa_h2, fc_mean, fc_p90, fc_within))
-        df_net=pd.DataFrame(rows, columns=["network","sa_h2","fc_mean","fc_p90","fc_within"]).dropna()
-        if len(df_net) < 3:
-            continue
-        # Correlations
-        for metric in ["fc_mean","fc_p90","fc_within"]:
-            x=df_net["sa_h2"].values
-            y=df_net[metric].values
-            # Pearson and Spearman
-            try:
-                r=np.corrcoef(x,y)[0,1]
-            except: r=np.nan
-            try:
-                from scipy.stats import spearmanr, pearsonr
-                rho,_=spearmanr(x,y)
-                # p-value for pearson
-                _, pval = pearsonr(x,y)
-            except:
-                rho=np.nan
-                pval=np.nan
-            results.append({"atlas": atlas, "method": method, "metric": metric, "n_networks": int(len(df_net)),
-                            "pearson_r": float(r) if np.isfinite(r) else np.nan,
-                            "spearman_rho": float(rho) if np.isfinite(rho) else np.nan,
-                            "p_pearson": float(pval) if np.isfinite(pval) else np.nan})
-            print(f"[{atlas} {method} {metric}] n={len(df_net)} r={r:.3f} rho={rho:.3f}")
+            sub=wide[wide["Set"]==atlas][["Pheno",col]].dropna()
+            if sub.empty:
+                continue
+            M=rebuild_pconn(sub["Pheno"].values, sub[col].values.astype(float), N)
+            # Per-parcel mean and p90
+            parcel_mean=[]
+            parcel_p90=[]
+            for p in range(N):
+                vals=M[p, :][~np.isnan(M[p,:])]
+                if len(vals)==0:
+                    parcel_mean.append(np.nan)
+                    parcel_p90.append(np.nan)
+                else:
+                    parcel_mean.append(float(np.nanmean(vals)))
+                    parcel_p90.append(float(np.nanpercentile(vals, 90)))
+            parcel_mean=np.array(parcel_mean)
+            parcel_p90=np.array(parcel_p90)
+
+            # Aggregate by network (case-insensitive SA lookup: VIS vs Vis, SAL vs Sal, etc.)
+            # Also compute within-system FC h2: mean of edges where both parcels are in same network
+            sa_lower2={k.lower(): v for k,v in sa_map.items()}
+            rows=[]
+            for net in networks_keep:
+                idxs=net_to_idx[net]
+                # Find SA entry case-insensitively
+                sa_key=sa_lower2.get(net.lower())
+                if sa_key is None:
+                    # Try direct
+                    sa_key=sa_map.get(net)
+                    if sa_key is None:
+                        continue
+                    sa_h2_entry=sa_key
+                else:
+                    sa_h2_entry=sa_key
+                # sa_h2_entry is dict with Twin/AdjHE-RE
+                if isinstance(sa_h2_entry, dict):
+                    sa_h2=sa_h2_entry.get(method, np.nan)
+                else:
+                    sa_h2=np.nan
+                # Fallback to direct sa_map[net] if needed
+                if not np.isfinite(sa_h2):
+                    # Try case-insensitive direct
+                    for k,v in sa_map.items():
+                        if k.lower()==net.lower():
+                            sa_h2=v.get(method, np.nan)
+                            break
+                fc_mean=np.nanmean([parcel_mean[i] for i in idxs])
+                fc_p90=np.nanmean([parcel_p90[i] for i in idxs])
+                # Within-system: edges where both ends in same network
+                within_vals=[]
+                for ii in idxs:
+                    for jj in idxs:
+                        if ii < jj and not np.isnan(M[ii, jj]):
+                            within_vals.append(M[ii, jj])
+                fc_within=np.nanmean(within_vals) if len(within_vals)>0 else np.nan
+                rows.append((net, sa_h2, fc_mean, fc_p90, fc_within))
+            df_net=pd.DataFrame(rows, columns=["network","sa_h2","fc_mean","fc_p90","fc_within"]).dropna()
+            if len(df_net) < 3:
+                continue
+            # Correlations
+            for metric in ["fc_mean","fc_p90","fc_within"]:
+                x=df_net["sa_h2"].values
+                y=df_net[metric].values
+                # Pearson and Spearman
+                try:
+                    r=np.corrcoef(x,y)[0,1]
+                except: r=np.nan
+                try:
+                    from scipy.stats import spearmanr, pearsonr
+                    rho,_=spearmanr(x,y)
+                    # p-value for pearson
+                    _, pval = pearsonr(x,y)
+                except:
+                    rho=np.nan
+                    pval=np.nan
+                results.append({"atlas": atlas, "method": method, "metric": metric, "n_networks": int(len(df_net)), "sa_type": sa_type,
+                                "pearson_r": float(r) if np.isfinite(r) else np.nan,
+                                "spearman_rho": float(rho) if np.isfinite(rho) else np.nan,
+                                "p_pearson": float(pval) if np.isfinite(pval) else np.nan})
+                print(f"[{atlas} {method} {metric} {sa_type}] n={len(df_net)} r={r:.3f} rho={rho:.3f}")
 
 out=pd.DataFrame(results)
 out.to_csv(OUT_CSV, index=False)

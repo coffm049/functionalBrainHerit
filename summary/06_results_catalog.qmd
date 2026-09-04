@@ -16,6 +16,7 @@ format:
     margin: 0.04
     code-fold: true
     code-tools: true
+    scrollable: true
 execute:
   echo: false
   warning: false
@@ -38,6 +39,14 @@ fivenum_tbl <- function(x) {
     mean = mean(x), q3 = quantile(x, 0.75), max = max(x),
     n = length(x), sd = sd(x)
   )
+}
+# Helper to filter n=0 rows for publication (per user: filter all tables to remove n=0)
+filter_n0 <- function(df) {
+  if ("n" %in% names(df)) df <- df %>% filter(n != 0)
+  if ("n_valid" %in% names(df)) df <- df %>% filter(n_valid != 0)
+  if ("n_networks" %in% names(df)) df <- df %>% filter(n_networks != 0)
+  if ("n_pheno" %in% names(df)) df <- df %>% filter(n_pheno != 0)
+  df
 }
 ```
 
@@ -98,18 +107,18 @@ if (nrow(wide)>0) {
     select(Pheno, Twin_h2, h2_gordon_AdjHE_RE) %>%
     pivot_longer(c(Twin_h2, h2_gordon_AdjHE_RE), names_to="Method", values_to="h2") %>%
     mutate(Method = recode(Method, Twin_h2="Twin", h2_gordon_AdjHE_RE="AdjHE-RE"))
-  # fivenum per Method
+  # fivenum per Method — filter n=0 (per user)
   fivenum_gordon <- gordon_long %>%
-    group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
+    group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>% filter(n != 0) %>%
     mutate(across(where(is.numeric), ~round(.x,3)))
-  kable(fivenum_gordon, caption="Gordon — h2 five-number summary (Twin vs AdjHE-RE, 30 PCs)")
+  kable(filter_n0(fivenum_gordon), caption="Gordon — h2 five-number summary (Twin vs AdjHE-RE, 30 PCs)")
 } else { cat("mash_twin_wide.csv not found — run 01_compare_mash_twin.R"); cat("\n") }
 ```
 
 ```{r gordon-corr}
 if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
   corr <- read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE)
-  kable(corr %>% filter(Set=="gordon"), caption="Gordon — Twin vs MASH correlations")
+  kable(filter_n0(corr %>% filter(Set=="gordon")), caption="Gordon — Twin vs MASH correlations")
 } else if (nrow(wide)>0) {
   # fallback: compute from wide
   tmp <- gordon_wide %>% select(Twin_h2, h2_gordon_AdjHE_RE) %>% drop_na()
@@ -177,13 +186,13 @@ if (nrow(wide)>0) {
     mutate(Method = recode(Method, Twin_h2="Twin", h2_proba_AdjHE_RE="AdjHE-RE"))
   fivenum_proba <- proba_long %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
     mutate(across(where(is.numeric), ~round(.x,3)))
-  kable(fivenum_proba, caption="ProbaConns — h2 five-number summary")
+  kable(filter_n0(fivenum_proba), caption="ProbaConns — h2 five-number summary")
 }
 ```
 
 ```{r proba-corr}
 if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
-  kable(read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="probaConns"), caption="ProbaConns — Twin vs MASH correlations")
+  kable(filter_n0(read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="probaConns")), caption="ProbaConns — Twin vs MASH correlations")
 }
 ```
 
@@ -207,13 +216,13 @@ if (nrow(wide)>0) {
     mutate(Method = recode(Method, Twin_h2="Twin", h2_SA_AdjHE_RE="AdjHE-RE"))
   fivenum_sa <- sa_long %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
     mutate(across(where(is.numeric), ~round(.x,3)))
-  kable(fivenum_sa, caption="SA (wo_total, 14 networks excl. 4/6/17 null) — h2 five-number summary")
+  kable(filter_n0(fivenum_sa), caption="SA (wo_total, 14 networks excl. 4/6/17 null) — h2 five-number summary")
 }
 ```
 
 ```{r sa-corr}
 if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
-  kable(read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="SA"), caption="SA — Twin vs MASH correlations (wo_total)")
+  kable(filter_n0(read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="SA")), caption="SA — Twin vs MASH correlations (wo_total)")
 }
 ```
 
@@ -241,18 +250,18 @@ if (length(wcols)>0) {
     mutate(Method = gsub("h2_SA_|_w_total", "", Method))
   fivenum_saw <- sa_w %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
     mutate(across(where(is.numeric), ~round(.x,3)))
-  kable(fivenum_saw, caption="SA w_total — h2 five-number summary (if w_total columns present)")
+  kable(filter_n0(fivenum_saw), caption="SA w_total — h2 five-number summary (if w_total columns present)")
 } else {
   cat("No w_total columns in mash_twin_wide.csv yet — run w_total SLURMs and rebuild 01_compare_mash_twin.R with w_total pattern.\n")
   if (file.exists(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"))) {
-    kable(read_csv(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"), show_col_types=FALSE), caption="SA w_total vs wo_total R² (from 04_compare_r2.R)")
+    kable(filter_n0(read_csv(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"), show_col_types=FALSE)), caption="SA w_total vs wo_total R² (from 04_compare_r2.R)")
   }
 }
 ```
 
 ```{r sa-wtotal-corr}
 if (file.exists(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"))) {
-  kable(read_csv(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"), show_col_types=FALSE), caption="SA w_total vs wo_total — Twin and AdjHE-RE R²")
+  kable(filter_n0(read_csv(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"), show_col_types=FALSE)), caption="SA w_total vs wo_total — Twin and AdjHE-RE R²")
 }
 ```
 
@@ -266,7 +275,7 @@ if (file.exists(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"))) {
 corr_path <- file.path(ROOT, "results/summary/sa_fc_h2_correlation.csv")
 if (file.exists(corr_path)) {
   corr_sa_fc <- read_csv(corr_path, show_col_types = FALSE) %>% mutate(across(where(is.numeric), ~round(.x, 3)))
-  kable(corr_sa_fc, caption="SA-FC h2 by system: parcel-mean, 90th percentile, and within-system (edges both ends in same network) FC h2 vs SA h2 (14 networks excl. 4/6/17, per atlas × Twin vs AdjHE-RE)")
+  kable(filter_n0(corr_sa_fc), caption="SA-FC h2 by system: parcel-mean, 90th percentile, and within-system (edges both ends in same network) FC h2 vs SA h2 (14 networks excl. 4/6/17, per atlas × Twin vs AdjHE-RE)")
 } else {
   cat("Run `python summary/04b_h2_SA_correlation.py` to generate sa_fc_h2_correlation.csv (now includes fc_within)\n")
 }
@@ -277,7 +286,7 @@ if (file.exists(corr_path)) {
 for (p in c(file.path(ROOT,"results/summary/plots/SA_horizontal_barplot_stats.csv"),
             file.path(ROOT,"results/summary/plots/SA_w_total_horizontal_barplot_stats.csv"))) {
   if (file.exists(p)) {
-    kable(read_csv(p, show_col_types=FALSE) %>% mutate(across(where(is.numeric), ~round(.x,3))), caption=paste0("SA barplot stats: ", basename(p)))
+    kable(filter_n0(read_csv(p, show_col_types=FALSE) %>% mutate(across(where(is.numeric), ~round(.x,3)))), caption=paste0("SA barplot stats: ", basename(p)))
   }
 }
 ```
@@ -306,7 +315,7 @@ for (p in c(file.path(ROOT,"results/summary/plots/heatmap_gordon_Twin_stats.csv"
             file.path(ROOT,"results/summary/plots/heatmap_probaConns_Twin_stats.csv"),
             file.path(ROOT,"results/summary/plots/heatmap_probaConns_AdjHERE_stats.csv"))) {
   if (file.exists(p)) {
-    kable(read_csv(p, show_col_types=FALSE) %>% mutate(across(where(is.numeric), ~round(.x,3))), caption=paste0("Heatmap stats: ", basename(p)))
+    kable(filter_n0(read_csv(p, show_col_types=FALSE) %>% mutate(across(where(is.numeric), ~round(.x,3)))), caption=paste0("Heatmap stats: ", basename(p)))
   }
 }
 ```
@@ -323,7 +332,7 @@ if (file.exists(pct_path)) {
   # Display as percent with SE: mean ± SE, median, etc.
   # Keep Set order gordon, probaConns, SA
   pct <- pct %>% arrange(match(Set, c("gordon","probaConns","SA")))
-  kable(pct, caption="Percent SNP heritability of Twin estimates — 100 × AdjHE-RE / Twin per phenotype (per Set: mean ± SE, median, SD, q1/q3, min/max, n_valid; SA 14 nets excl. 4/6/17, FCs filtered Twin_h2>0.001, MASH 0–1.2)")
+  kable(filter_n0(pct), caption="Percent SNP heritability of Twin estimates — 100 × AdjHE-RE / Twin per phenotype (per Set: mean ± SE, median, SD, q1/q3, min/max, n_valid; SA 14 nets excl. 4/6/17, FCs filtered Twin_h2>0.001, MASH 0–1.2)")
   cat("\n\n*Interpretation: `mean_pct` = mean of per-phenotype `pct`; `se_pct = sd / sqrt(n_valid)`; `median_pct` robust to outliers (Twin near 0 inflates mean). `ratio_of_means_pct = 100 × mean(MASH)/mean(Twin)` is also shown.*\n")
 } else {
   cat("Run `Rscript summary/04d_percent_SNP.R` to generate percent_SNP_explained.csv\n")
@@ -343,11 +352,11 @@ if (file.exists(pct_detail_path)) {
 
 ```bash
 Rscript summary/01_compare_mash_twin.R          # 01 → mash_twin_wide.csv
-bash summary/02_run_brain_viz.sh                # 02a-d → Gordon/ProbaConns/SA surfaces+chords (proba fix: iter_structures for 29696 vs 32492; chord h2>0.25)
+bash summary/02_run_brain_viz.sh                # 02a-d → Gordon/ProbaConns/SA surfaces+chords (proba fix: iter_structures for 29696 vs 32492; chord h2>0.33)
 Rscript summary/03_plot_sa_horizontal.R         # SA barplots: Twin vs AdjHE-RE dodged (wo_total + w_total, 14 nets, publication ready)
 Rscript summary/04_compare_r2.R                 # R² per Set + SA w/wo
 Rscript summary/04d_percent_SNP.R               # % SNP of Twin per Set: mean ± SE, median, etc. (100× AdjHE-RE/Twin)
-python summary/04b_h2_SA_correlation.py         # SA-FC: parcel-mean/p90/within-system h2 vs SA h2 by system (14 nets)
+python summary/04b_h2_SA_correlation.py         # SA-FC: parcel-mean/p90/within-system h2 vs SA h2 by system (14 nets, w_total + wo_total)
 python summary/04c_FC_heatmap.py                # FC h2 heatmaps ordered Sys-Sys, red→yellow 0–0.5
 python summary/05_manhattan.py                  # 05 → manhattans + overview (full x-axis, Sys-Sys, AdjHE-RE, publication ready)
 quarto render summary/06_results_catalog.qmd --to html

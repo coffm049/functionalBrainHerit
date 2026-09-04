@@ -360,7 +360,7 @@ def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     print(f"  wrote {png}")
 
 
-def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.25):
+def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.33):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -376,11 +376,11 @@ def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.25):
     vals = M[iu]
     mask = vals > h2_thr
     n_edges = int(mask.sum())
-    # line thickness + alpha rescaled: h2 0.25–0.5 -> lw 0.1–1.0, alpha 0.1–1.0 (bumped to 0.25)
+    # line thickness + alpha rescaled: h2 0.33–0.5 -> lw 0.1–1.0, alpha 0.1–1.0
     for (a, b), v in zip(zip(iu[0][mask], iu[1][mask]), vals[mask]):
         pa, pb = pos[a], pos[b]
-        v_clipped = float(np.clip(v, 0.25, 0.5))
-        norm = (v_clipped - 0.25) / (0.5 - 0.25)
+        v_clipped = float(np.clip(v, 0.33, 0.5))
+        norm = (v_clipped - 0.33) / (0.5 - 0.33)
         lw = 0.1 + norm * (1.0 - 0.1)
         alpha = 0.1 + norm * (1.0 - 0.1)
         ax.plot([xy[pa, 0], xy[pb, 0]], [xy[pa, 1], xy[pb, 1]], color="red", alpha=alpha, linewidth=lw)
