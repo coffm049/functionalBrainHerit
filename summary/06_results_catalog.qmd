@@ -1,7 +1,5 @@
 ---
 title: "Functional Brain Heritability — Results Catalog"
-subtitle: "Surfaces + Chords · Manhattans · Five-Number Summaries · Correlations"
-author: "MASH + Twin (30 PCs)"
 date: today
 date-format: long
 format:
@@ -54,7 +52,7 @@ filter_n0 <- function(df) {
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
-![Gordon Networks — parcel → network assignment (categorical, `Gordon333_LUT.txt` `ROI_ID→Network_Name` as ground truth, 14 nets `DMN,VIS,FP,DAN,VAN,SAL,CO,SMD,SML,AUD,Tpole,MTL,PMN,PON`; subcortical `NA` hidden)](../results/summary/brain/gordon/gordon_networks_surface.png){width="100%" style="object-fit:contain;"}
+![](../results/summary/brain/gordon/gordon_networks_surface.png){width="100%" style="object-fit:contain;"}
 
 :::
 
@@ -131,7 +129,7 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
-![ProbaConns Networks — parcel → network assignment (`abcd_template_matching_combined_clusters_thresh0.75:80` label-table, `Sal↔SMl` swapped for insula, `NA` hidden)](../results/summary/brain/probaConns/probaConns_networks_surface.png){width="100%" style="object-fit:contain;"}
+![](../results/summary/brain/probaConns/probaConns_networks_surface.png){width="100%" style="object-fit:contain;"}
 
 :::
 
