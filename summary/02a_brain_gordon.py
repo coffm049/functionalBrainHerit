@@ -394,21 +394,28 @@ def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     sides = [("left", surf_l, val_left), ("right", surf_r, val_right)]
     sides = [(n, s, v) for n, s, v in sides if v is not None]
     png = outdir / f"{tag}_surface.png"
-    fig = plt.figure(figsize=(6 * len(sides), 5))
+    # Publication-ready: minimal whitespace, no title
+    fig = plt.figure(figsize=(5.5 * len(sides), 4.2))
     for i, (hemi, surf, val) in enumerate(sides, start=1):
         ax = fig.add_subplot(1, len(sides), i, projection="3d")
         niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
-                                  cmap="coolwarm", colorbar=(hemi == "right"), threshold=None,
-                                  vmin=0.0, vmax=vmax, title=f"{_display_tag(tag)} ({hemi})")
-    fig.savefig(png, dpi=150, bbox_inches="tight")
+                                   cmap="coolwarm", colorbar=(hemi == "right"), threshold=None,
+                                   vmin=0.0, vmax=vmax, title="")
+    fig.tight_layout(pad=0.5)
+    fig.savefig(png, dpi=300, bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
+    # Save stats for quarto (instead of title numbers)
+    stats_path = outdir / f"{tag}_surface_stats.csv"
+    try:
+        assigned = sum(np.count_nonzero(~np.isnan(v)) for _, _, v in sides)
+        allv = np.concatenate([v[~np.isnan(v)] for _, _, v in sides]) if assigned>0 else np.array([np.nan])
+        pd.DataFrame([{"tag": tag, "assigned_vertices": int(assigned), "h2_min": float(np.nanmin(allv)), "h2_max": float(np.nanmax(allv)), "h2_mean": float(np.nanmean(allv))}]).to_csv(stats_path, index=False)
+    except Exception:
+        pass
     print(f"  wrote {png}")
-    assigned = sum(np.count_nonzero(~np.isnan(v)) for _, _, v in sides)
-    allv = np.concatenate([v[~np.isnan(v)] for _, _, v in sides])
-    print(f"  [{tag}] surface assigned={assigned} min={np.nanmin(allv):.3f} max={np.nanmax(allv):.3f}")
 
 
-def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.35):
+def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.1):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -419,30 +426,36 @@ def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.35):
     pos[order] = np.arange(N)
     angles = np.linspace(0, 2 * np.pi, N, endpoint=False)
     xy = np.column_stack([np.cos(angles), np.sin(angles)])
-    fig, ax = plt.subplots(figsize=(9, 9))
+    fig, ax = plt.subplots(figsize=(7, 7))
     iu = np.triu_indices(N, 1)
     vals = M[iu]
     mask = vals > h2_thr
     n_edges = int(mask.sum())
-    # line thickness + alpha rescaled: h2 0.35–0.5 -> lw 0.1–1.0, alpha 0.1–1.0
+    # line thickness + alpha rescaled: h2 0.1–0.5 -> lw 0.1–1.0, alpha 0.1–1.0 (publication: 0.1 filter)
     for (a, b), v in zip(zip(iu[0][mask], iu[1][mask]), vals[mask]):
         pa, pb = pos[a], pos[b]
-        v_clipped = float(np.clip(v, 0.35, 0.5))
-        norm = (v_clipped - 0.35) / (0.5 - 0.35)
+        v_clipped = float(np.clip(v, 0.1, 0.5))
+        norm = (v_clipped - 0.1) / (0.5 - 0.1)
         lw = 0.1 + norm * (1.0 - 0.1)
         alpha = 0.1 + norm * (1.0 - 0.1)
         ax.plot([xy[pa, 0], xy[pb, 0]], [xy[pa, 1], xy[pb, 1]], color="red", alpha=alpha, linewidth=lw)
     _, color_of = _network_palette(net_names, DLABEL)
     node_colors = [color_of.get(net_ordered[i], "#999999") for i in range(N)]
-    ax.scatter(xy[:, 0], xy[:, 1], s=20, c=node_colors, zorder=5, edgecolors="black", linewidths=0.3)
+    ax.scatter(xy[:, 0], xy[:, 1], s=18, c=node_colors, zorder=5, edgecolors="black", linewidths=0.3)
     handles = [plt.Line2D([0], [0], marker="o", linestyle="", color=color_of[net], label=net) for net in net_names]
     ax.legend(handles=handles, loc="center left", bbox_to_anchor=(1.02, 0.5), fontsize=7, frameon=False)
     ax.set_aspect("equal")
     ax.axis("off")
-    ax.set_title(f"{_display_tag(tag)} Circular (h2>{h2_thr}, {n_edges} edges, {len(net_names)} networks)")
+    # No title for publication; stats saved to CSV for quarto
     png = outdir / f"{tag}_circular.png"
-    fig.savefig(png, dpi=150, bbox_inches="tight")
+    fig.tight_layout(pad=0.3)
+    fig.savefig(png, dpi=300, bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
+    stats_path = outdir / f"{tag}_circular_stats.csv"
+    try:
+        pd.DataFrame([{"tag": tag, "h2_thr": float(h2_thr), "n_edges": int(n_edges), "n_networks": int(len(net_names))}]).to_csv(stats_path, index=False)
+    except Exception:
+        pass
     print(f"  wrote {png}")
 
 
@@ -453,15 +466,16 @@ def plot_surface_networks(net_left, net_right, net_names, surf_l, surf_r, outdir
     K = len(net_names)
     cmap, color_of = _network_palette(net_names, DLABEL)
     png = outdir / f"{tag}_networks_surface.png"
-    fig = plt.figure(figsize=(6 * len(sides), 5))
+    fig = plt.figure(figsize=(5.5 * len(sides), 4.2))
     for i, (hemi, surf, val) in enumerate(sides, start=1):
         ax = fig.add_subplot(1, len(sides), i, projection="3d")
         niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
                                    cmap=cmap, colorbar=False, threshold=None,
-                                   vmin=0.0, vmax=max(K - 1, 1), title=f"{_display_tag(tag)} Networks ({hemi})")
+                                   vmin=0.0, vmax=max(K - 1, 1), title="")
     handles = [plt.Line2D([0], [0], marker="o", linestyle="", color=color_of[net], label=net) for net in net_names]
     fig.legend(handles=handles, loc="lower center", ncol=4, fontsize=7, frameon=False)
-    fig.savefig(png, dpi=150, bbox_inches="tight")
+    fig.tight_layout(pad=0.5)
+    fig.savefig(png, dpi=300, bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
     print(f"  wrote {png}")
 

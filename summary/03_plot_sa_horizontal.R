@@ -40,7 +40,7 @@ plot_sa <- function(df, out_path, title_suffix) {
     message("No data for ", title_suffix, " — skipping ", out_path)
     return(invisible(NULL))
   }
-  # Order y-axis by max twin h2 (ascending → most heritable at top in horizontal plot)
+  # Order y-axis by max twin h2 (ascending → most heritable at top)
   twin_order <- df %>%
     filter(Type == "Twin") %>%
     group_by(pheno_label) %>%
@@ -55,34 +55,35 @@ plot_sa <- function(df, out_path, title_suffix) {
       r = suppressWarnings(cor(Twin, AdjHE_RE, use = "pairwise.complete.obs")),
       rho = suppressWarnings(cor(Twin, AdjHE_RE, method = "spearman", use = "pairwise.complete.obs"))
     )
+  # Save stats for quarto (instead of subtitle numbers)
+  stats_path <- sub("\\.png$", "_stats.csv", out_path)
+  tryCatch({
+    write_csv(cor_df %>% mutate(suffix = title_suffix), stats_path)
+  }, error = function(e) NULL)
 
   p <- df %>%
     mutate(pheno_label = factor(pheno_label, levels = twin_order)) %>%
     ggplot(aes(y = pheno_label, x = h2, fill = Type)) +
-    geom_col(position = position_dodge2(width = 0.8, preserve = "single"),
-             width = 0.7) +
-    scale_x_continuous(limits = c(0, 0.5), breaks = seq(0, 0.5, 0.1)) +
-    scale_fill_manual(values = c("Twin" = "#1f77b4", "AdjHE_RE" = "#ff7f0e")) +
-    labs(
-      x = expression(paste("Heritability (", h^2, ")")),
-      y = "",
-      fill = "",
-      title = paste0("SA network surface area h2", title_suffix),
-      subtitle = sprintf("n=%d networks, r=%.2f, rho=%.2f (Twin vs AdjHE_RE, 30 PCs)",
-                         cor_df$n, cor_df$r, cor_df$rho)
-    ) +
-    theme_minimal(base_size = 12) +
+    geom_col(position = position_dodge2(width = 0.8, preserve = "single"), width = 0.7) +
+    scale_x_continuous(limits = c(0, 0.5), breaks = seq(0, 0.5, 0.1), expand = expansion(mult = c(0, 0.02))) +
+    scale_fill_manual(values = c("Twin" = "#1f77b4", "AdjHE-RE" = "#ff7f0e"), labels = c("Twin", "AdjHE-RE")) +
+    labs(x = expression(paste("Heritability (", h^2, ")")), y = "", fill = "") +
+    theme_minimal(base_size = 11) +
     theme(
-      axis.text.y = element_text(face = "bold", size = 10),
-      axis.text.x = element_text(size = 10),
-      axis.title.x = element_text(size = 12, face = "bold"),
+      axis.text.y = element_text(face = "bold", size = 9, margin = margin(r = 4)),
+      axis.text.x = element_text(size = 9, margin = margin(t = 4)),
+      axis.title.x = element_text(size = 11, face = "bold", margin = margin(t = 8)),
       legend.position = "bottom",
-      legend.text = element_text(size = 10),
-      plot.title = element_text(face = "bold", size = 12),
-      panel.grid.major.y = element_blank()
+      legend.text = element_text(size = 9),
+      legend.margin = margin(t = 4, b = 0),
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor = element_blank(),
+      plot.margin = margin(4, 4, 2, 2),
+      axis.ticks.y = element_blank(),
+      plot.title = element_blank(),
+      plot.subtitle = element_blank()
     )
-
-  ggsave(out_path, p, width = 8, height = 6, dpi = 300)
+  ggsave(out_path, p, width = 7, height = 5, dpi = 300)
   message("Wrote ", out_path)
   print(cor_df)
 }

@@ -256,6 +256,63 @@ if (file.exists(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"))) {
 }
 ```
 
+---
+
+## SA-FC System Correlation — FC parcel-mean / 90th percentile h2 vs SA h2
+
+```{r sa-fc-corr}
+#| fig-width: 8
+#| fig-height: 4
+corr_path <- file.path(ROOT, "results/summary/sa_fc_h2_correlation.csv")
+if (file.exists(corr_path)) {
+  corr_sa_fc <- read_csv(corr_path, show_col_types = FALSE) %>% mutate(across(where(is.numeric), ~round(.x, 3)))
+  kable(corr_sa_fc, caption="SA-FC h2 by system: parcel-mean and 90th percentile FC h2 vs SA h2 (14 networks excl. 4/6/17, per atlas × Twin vs AdjHE-RE)")
+  # Optional scatter for quick check (first row)
+  # ggplot(corr_sa_fc, aes(x=pearson_r, y=spearman_rho, color=atlas, shape=metric)) + geom_point(size=3) + theme_minimal()
+} else {
+  cat("Run `python summary/04b_h2_SA_correlation.py` to generate sa_fc_h2_correlation.csv\n")
+}
+```
+
+```{r sa-bar-stats}
+# Show SA barplot stats saved by 03_plot_sa_horizontal.R (instead of plot titles)
+for (p in c(file.path(ROOT,"results/summary/plots/SA_horizontal_barplot_stats.csv"),
+            file.path(ROOT,"results/summary/plots/SA_w_total_horizontal_barplot_stats.csv"))) {
+  if (file.exists(p)) {
+    kable(read_csv(p, show_col_types=FALSE) %>% mutate(across(where(is.numeric), ~round(.x,3))), caption=paste0("SA barplot stats: ", basename(p)))
+  }
+}
+```
+
+---
+
+## FC Correlation Heatmaps — Ordered by Sys-Sys (red→yellow, 0–0.5)
+
+::: {layout="[[1,1],[1,1]]" style="text-align:center;"}
+
+![Gordon Twin FC h2 heatmap (352×352, red low → yellow high, 0–0.5, parcels ordered by network as in circular)](../results/summary/plots/heatmap_gordon_Twin.png){width="100%" style="object-fit:contain;"}
+
+![Gordon AdjHE-RE heatmap](../results/summary/plots/heatmap_gordon_AdjHERE.png){width="100%" style="object-fit:contain;"}
+
+![ProbaConns Twin heatmap (80×80)](../results/summary/plots/heatmap_probaConns_Twin.png){width="100%" style="object-fit:contain;"}
+
+![ProbaConns AdjHE-RE heatmap](../results/summary/plots/heatmap_probaConns_AdjHERE.png){width="100%" style="object-fit:contain;"}
+
+:::
+
+*Heatmaps via `summary/04c_FC_heatmap.py` — `M_ordered = M[np.ix_(order,order)]` where `order = argsort(networks)` (same as circular), `red_yellow` cmap `vmin=0 vmax=0.5` matching surface colorbars, network block boundaries at `cumsum(counts)`.*
+
+```{r heatmap-stats}
+for (p in c(file.path(ROOT,"results/summary/plots/heatmap_gordon_Twin_stats.csv"),
+            file.path(ROOT,"results/summary/plots/heatmap_gordon_AdjHERE_stats.csv"),
+            file.path(ROOT,"results/summary/plots/heatmap_probaConns_Twin_stats.csv"),
+            file.path(ROOT,"results/summary/plots/heatmap_probaConns_AdjHERE_stats.csv"))) {
+  if (file.exists(p)) {
+    kable(read_csv(p, show_col_types=FALSE) %>% mutate(across(where(is.numeric), ~round(.x,3))), caption=paste0("Heatmap stats: ", basename(p)))
+  }
+}
+```
+
 ## Run Order
 
 ```bash

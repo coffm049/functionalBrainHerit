@@ -358,16 +358,22 @@ def manhattan_for_df(df, atlas, method, out_path):
     ax.set_ylabel(r"Heritability ($h^2$)", size=11)
     ax.set_yticks([0, 0.25, 0.5, 0.75, 1])
     ax.set_yticklabels([0, 0.25, 0.5, 0.75, 1], size=9)
-    ax.set_title(f"{disp} — {method}", fontsize=12, fontweight="bold")
+    # Publication-ready: no title (handled in quarto caption), minimal whitespace
     from matplotlib.lines import Line2D
     handles = [
         Line2D([0], [0], marker="o", color="w", markerfacecolor=alt_colors[0], markersize=7, label="Top 20 Sys-Sys (alternating)"),
         Line2D([0], [0], marker="o", color="w", markerfacecolor="grey", markersize=7, label="Remaining (100× compressed)"),
     ]
     ax.legend(handles=handles, loc="upper right", fontsize=7, frameon=False)
-
-    plt.savefig(out_path, dpi=300, bbox_inches="tight", pad_inches=0.12)
+    fig.tight_layout(pad=0.4)
+    plt.savefig(out_path, dpi=300, bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
+    # Save stats for quarto (instead of title numbers)
+    try:
+        stats_out = str(out_path).replace(".png", "_stats.csv")
+        pd.DataFrame([{"atlas": atlas, "method": method, "n": int(len(df)), "groups": int(len(grouped)), "large20": int(len(largest_20)), "divider": float(divider) if divider is not None else np.nan, "xmax_compressed": float(xmax)}]).to_csv(stats_out, index=False)
+    except Exception:
+        pass
     print(f"  wrote {out_path}  n={len(df)} groups={len(grouped)} large20={len(largest_20)} divider={divider} xmax_compressed={xmax:.1f}")
 
 

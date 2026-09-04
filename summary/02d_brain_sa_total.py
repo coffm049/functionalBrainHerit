@@ -163,18 +163,23 @@ def plot_sa_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     sides = [("left", surf_l, val_left), ("right", surf_r, val_right)]
     sides = [(h, s, v) for h, s, v in sides if v is not None]
     png = outdir / f"{tag}_surface.png"
-    fig = plt.figure(figsize=(6 * len(sides), 5))
+    fig = plt.figure(figsize=(5.5 * len(sides), 4.2))
     for i, (hemi, surf, val) in enumerate(sides, start=1):
         ax = fig.add_subplot(1, len(sides), i, projection="3d")
         niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
-                                  cmap="coolwarm", colorbar=(hemi == "right"), threshold=None,
-                                  vmin=0.0, vmax=vmax, title=f"{_display_tag(tag)} ({hemi})")
-    fig.savefig(png, dpi=150, bbox_inches="tight")
+                                   cmap="coolwarm", colorbar=(hemi == "right"), threshold=None,
+                                   vmin=0.0, vmax=vmax, title="")
+    fig.tight_layout(pad=0.5)
+    fig.savefig(png, dpi=300, bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
+    stats_path = outdir / f"{tag}_surface_stats.csv"
+    try:
+        assigned = sum(np.count_nonzero(~np.isnan(v)) for _, _, v in sides)
+        allv = np.concatenate([v[~np.isnan(v)] for _, _, v in sides]) if assigned>0 else np.array([np.nan])
+        pd.DataFrame([{"tag": tag, "assigned_vertices": int(assigned), "h2_min": float(np.nanmin(allv)), "h2_max": float(np.nanmax(allv)), "h2_mean": float(np.nanmean(allv))}]).to_csv(stats_path, index=False)
+    except Exception:
+        pass
     print(f"  wrote {png}")
-    assigned = sum(np.count_nonzero(~np.isnan(v)) for _, _, v in sides)
-    allv = np.concatenate([v[~np.isnan(v)] for _, _, v in sides])
-    print(f"  [{tag}] surface assigned={assigned} min={np.nanmin(allv):.3f} max={np.nanmax(allv):.3f}")
 
 OUTDIR.mkdir(parents=True, exist_ok=True)
 
