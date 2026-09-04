@@ -208,10 +208,15 @@ def plot_sa_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     fig = plt.figure(figsize=(5.8 * len(sides), 4.2))
     for i, (hemi, surf, val) in enumerate(sides, start=1):
         ax = fig.add_subplot(1, len(sides), i, projection="3d")
-        cbar_kwargs = {"shrink": 0.6, "aspect": 12, "pad": 0.02} if hemi == "right" else None
-        niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
-                                   cmap="coolwarm", colorbar=(hemi == "right"), cbar_kwargs=cbar_kwargs,
-                                   threshold=None, vmin=0.0, vmax=vmax, title="")
+        try:
+            cbar_kwargs = {"shrink": 0.6, "aspect": 12, "pad": 0.02} if hemi == "right" else None
+            niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
+                                       cmap="coolwarm", colorbar=(hemi == "right"), cbar_kwargs=cbar_kwargs,
+                                       threshold=None, vmin=0.0, vmax=vmax, title="")
+        except TypeError:
+            niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
+                                       cmap="coolwarm", colorbar=(hemi == "right"),
+                                       threshold=None, vmin=0.0, vmax=vmax, title="")
     fig.subplots_adjust(right=0.88, wspace=0.15)
     fig.tight_layout(pad=0.4, rect=[0, 0, 0.88, 1])
     fig.savefig(png, dpi=300, bbox_inches="tight", pad_inches=0.05)
