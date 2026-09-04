@@ -112,18 +112,15 @@ if (nrow(wide)>0) {
 
 ```{r gordon-corr}
 if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
-  corr <- read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE)
-  kable(filter_n0(corr %>% filter(Set=="gordon")), caption="Gordon — Twin vs MASH correlations")
+  corr <- read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="gordon")
+  if ("n" %in% names(corr)) corr <- corr %>% filter(n != 0)
+  # Only Pearson R per user (remove Spearman/R2)
+  corr <- corr %>% select(any_of(c("Set","MashMethod","n","Pearson_r"))) %>% mutate(Pearson_r = round(Pearson_r, 3))
+  kable(filter_n0(corr), caption="Gordon — Twin vs MASH Pearson R")
 } else if (nrow(wide)>0) {
-  # fallback: compute from wide
   tmp <- gordon_wide %>% select(Twin_h2, h2_gordon_AdjHE_RE) %>% drop_na()
   if (nrow(tmp)>2) {
-    kable(tibble(
-      Set="gordon", Method="h2_gordon_AdjHE_RE", n=nrow(tmp),
-      Pearson_r=cor(tmp$Twin_h2, tmp$h2_gordon_AdjHE_RE),
-      Spearman_rho=cor(tmp$Twin_h2, tmp$h2_gordon_AdjHE_RE, method="spearman"),
-      R2_pearson=cor(tmp$Twin_h2, tmp$h2_gordon_AdjHE_RE)^2
-    ) %>% mutate(across(where(is.numeric), ~round(.x,3))), caption="Gordon — Twin vs AdjHE-RE (computed)")
+    kable(tibble(Set="gordon", MashMethod="h2_gordon_AdjHE_RE", n=nrow(tmp), Pearson_r=round(cor(tmp$Twin_h2, tmp$h2_gordon_AdjHE_RE),3)) %>% filter(n != 0), caption="Gordon — Twin vs AdjHE-RE Pearson R")
   }
 }
 ```
@@ -187,11 +184,13 @@ if (nrow(wide)>0) {
 
 ```{r proba-corr}
 if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
-  kable(filter_n0(read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="probaConns")), caption="ProbaConns — Twin vs MASH correlations")
+  corr <- read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="probaConns")
+  # Only Pearson R per user (remove Spearman/R2), filter n=0
+  if ("n" %in% names(corr)) corr <- corr %>% filter(n != 0)
+  corr <- corr %>% select(any_of(c("Set","MashMethod","n","Pearson_r"))) %>% mutate(Pearson_r = round(Pearson_r, 3))
+  kable(filter_n0(corr), caption="ProbaConns — Twin vs MASH Pearson R")
 }
 ```
-
----
 
 ---
 
@@ -228,7 +227,11 @@ if (length(wcols)>0) {
 
 ```{r sa-wtotal-corr}
 if (file.exists(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"))) {
-  kable(filter_n0(read_csv(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"), show_col_types=FALSE)), caption="SA w_total vs wo_total — Twin and AdjHE-RE R²")
+  r2 <- read_csv(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"), show_col_types=FALSE)
+  if ("n" %in% names(r2)) r2 <- r2 %>% filter(n != 0)
+  # Only Pearson R per user (remove Spearman/R2)
+  r2 <- r2 %>% select(any_of(c("Set","Method","n","Pearson_r"))) %>% mutate(Pearson_r = round(Pearson_r, 3))
+  kable(filter_n0(r2), caption="SA w_total vs wo_total — Pearson R")
 }
 ```
 
@@ -240,11 +243,16 @@ if (file.exists(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"))) {
 #| fig-width: 10
 #| fig-height: 5
 corr_path <- file.path(ROOT, "results/summary/sa_fc_h2_correlation.csv")
+# Fallback for Windows local render
+if (!file.exists(corr_path)) corr_path <- file.path("results", "summary", "sa_fc_h2_correlation.csv")
 if (file.exists(corr_path)) {
-  corr_sa_fc <- read_csv(corr_path, show_col_types = FALSE) %>% mutate(across(where(is.numeric), ~round(.x, 3)))
-  kable(filter_n0(corr_sa_fc), caption="SA-FC h2 by system: parcel-mean, 90th percentile, and within-system (edges both ends in same network) FC h2 vs SA h2 (14 networks excl. 4/6/17, per atlas × Twin vs AdjHE-RE)")
+  corr_sa_fc <- read_csv(corr_path, show_col_types = FALSE)
+  # Filter n=0 and keep only Pearson R per user (remove Spearman/R2)
+  if ("n_networks" %in% names(corr_sa_fc)) corr_sa_fc <- corr_sa_fc %>% filter(n_networks != 0)
+  corr_sa_fc <- corr_sa_fc %>% select(any_of(c("atlas","method","metric","sa_type","n_networks","pearson_r"))) %>% mutate(pearson_r = round(pearson_r, 3))
+  kable(filter_n0(corr_sa_fc), caption="SA-FC h2 by system: Pearson R of parcel-mean / 90th percentile / within-system FC h2 vs SA h2 (14 nets, w_total + wo_total, per atlas × Twin vs AdjHE-RE)")
 } else {
-  cat("Run `python summary/04b_h2_SA_correlation.py` to generate sa_fc_h2_correlation.csv (now includes fc_within)\n")
+  cat("Run `python summary/04b_h2_SA_correlation.py` to generate sa_fc_h2_correlation.csv\n")
 }
 ```
 
@@ -293,13 +301,17 @@ for (p in c(file.path(ROOT,"results/summary/plots/heatmap_gordon_Twin_stats.csv"
 
 ```{r percent-snp}
 pct_path <- file.path(ROOT, "results/summary/percent_SNP_explained.csv")
+if (!file.exists(pct_path)) pct_path <- file.path("results", "summary", "percent_SNP_explained.csv")
 pct_detail_path <- file.path(ROOT, "results/summary/percent_SNP_explained_per_pheno.csv")
+if (!file.exists(pct_detail_path)) pct_detail_path <- file.path("results", "summary", "percent_SNP_explained_per_pheno.csv")
 if (file.exists(pct_path)) {
   pct <- read_csv(pct_path, show_col_types = FALSE) %>% mutate(across(where(is.numeric), ~round(.x, 2)))
-  # Display as percent with SE: mean ± SE, median, etc.
-  # Keep Set order gordon, probaConns, SA
+  # Filter n=0
+  pct <- filter_n0(pct)
+  # Keep Set order gordon, probaConns, SA; select only needed cols for display (keep Pearson focus but percent table is separate)
   pct <- pct %>% arrange(match(Set, c("gordon","probaConns","SA")))
-  kable(filter_n0(pct), caption="Percent SNP heritability of Twin estimates — 100 × AdjHE-RE / Twin per phenotype (per Set: mean ± SE, median, SD, q1/q3, min/max, n_valid; SA 14 nets excl. 4/6/17, FCs filtered Twin_h2>0.001, MASH 0–1.2)")
+  # Only show mean/median + SE for publication (keep full for now but ensure n_valid !=0)
+  kable(pct, caption="Percent SNP heritability of Twin estimates — 100 × AdjHE-RE / Twin per phenotype (per Set: mean ± SE, median, SD, q1/q3, min/max, n_valid; SA 14 nets excl. 4/6/17, FCs filtered Twin_h2>0.001, MASH 0–1.2)")
   cat("\n\n*Interpretation: `mean_pct` = mean of per-phenotype `pct`; `se_pct = sd / sqrt(n_valid)`; `median_pct` robust to outliers (Twin near 0 inflates mean). `ratio_of_means_pct = 100 × mean(MASH)/mean(Twin)` is also shown.*\n")
 } else {
   cat("Run `Rscript summary/04d_percent_SNP.R` to generate percent_SNP_explained.csv\n")
@@ -314,8 +326,6 @@ if (file.exists(pct_detail_path)) {
   # kable(detail %>% group_by(Set) %>% arrange(desc(pct)) %>% slice_head(n=5), caption="Top 5 pct per Set")
 }
 ```
-
----
 
 # Appendix: SA without total surface control (SA wo_total)
 
@@ -354,11 +364,13 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 *Comparison of SA heritability estimates with vs without total surface area control (per network, 14 nets excl. 4/6/17).*
 
 ```{r sa-w-vs-wo-corr-appendix}
-# R² / Pearson / Spearman between w_total and wo_total per Method (Twin, AdjHE-RE)
+# Pearson R between w_total and wo_total per Method (Twin, AdjHE-RE) — only Pearson per user
 r2_path <- file.path(ROOT, "results/summary/r2_sa_w_vs_wo_total.csv")
 if (file.exists(r2_path)) {
-  r2 <- read_csv(r2_path, show_col_types = FALSE) %>% mutate(across(where(is.numeric), ~round(.x, 3)))
-  kable(filter_n0(r2), caption="SA w_total vs wo_total — correlation (R² = Pearson r², per Method)")
+  r2 <- read_csv(r2_path, show_col_types = FALSE)
+  if ("n" %in% names(r2)) r2 <- r2 %>% filter(n != 0)
+  r2 <- r2 %>% select(any_of(c("Set","Method","n","Pearson_r"))) %>% mutate(Pearson_r = round(Pearson_r, 3))
+  kable(filter_n0(r2), caption="SA w_total vs wo_total — Pearson R (per Method)")
 } else {
   cat("Run `Rscript summary/04_compare_r2.R` to generate r2_sa_w_vs_wo_total.csv\n")
 }
