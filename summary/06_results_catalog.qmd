@@ -354,6 +354,39 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 }
 ```
 
+## SA w_total vs wo_total — Correlation & Comparison {.scrollable style="text-align:center;"}
+
+*Comparison of SA heritability estimates with vs without total surface area control (per network, 14 nets excl. 4/6/17).*
+
+```{r sa-w-vs-wo-corr-appendix}
+# R² / Pearson / Spearman between w_total and wo_total per Method (Twin, AdjHE-RE)
+r2_path <- file.path(ROOT, "results/summary/r2_sa_w_vs_wo_total.csv")
+if (file.exists(r2_path)) {
+  r2 <- read_csv(r2_path, show_col_types = FALSE) %>% mutate(across(where(is.numeric), ~round(.x, 3)))
+  kable(filter_n0(r2), caption="SA w_total vs wo_total — correlation (R² = Pearson r², per Method)")
+} else {
+  cat("Run `Rscript summary/04_compare_r2.R` to generate r2_sa_w_vs_wo_total.csv\n")
+}
+```
+
+::: {style="overflow-y:auto; max-height:720px; text-align:center;"}
+
+![SA w_total vs wo_total scatter — Twin vs AdjHE-RE, red dashed y=x, blue LM, R² annotated](../results/summary/plots/r2_sa_w_vs_wo.png){width="95%" style="object-fit:contain; max-height:640px;"}
+
+:::
+
+*Scatter `wo_total (x)` vs `w_total (y)` per Method; `R²` from `04_compare_r2.R: r2_stats(wo_total, w_total)`.*
+
+```{r sa-w-vs-wo-detail-appendix}
+# Optional per-network detail: wo_total vs w_total h2 for SA (from 04d percent or direct SA files)
+# Show correlation between SA w_total and wo_total h2 by network (from 04d or r2_sa)
+pct_detail_path <- file.path(ROOT, "results/summary/percent_SNP_explained_per_pheno.csv")
+if (file.exists(r2_path)) {
+  # Also show per-network h2 values for w_total vs wo_total if available via r2_sa_w_vs_wo detail
+  # For brevity, just show the r2 table above; detail can be inspected via r2_sa_w_vs_wo.csv
+}
+```
+
 ---
 
 ## Run Order
