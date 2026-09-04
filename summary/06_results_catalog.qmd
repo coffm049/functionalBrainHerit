@@ -198,34 +198,6 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 
 ---
 
-## SA — Surface Area Heritability {.scrollable style="text-align:center;"}
-
-::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
-
-![SA Surface Area — Twin vs AdjHE-RE (wo_total), geom_col + position_dodge2, 14 networks (excludes 4/6/17 null) ordered by Twin h2](../results/summary/plots/SA_horizontal_barplot.png){width="100%" style="object-fit:contain; max-height:720px;"}
-
-:::
-
-## SA — Five-Number Summaries & Correlations
-
-```{r sa-stats}
-if (nrow(wide)>0) {
-  sa_long <- wide %>% filter(Set=="SA") %>%
-    select(Pheno, Twin_h2, h2_SA_AdjHE_RE) %>%
-    pivot_longer(c(Twin_h2, h2_SA_AdjHE_RE), names_to="Method", values_to="h2") %>%
-    mutate(Method = recode(Method, Twin_h2="Twin", h2_SA_AdjHE_RE="AdjHE-RE"))
-  fivenum_sa <- sa_long %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
-    mutate(across(where(is.numeric), ~round(.x,3)))
-  kable(filter_n0(fivenum_sa), caption="SA (wo_total, 14 networks excl. 4/6/17 null) — h2 five-number summary")
-}
-```
-
-```{r sa-corr}
-if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
-  kable(filter_n0(read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="SA")), caption="SA — Twin vs MASH correlations (wo_total)")
-}
-```
-
 ---
 
 ## SA w_total — Surface Area Heritability (w_total) {.scrollable style="text-align:center;"}
@@ -347,6 +319,42 @@ if (file.exists(pct_detail_path)) {
   # kable(detail %>% group_by(Set) %>% arrange(desc(pct)) %>% slice_head(n=5), caption="Top 5 pct per Set")
 }
 ```
+
+---
+
+# Appendix: SA without total surface control (SA wo_total)
+
+*All SA results above control for total surface area (`w_total`). This appendix collects the corresponding `wo_total` (without total surface) results for comparison.*
+
+## SA wo_total — Surface Area Heritability {.scrollable style="text-align:center;"}
+
+::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
+
+![SA Surface Area — Twin vs AdjHE-RE (wo_total), geom_col + position_dodge2, 14 networks (excludes 4/6/17 null) ordered by Twin h2](../results/summary/plots/SA_horizontal_barplot.png){width="100%" style="object-fit:contain; max-height:720px;"}
+
+:::
+
+## SA wo_total — Five-Number Summaries & Correlations
+
+```{r sa-stats-appendix}
+if (nrow(wide)>0) {
+  sa_long <- wide %>% filter(Set=="SA") %>%
+    select(Pheno, Twin_h2, h2_SA_AdjHE_RE) %>%
+    pivot_longer(c(Twin_h2, h2_SA_AdjHE_RE), names_to="Method", values_to="h2") %>%
+    mutate(Method = recode(Method, Twin_h2="Twin", h2_SA_AdjHE_RE="AdjHE-RE"))
+  fivenum_sa <- sa_long %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
+    mutate(across(where(is.numeric), ~round(.x,3)))
+  kable(filter_n0(fivenum_sa), caption="SA (wo_total, 14 networks excl. 4/6/17 null) — h2 five-number summary")
+}
+```
+
+```{r sa-corr-appendix}
+if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
+  kable(filter_n0(read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="SA")), caption="SA — Twin vs MASH correlations (wo_total)")
+}
+```
+
+---
 
 ## Run Order
 
