@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """ProbaConns (80 parcels) brain-space visualization — simple, hardcoded.
 
-Produces for twin and AdjHE (90th-percentile node summary):
-  - <out>/probaConns_{twin,AdjHE}_surface.png  (both hemispheres, 0–0.5)
-  - <out>/probaConns_networks_surface.png      (categorical, from label table)
-  - <out>/probaConns_{twin,AdjHE}_circular.png (h2 > 0.35, nodes grouped by network)
+Produces for twin and AdjHE-RE (90th-percentile node summary, publication-ready, no titles, minimal whitespace):
+  - <out>/probaConns_{twin,AdjHE-RE}_surface.png  (both hemispheres, 0–0.5, colorbar not overlapping)
+  - <out>/probaConns_networks_surface.png      (categorical, from label table, Sal↔SMl swapped, 14 nets)
+  - <out>/probaConns_{twin,AdjHE-RE}_circular.png (h2 > 0.25, nodes grouped by network, publication-ready)
 
 Run on the HPC where the dlabel / surfaces and .venv are available:
   /users/4/coffm049/papers/functionalBrainHerit/.venv/bin/python summary/brain_probaconns.py
@@ -334,13 +334,15 @@ def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     sides = [("left", surf_l, val_left), ("right", surf_r, val_right)]
     sides = [(n, s, v) for n, s, v in sides if v is not None]
     png = outdir / f"{tag}_surface.png"
-    fig = plt.figure(figsize=(5.5 * len(sides), 4.2))
+    fig = plt.figure(figsize=(5.8 * len(sides), 4.2))
     for i, (hemi, surf, val) in enumerate(sides, start=1):
         ax = fig.add_subplot(1, len(sides), i, projection="3d")
+        cbar_kwargs = {"shrink": 0.6, "aspect": 12, "pad": 0.02} if hemi == "right" else None
         niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
-                                   cmap="coolwarm", colorbar=(hemi == "right"), threshold=None,
-                                   vmin=0.0, vmax=vmax, title="")
-    fig.tight_layout(pad=0.5)
+                                   cmap="coolwarm", colorbar=(hemi == "right"), cbar_kwargs=cbar_kwargs,
+                                   threshold=None, vmin=0.0, vmax=vmax, title="")
+    fig.subplots_adjust(right=0.88, wspace=0.15)
+    fig.tight_layout(pad=0.4, rect=[0, 0, 0.88, 1])
     fig.savefig(png, dpi=300, bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
     stats_path = outdir / f"{tag}_surface_stats.csv"
@@ -353,7 +355,7 @@ def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     print(f"  wrote {png}")
 
 
-def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.1):
+def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.25):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -369,11 +371,11 @@ def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.1):
     vals = M[iu]
     mask = vals > h2_thr
     n_edges = int(mask.sum())
-    # line thickness + alpha rescaled: h2 0.1–0.5 -> lw 0.1–1.0, alpha 0.1–1.0 (publication: 0.1 filter)
+    # line thickness + alpha rescaled: h2 0.25–0.5 -> lw 0.1–1.0, alpha 0.1–1.0 (bumped to 0.25)
     for (a, b), v in zip(zip(iu[0][mask], iu[1][mask]), vals[mask]):
         pa, pb = pos[a], pos[b]
-        v_clipped = float(np.clip(v, 0.1, 0.5))
-        norm = (v_clipped - 0.1) / (0.5 - 0.1)
+        v_clipped = float(np.clip(v, 0.25, 0.5))
+        norm = (v_clipped - 0.25) / (0.5 - 0.25)
         lw = 0.1 + norm * (1.0 - 0.1)
         alpha = 0.1 + norm * (1.0 - 0.1)
         ax.plot([xy[pa, 0], xy[pb, 0]], [xy[pa, 1], xy[pb, 1]], color="red", alpha=alpha, linewidth=lw)
