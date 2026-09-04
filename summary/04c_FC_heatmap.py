@@ -5,10 +5,10 @@ Heatmap of FC heritability (h2) ordered by Sys-Sys network labels.
 For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-RE, 30 PCs):
   * Rebuild the full N x N h2 matrix from mash_twin_wide.csv
   * Order parcels by network (as in circular plot: argsort(networks))
-  * Plot heatmap with networks as blocks, ordered by Sys-Sys labels
+  * Plot heatmap with networks as blocks, ordered by Sys-Sys labels, red (low) -> yellow (high), 0-1
   * Save as results/summary/plots/heatmap_{atlas}_{method}.png
 
-Publication-ready: minimal whitespace, no title numbers, stats to CSV, AdjHE-RE naming.
+Publication-ready: minimal whitespace, no title numbers, stats to CSV, AdjHE-RE naming, 0-1 colorbar.
 
 Run:
   .venv/bin/python summary/04c_FC_heatmap.py
@@ -151,10 +151,10 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
         M=rebuild_pconn(sub["Pheno"].values, sub[col].values.astype(float), N)
         # Order matrix
         M_ordered=M[np.ix_(order, order)]
-        # Publication-ready heatmap: red (low) -> yellow (high), 0-0.5 same limits as colorbars
+        # Publication-ready heatmap: red (low) -> yellow (high), 0-1 as requested (was 0-0.5)
         fig, ax = plt.subplots(figsize=(6, 6))
         red_yellow = mcolors.LinearSegmentedColormap.from_list("red_yellow", ["#d73027", "#ffff00"])
-        im=ax.imshow(M_ordered, cmap=red_yellow, vmin=0, vmax=0.5, interpolation="nearest", aspect="auto")
+        im=ax.imshow(M_ordered, cmap=red_yellow, vmin=0, vmax=1.0, interpolation="nearest", aspect="auto")
         # Add network boundaries
         cum=np.cumsum(counts)[:-1]
         for c in cum:

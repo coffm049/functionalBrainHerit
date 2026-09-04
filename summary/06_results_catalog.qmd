@@ -268,21 +268,21 @@ for (p in c(file.path(ROOT,"results/summary/plots/SA_horizontal_barplot_stats.cs
 
 ---
 
-## FC Correlation Heatmaps — Ordered by Sys-Sys (red→yellow, 0–0.5)
+## FC Correlation Heatmaps — Ordered by Sys-Sys (red→yellow, 0–1)
 
 ::: {layout="[[1,1],[1,1]]" style="text-align:center;"}
 
-![Gordon Twin FC h2 heatmap (352×352, red low → yellow high, 0–0.5, parcels ordered by network as in circular)](../results/summary/plots/heatmap_gordon_Twin.png){width="100%" style="object-fit:contain;"}
+![Gordon Twin FC h2 heatmap (352×352, red low → yellow high, 0–1, parcels ordered by network as in circular)](../results/summary/plots/heatmap_gordon_Twin.png){width="100%" style="object-fit:contain;"}
 
-![Gordon AdjHE-RE heatmap](../results/summary/plots/heatmap_gordon_AdjHERE.png){width="100%" style="object-fit:contain;"}
+![Gordon AdjHE-RE heatmap (0–1)](../results/summary/plots/heatmap_gordon_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
-![ProbaConns Twin heatmap (80×80)](../results/summary/plots/heatmap_probaConns_Twin.png){width="100%" style="object-fit:contain;"}
+![ProbaConns Twin heatmap (80×80, 0–1)](../results/summary/plots/heatmap_probaConns_Twin.png){width="100%" style="object-fit:contain;"}
 
-![ProbaConns AdjHE-RE heatmap](../results/summary/plots/heatmap_probaConns_AdjHERE.png){width="100%" style="object-fit:contain;"}
+![ProbaConns AdjHE-RE heatmap (0–1)](../results/summary/plots/heatmap_probaConns_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
 :::
 
-*Heatmaps via `summary/04c_FC_heatmap.py` — `M_ordered = M[np.ix_(order,order)]` where `order = argsort(networks)` (same as circular), `red_yellow` cmap `vmin=0 vmax=0.5` matching surface colorbars, network block boundaries at `cumsum(counts)`.*
+*Heatmaps via `summary/04c_FC_heatmap.py` — `M_ordered = M[np.ix_(order,order)]` where `order = argsort(networks)` (same as circular), `red_yellow` cmap `vmin=0 vmax=1.0` (per user, was 0–0.5), network block boundaries at `cumsum(counts)`.*
 
 ```{r heatmap-stats}
 for (p in c(file.path(ROOT,"results/summary/plots/heatmap_gordon_Twin_stats.csv"),
