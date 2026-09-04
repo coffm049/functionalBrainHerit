@@ -258,19 +258,17 @@ if (file.exists(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"))) {
 
 ---
 
-## SA-FC System Correlation — FC parcel-mean / 90th percentile h2 vs SA h2
+## SA-FC System Correlation — FC parcel-mean / 90th percentile / within-system h2 vs SA h2
 
 ```{r sa-fc-corr}
-#| fig-width: 8
-#| fig-height: 4
+#| fig-width: 10
+#| fig-height: 5
 corr_path <- file.path(ROOT, "results/summary/sa_fc_h2_correlation.csv")
 if (file.exists(corr_path)) {
   corr_sa_fc <- read_csv(corr_path, show_col_types = FALSE) %>% mutate(across(where(is.numeric), ~round(.x, 3)))
-  kable(corr_sa_fc, caption="SA-FC h2 by system: parcel-mean and 90th percentile FC h2 vs SA h2 (14 networks excl. 4/6/17, per atlas × Twin vs AdjHE-RE)")
-  # Optional scatter for quick check (first row)
-  # ggplot(corr_sa_fc, aes(x=pearson_r, y=spearman_rho, color=atlas, shape=metric)) + geom_point(size=3) + theme_minimal()
+  kable(corr_sa_fc, caption="SA-FC h2 by system: parcel-mean, 90th percentile, and within-system (edges both ends in same network) FC h2 vs SA h2 (14 networks excl. 4/6/17, per atlas × Twin vs AdjHE-RE)")
 } else {
-  cat("Run `python summary/04b_h2_SA_correlation.py` to generate sa_fc_h2_correlation.csv\n")
+  cat("Run `python summary/04b_h2_SA_correlation.py` to generate sa_fc_h2_correlation.csv (now includes fc_within)\n")
 }
 ```
 
@@ -317,10 +315,12 @@ for (p in c(file.path(ROOT,"results/summary/plots/heatmap_gordon_Twin_stats.csv"
 
 ```bash
 Rscript summary/01_compare_mash_twin.R          # 01 → mash_twin_wide.csv
-bash summary/02_run_brain_viz.sh                # 02a-d → Gordon/ProbaConns/SA surfaces+chords (proba fix: iter_structures for 29696 vs 32492)
-Rscript summary/03_plot_sa_horizontal.R         # SA barplots: Twin vs AdjHE-RE dodged (wo_total + w_total, geom_col + position_dodge2)
+bash summary/02_run_brain_viz.sh                # 02a-d → Gordon/ProbaConns/SA surfaces+chords (proba fix: iter_structures for 29696 vs 32492; chord h2>0.1)
+Rscript summary/03_plot_sa_horizontal.R         # SA barplots: Twin vs AdjHE-RE dodged (wo_total + w_total, 14 nets)
 Rscript summary/04_compare_r2.R                 # R² per Set + SA w/wo
-python summary/05_manhattan.py                  # 05 → manhattans + overview (full x-axis, Sys-Sys labels; cf. 03-matrixManhattan2.py:174-249, 03c-matrixManhattan-separate.py:253-259) — overview now regenerated
+python summary/04b_h2_SA_correlation.py         # SA-FC: parcel-mean/p90/within-system h2 vs SA h2 by system (14 nets)
+python summary/04c_FC_heatmap.py                # FC h2 heatmaps ordered Sys-Sys, red→yellow 0–0.5
+python summary/05_manhattan.py                  # 05 → manhattans + overview (full x-axis, Sys-Sys, AdjHE-RE)
 quarto render summary/06_results_catalog.qmd --to html
 ```
 

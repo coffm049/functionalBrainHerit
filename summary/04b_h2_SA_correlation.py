@@ -205,6 +205,7 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
         parcel_p90=np.array(parcel_p90)
 
         # Aggregate by network (case-insensitive SA lookup: VIS vs Vis, SAL vs Sal, etc.)
+        # Also compute within-system FC h2: mean of edges where both parcels are in same network
         sa_lower2={k.lower(): v for k,v in sa_map.items()}
         rows=[]
         for net in networks_keep:
@@ -231,16 +232,21 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
                     if k.lower()==net.lower():
                         sa_h2=v.get(method, np.nan)
                         break
-            # SA h2 for this method: for FC methods, use same SA method (Twin vs AdjHE-RE)
-            # SA map has Twin_h2 and AdjHE-RE
             fc_mean=np.nanmean([parcel_mean[i] for i in idxs])
             fc_p90=np.nanmean([parcel_p90[i] for i in idxs])
-            rows.append((net, sa_h2, fc_mean, fc_p90))
-        df_net=pd.DataFrame(rows, columns=["network","sa_h2","fc_mean","fc_p90"]).dropna()
+            # Within-system: edges where both ends in same network
+            within_vals=[]
+            for ii in idxs:
+                for jj in idxs:
+                    if ii < jj and not np.isnan(M[ii, jj]):
+                        within_vals.append(M[ii, jj])
+            fc_within=np.nanmean(within_vals) if len(within_vals)>0 else np.nan
+            rows.append((net, sa_h2, fc_mean, fc_p90, fc_within))
+        df_net=pd.DataFrame(rows, columns=["network","sa_h2","fc_mean","fc_p90","fc_within"]).dropna()
         if len(df_net) < 3:
             continue
         # Correlations
-        for metric in ["fc_mean","fc_p90"]:
+        for metric in ["fc_mean","fc_p90","fc_within"]:
             x=df_net["sa_h2"].values
             y=df_net[metric].values
             # Pearson and Spearman
