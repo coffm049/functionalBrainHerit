@@ -50,12 +50,7 @@ filter_n0 <- function(df) {
 }
 ```
 
-# Overview
-
-- Heritability from FCs- Gordon and Probabilistic atlas (thresholded at 0.8) comparing SNP (AdjHE-RE) to twin
-- Heritability of 14 network surface areas (17 phenos, but 4/6/17 are null per Gordon; 01-07 labeling `05-topoViz.R` keeps 1,2,3,5,7,8,9,10,11,12,13,14,15,16 — see `03b-topoh2Ests2Brain.py:range(1,15)`)
-
-## Gordon {style="text-align:center;" .scrollable}
+# Gordon {style="text-align:center;" .scrollable}
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
@@ -135,7 +130,7 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 
 ---
 
-## ProbaConns — Network Topography {style="text-align:center;" .scrollable}
+# ProbaConns — Network Topography {style="text-align:center;" .scrollable}
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
@@ -387,20 +382,5 @@ if (file.exists(r2_path)) {
 }
 ```
 
----
-
-## Run Order
-
-```bash
-Rscript summary/01_compare_mash_twin.R          # 01 → mash_twin_wide.csv
-bash summary/02_run_brain_viz.sh                # 02a-d → Gordon/ProbaConns/SA surfaces+chords (proba fix: iter_structures for 29696 vs 32492; chord h2>0.33)
-Rscript summary/03_plot_sa_horizontal.R         # SA barplots: Twin vs AdjHE-RE dodged (wo_total + w_total, 14 nets, publication ready)
-Rscript summary/04_compare_r2.R                 # R² per Set + SA w/wo
-Rscript summary/04d_percent_SNP.R               # % SNP of Twin per Set: mean ± SE, median, etc. (100× AdjHE-RE/Twin)
-python summary/04b_h2_SA_correlation.py         # SA-FC: parcel-mean/p90/within-system h2 vs SA h2 by system (14 nets, w_total + wo_total)
-python summary/04c_FC_heatmap.py                # FC h2 heatmaps ordered Sys-Sys, red→yellow 0–0.5
-python summary/05_manhattan.py                  # 05 → manhattans + overview (full x-axis, Sys-Sys, AdjHE-RE, publication ready)
-quarto render summary/06_results_catalog.qmd --to html
-```
 
 Twin `#1f77b4` vs AdjHE-RE `#ff7f0e`
