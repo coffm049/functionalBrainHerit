@@ -48,6 +48,18 @@ filter_n0 <- function(df) {
 }
 ```
 
+# Summary of Findings — At a Glance {.scrollable style="text-align:center;"}
+
+::: {style="overflow-y:auto; max-height:820px; text-align:left; font-size:1.15em; line-height:1.6;"}
+
+- **Brain wiring is heritable:** Both twin and DNA-based (SNP) estimates show heritability for functional connections (`Gordon`/`ProbaConns`) and for network surface area, but DNA captures only ~30% of twin heritability on average.
+- **Networks differ:** Some systems (e.g., `DMN`, `VIS`, `DAN`) are more heritable than others, and the pattern is similar for `Gordon` and `ProbaConns`.
+- **Total brain size matters for surface area:** Controlling for total surface area (`w_total`) lowers heritability and changes which networks look most heritable.
+- **Surface vs. wiring are weakly linked:** How heritable a network's surface area is only weakly predicts how heritable its connections are.
+- **Methods agree:** Twin and SNP (`AdjHE-RE`) estimates are correlated (`Pearson R` ~0.6–0.8 per phenotype set), supporting the SNP findings.
+
+:::
+
 # Gordon {style="text-align:center;" .scrollable}
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
