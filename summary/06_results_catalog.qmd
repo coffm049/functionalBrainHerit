@@ -88,13 +88,15 @@ filter_n0 <- function(df) {
 
 ## Gordon — "Manhattans" {.scrollable style="text-align:center;"}
 
+*Sys-Sys ordered by SNP (`AdjHE-RE`) median `h²` (20 largest by size, alternating `Twin` blue `AdjHE-RE` orange, grey tail `100×`), `Twin` uses same SNP `x`-axis for direct comparison.*
+
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
 ::: {layout="[[1],[1]]" style="text-align:center;"}
 
-![Gordon Twin "Manhattan" — Sys-Sys pairs, (20 largest by #connections, alternating colours; remainder grey 100× compressed on right)](../results/summary/plots/manhattan_gordon_Twin.png){width="100%" style="object-fit:contain;"}
+![Gordon Twin "Manhattan" — Sys-Sys pairs, SNP determines order, Twin same x-axis](../results/summary/plots/manhattan_gordon_Twin.png){width="100%" style="object-fit:contain;"}
 
-![Gordon AdjHE-RE Manhattan](../results/summary/plots/manhattan_gordon_AdjHERE.png){width="100%" style="object-fit:contain;"}
+![Gordon AdjHE-RE Manhattan (SNP order)](../results/summary/plots/manhattan_gordon_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
 :::
 
@@ -166,13 +168,15 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 
 ## ProbaConns — Manhattans {.scrollable style="text-align:center;"}
 
+*Sys-Sys ordered by SNP (`AdjHE-RE`) median `h²`, `Twin` same `x`-axis as SNP.*
+
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
 ::: {layout="[[1],[1]]" style="text-align:center;"}
 
-![ProbaConns Twin Manhattan](../results/summary/plots/manhattan_probaConns_Twin.png){width="100%" style="object-fit:contain;"}
+![ProbaConns Twin Manhattan (SNP order)](../results/summary/plots/manhattan_probaConns_Twin.png){width="100%" style="object-fit:contain;"}
 
-![ProbaConns AdjHE-RE Manhattan](../results/summary/plots/manhattan_probaConns_AdjHERE.png){width="100%" style="object-fit:contain;"}
+![ProbaConns AdjHE-RE Manhattan (determines order)](../results/summary/plots/manhattan_probaConns_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
 :::
 
