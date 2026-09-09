@@ -48,7 +48,7 @@ filter_n0 <- function(df) {
 }
 ```
 
-# Summary of Findings — At a Glance {.scrollable style="text-align:center;"}
+# Summary {.scrollable style="text-align:center;"}
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:left; font-size:1.15em; line-height:1.6;"}
 
