@@ -278,14 +278,23 @@ def build_long_for_set(wide, atlas, N, h2_col):
     return pd.DataFrame(rows, columns=["connection", "h2"])
 
 
-def manhattan_for_df(df, atlas, method, out_path):
-    # median h2 and size per Sys-Sys group
+def _get_ordering(df, atlas, method):
+    """Helper to get Sys-Sys ordering for an atlas — used to share SNP ordering between Twin and AdjHE-RE per user request."""
     stats = df.groupby("connection")["h2"].agg(median="median", size="size")
-    # largest 20 by number of connections — plotted normally with alternating colours
     largest_20 = stats.sort_values("size", ascending=False).head(20).index.tolist()
-    # order: large 20 sorted by median h2 desc, then remaining sorted by median h2 desc
     large_order = stats.loc[stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
     small_order = stats.loc[~stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
+    return large_order, small_order, largest_20
+
+def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
+    # median h2 and size per Sys-Sys group — if shared_order provided (from SNP), use it for both Twin and AdjHE-RE per user
+    if shared_order is not None:
+        large_order, small_order, largest_20 = shared_order
+    else:
+        stats = df.groupby("connection")["h2"].agg(median="median", size="size")
+        largest_20 = stats.sort_values("size", ascending=False).head(20).index.tolist()
+        large_order = stats.loc[stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
+        small_order = stats.loc[~stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
     connection_order = large_order + small_order
 
     df["connection"] = pd.Categorical(df["connection"], categories=connection_order, ordered=True)
@@ -381,6 +390,9 @@ wide = pd.read_csv(WIDE)
 set_N = {"gordon": 352, "probaConns": 80, "SA": 17}
 for atlas in ["gordon", "probaConns", "SA"]:
     N = set_N[atlas]
+    # Build both methods first so we can share SNP ordering between Twin and AdjHE-RE per user request
+    dfs = {}
+    cols = {}
     for method, col in [("Twin", "Twin_h2"), ("AdjHE-RE", f"h2_{atlas}_AdjHE_RE" if atlas != "SA" else "h2_SA_AdjHE_RE")]:
         if col not in wide.columns:
             alt = col.replace("probaConns", "proba")
@@ -397,8 +409,23 @@ for atlas in ["gordon", "probaConns", "SA"]:
         if df.empty:
             print(f"skip {atlas} {method}: empty df")
             continue
+        dfs[method] = df
+        cols[method] = col
+    if not dfs:
+        continue
+    # For Gordon/Proba (and SA for consistency), SNP (AdjHE-RE) determines Sys-Sys ordering so Twin uses same x-axis
+    shared_order = None
+    if "AdjHE-RE" in dfs and not dfs["AdjHE-RE"].empty:
+        # Use AdjHE-RE to define ordering
+        shared_order = _get_ordering(dfs["AdjHE-RE"], atlas, "AdjHE-RE")
+    elif "Twin" in dfs:
+        shared_order = _get_ordering(dfs["Twin"], atlas, "Twin")
+    for method, df in dfs.items():
+        # Use shared SNP ordering for both methods when available (per user: Gordon SNP determines order, Twin same)
+        order_to_use = shared_order
+        # For SA, also use shared if available
         out = PLOT_DIR / f"manhattan_{atlas}_{method.replace('-','')}.png"
-        manhattan_for_df(df, atlas, method, out)
+        manhattan_for_df(df, atlas, method, out, shared_order=order_to_use)
 
 # ---- Manhattan Overview (3 rows x 2 cols, faceted, same styling as individual panels) ----
 # Regenerates manhattan_overview.png so it matches the updated individual panels
