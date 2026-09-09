@@ -137,6 +137,21 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 }
 ```
 
+### Gordon — Within vs Outside Network h2 (10th, 50th, 90th)
+
+```{r gordon-within-outside}
+wo_path <- file.path(ROOT, "results/summary/within_outside_h2.csv")
+if (!file.exists(wo_path)) wo_path <- file.path("results", "summary", "within_outside_h2.csv")
+if (file.exists(wo_path)) {
+  wo <- read_csv(wo_path, show_col_types=FALSE) %>% filter(atlas=="gordon")
+  wo <- wo %>% filter(n != 0) %>% mutate(across(where(is.numeric), ~round(.x, 3)))
+  # Keep only p10/p50/p90 + mean for publication (remove Spearman/R2 already)
+  kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), caption="Gordon — Within vs outside network h2 (10th, 50th/median, 90th percentiles, per Twin vs AdjHE-RE)")
+} else {
+  cat("Run `python summary/04e_within_outside.py` to generate within_outside_h2.csv\n")
+}
+```
+
 ---
 
 # ProbaConns — Network Topography {style="text-align:center;" .scrollable}
@@ -203,6 +218,20 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
   if ("n" %in% names(corr)) corr <- corr %>% filter(n != 0)
   corr <- corr %>% select(any_of(c("Set","MashMethod","n","Pearson_r"))) %>% mutate(Pearson_r = round(Pearson_r, 3))
   kable(filter_n0(corr), caption="ProbaConns — Twin vs MASH Pearson R")
+}
+```
+
+### ProbaConns — Within vs Outside Network h2 (10th, 50th, 90th)
+
+```{r proba-within-outside}
+wo_path <- file.path(ROOT, "results/summary/within_outside_h2.csv")
+if (!file.exists(wo_path)) wo_path <- file.path("results", "summary", "within_outside_h2.csv")
+if (file.exists(wo_path)) {
+  wo <- read_csv(wo_path, show_col_types=FALSE) %>% filter(atlas=="probaConns")
+  wo <- wo %>% filter(n != 0) %>% mutate(across(where(is.numeric), ~round(.x, 3)))
+  kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), caption="ProbaConns — Within vs outside network h2 (10th, 50th/median, 90th percentiles, per Twin vs AdjHE-RE)")
+} else {
+  cat("Run `python summary/04e_within_outside.py` to generate within_outside_h2.csv\n")
 }
 ```
 
