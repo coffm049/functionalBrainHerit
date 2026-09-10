@@ -171,13 +171,12 @@ def parcel_centroids(dlabel, N, surf_l, surf_r):
             centroid_vertex[p]=(None, -1)
     return centroids, centroid_vertex
 
-def geodesic_distances_via_wb(surf_l, surf_r, centroids, parcel_networks, tmpdir=Path("/tmp")):
+def geodesic_distances_via_wb(surf_l, surf_r, centroids, centroid_vertex, tmpdir=Path("/tmp")):
     """Try wb_command geodesic distance via python subprocess; fallback to nan.
-    
-    For each parcel's centroid vertex, call wb_command -surface-geodesic-distance
-    on the appropriate hemisphere surface, then read the distance to the other parcel's centroid.
-    This is slow for 352*352/2 pairs, so we only compute for a subsample or on HPC where wb_command is fast.
-    For now, we attempt a full computation but with caching and early exit if wb_command not found.
+
+    Returns a cache dict and helper to compute geodesic per edge.
+    We precompute for each source parcel's centroid vertex via wb_command once,
+    caching the full distance map, so we need at most N calls (352), not N^2.
     """
     try:
         result=subprocess.run(["wb_command", "-help"], capture_output=True, timeout=5)
@@ -187,22 +186,74 @@ def geodesic_distances_via_wb(surf_l, surf_r, centroids, parcel_networks, tmpdir
     if not has_wb:
         print("  wb_command not found, geodesic will be NaN (Euclidean only)")
         return None
-    # Check if surfaces exist for wb_command (needs midthickness or inflated)
-    # Use inflated as fallback; ideally use midthickness for accurate geodesic
-    # For this simple scatter, we will compute geodesic for all pairs via Euclidean as fallback
-    # and only attempt wb_command for a small subset to demonstrate capability.
-    print("  wb_command found — attempting geodesic via surface (may be slow, sampling 2000 edges for demo)")
-    # To avoid 60k wb_command calls (352*351/2), we will not compute full matrix here
-    # Instead, return a placeholder dict that the main loop can use to compute on-demand via Euclidean
-    # The main loop will call a helper to compute geodesic for each edge via wb_command if needed
-    # For now, return a function that can be called per edge
-    return "wb_available"
+    def _find_midthickness(hemi):
+        cands = [
+            surf_l.parent / f"Conte69.{hemi}.midthickness.32k_fs_LR.surf.gii",
+            Path(f"/users/4/coffm049/papers/brainTemplates/Conte69.{hemi}.midthickness.32k_fs_LR.surf.gii"),
+            Path(f"C:/Users/coffm049/brainTemplates/Conte69.{hemi}.midthickness.32k_fs_LR.surf.gii"),
+        ]
+        for c in cands:
+            if c.exists():
+                return c
+        return surf_l if hemi=="L" else surf_r
+    has_left = any(v[0]=="L" for v in centroid_vertex.values() if v[0] is not None)
+    has_right = any(v[0]=="R" for v in centroid_vertex.values() if v[0] is not None)
+    print(f"  wb_command found — will compute geodesic for same-hemisphere pairs (L:{has_left} R:{has_right}) via centroid vertices")
+    tmpdir.mkdir(parents=True, exist_ok=True)
+    return {"centroid_vertex": centroid_vertex, "has_wb": True, "surf_l": _find_midthickness("L"), "surf_r": _find_midthickness("R"), "tmpdir": tmpdir, "cache": {}}
 
 # Main
 SURF_L = _resolve(ROOT.parent / "brainTemplates" / "Conte69.L.inflated.32k_fs_LR.surf.gii",
                   "/users/4/coffm049/papers/brainTemplates/Conte69.L.inflated.32k_fs_LR.surf.gii")
 SURF_R = _resolve(ROOT.parent / "brainTemplates" / "Conte69.R.inflated.32k_fs_LR.surf.gii",
                   "/users/4/coffm049/papers/brainTemplates/Conte69.R.inflated.32k_fs_LR.surf.gii")
+
+def _geodesic_for_pair(atlas, i, j, centroids, centroid_vertex, geo_cache):
+    """Compute geodesic distance for parcels i,j (0-indexed) via wb_command if available."""
+    if geo_cache is None or not geo_cache.get("has_wb"):
+        return np.nan
+    # Only same-hemisphere geodesic is meaningful
+    hemi_i, vi = centroid_vertex.get(i+1, (None, -1))
+    hemi_j, vj = centroid_vertex.get(j+1, (None, -1))
+    if hemi_i is None or hemi_j is None or hemi_i != hemi_j or vi < 0 or vj < 0:
+        return np.nan
+    surf = geo_cache["surf_l"] if hemi_i == "L" else geo_cache["surf_r"]
+    # Cache key: (hemi, vi)
+    cache_key = (hemi_i, vi)
+    if cache_key not in geo_cache["cache"]:
+        # Run wb_command for this source vertex
+        tmpdir = geo_cache["tmpdir"]
+        out_metric = tmpdir / f"geodesic_{atlas}_{hemi_i}_{vi}.func.gii"
+        # Also need a dscalar for output? Use metric
+        # wb_command -surface-geodesic-distance <surf> <vertex> <out>
+        # On some versions, need -borders or -limit
+        try:
+            # Use midthickness if available, else inflated
+            cmd = ["wb_command", "-surface-geodesic-distance", str(surf), str(vi), str(out_metric)]
+            # print(f"  wb_command: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, timeout=30)
+            if result.returncode != 0:
+                # Try alternative: -surface-geodesic-distance with -borders
+                # For now, just fail and return nan
+                geo_cache["cache"][cache_key] = None
+                return np.nan
+            # Read the metric file (contains distance per vertex)
+            # The metric is a func.gii with one column, we can read via nibabel
+            try:
+                metric = nib.load(str(out_metric))
+                # func.gii has darrays
+                data = metric.darrays[0].data
+                geo_cache["cache"][cache_key] = np.array(data, dtype=float)
+            except Exception as e:
+                geo_cache["cache"][cache_key] = None
+                return np.nan
+        except Exception as e:
+            geo_cache["cache"][cache_key] = None
+            return np.nan
+    dist_map = geo_cache["cache"].get(cache_key)
+    if dist_map is None or vj >= len(dist_map):
+        return np.nan
+    return float(dist_map[vj])
 
 wide=pd.read_csv(WIDE)
 rows=[]
@@ -214,9 +265,9 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
     else:
         dlabel=find_proba_dlabel(N)
         networks=load_proba_networks(dlabel, N)
-    centroids=parcel_centroids(dlabel, N, SURF_L, SURF_R)
-    # Try geodesic (will fallback to None)
-    geo=geodesic_distances_via_wb(SURF_L, SURF_R, centroids, networks)
+    centroids, centroid_vertex = parcel_centroids(dlabel, N, SURF_L, SURF_R)
+    # Try geodesic (will fallback to None) — now returns cache dict
+    geo_cache=geodesic_distances_via_wb(SURF_L, SURF_R, centroids, centroid_vertex)
     for method, col in [("Twin","Twin_h2"), ("AdjHE-RE", f"h2_{atlas}_AdjHE_RE")]:
         if col not in wide.columns:
             alt=col.replace("probaConns","proba")
@@ -238,8 +289,13 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
             c1=centroids.get(ii+1, np.array([np.nan,np.nan,np.nan]))
             c2=centroids.get(jj+1, np.array([np.nan,np.nan,np.nan]))
             euclid=np.linalg.norm(c1-c2) if np.all(np.isfinite(c1)) and np.all(np.isfinite(c2)) else np.nan
-            # geodesic placeholder
+            # geodesic via wb_command if available and same hemisphere
             geod=np.nan
+            if geo_cache is not None:
+                try:
+                    geod=_geodesic_for_pair(atlas, ii, jj, centroids, centroid_vertex, geo_cache)
+                except:
+                    geod=np.nan
             same=networks[ii]==networks[jj] and networks[ii] not in ("NA","SUB","???")
             rows.append({"atlas": atlas, "method": method, "pheno": pheno, "i": ii, "j": jj,
                          "h2": float(h2), "euclidean_dist": float(euclid) if np.isfinite(euclid) else np.nan,
