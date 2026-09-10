@@ -48,15 +48,24 @@ filter_n0 <- function(df) {
 }
 ```
 
+<style>
+/* Keep wide tables inside slides: smaller type, horizontal scroll, one header rule */
+.reveal .cell-output-display { overflow-x: auto; max-width: 100%; }
+.reveal .cell-output-display table { margin-left: auto; margin-right: auto; border-collapse: collapse; font-size: 0.62em; white-space: nowrap; }
+.reveal .cell-output-display thead th { border-bottom: 2px solid #444; }
+.reveal .cell-output-display tbody td, .reveal .cell-output-display tbody th { border-bottom: none; }
+.reveal .cell-output-display caption { font-size: 1.1em; white-space: normal; }
+</style>
+
 # Summary {.scrollable style="text-align:center;"}
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:left; font-size:1.15em; line-height:1.6;"}
 
-- **Brain wiring is heritable:** Both twin and DNA-based (SNP) estimates show heritability for functional connections (`Gordon`/`ProbaConns`) and for network surface area, but DNA captures only ~30% of twin heritability on average.
-- **Networks differ:** Some systems (e.g., `DMN`, `VIS`, `DAN`) are more heritable than others, and the pattern is similar for `Gordon` and `ProbaConns`.
-- **Total brain size matters for surface area:** Controlling for total surface area (`w_total`) lowers heritability and changes which networks look most heritable.
-- **Surface vs. wiring are weakly linked:** How heritable a network's surface area is only weakly predicts how heritable its connections are.
-- **Methods agree:** Twin and SNP (`AdjHE-RE`) estimates are correlated (`Pearson R` ~0.6–0.8 per phenotype set), supporting the SNP findings.
+- **FC heritability is low but concentrated within networks:** median SNP h² is just 0.024 (Gordon); Twin median is 0.177 within vs 0.119 across networks.
+- **Surface area peaks higher:** without total-surface control, SA Twin mean h² is 0.177, reaching ~0.401 in MTL and VIS.
+- **Twin–SNP gap:** Gordon mean h² is 0.129 (Twin) vs 0.053 (SNP) — the classic missing-heritability pattern.
+- **Distance decay flips by context:** Gordon Twin h² correlates negatively with distance across networks (R = −0.104) but positively within networks (R = 0.103).
+- **Zero-heritability connections are common:** 14.1% of across- and 7.9% of within-network connections sit at zero (h² ≤ 1e-9, Gordon Twin).
 
 :::
 
@@ -265,16 +274,6 @@ if (length(wcols)>0) {
   if (file.exists(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"))) {
     kable(filter_n0(read_csv(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"), show_col_types=FALSE)), caption="SA w_total vs wo_total R²")
   }
-}
-```
-
-```{r sa-wtotal-corr}
-if (file.exists(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"))) {
-  r2 <- read_csv(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"), show_col_types=FALSE)
-  if ("n" %in% names(r2)) r2 <- r2 %>% filter(n != 0)
-  # Only Pearson R per user (remove Spearman/R2)
-  r2 <- r2 %>% select(any_of(c("Set","Method","n","Pearson_r"))) %>% mutate(Pearson_r = round(Pearson_r, 3))
-  kable(filter_n0(r2), caption="SA w_total vs wo_total — Pearson R")
 }
 ```
 

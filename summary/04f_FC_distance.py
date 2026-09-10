@@ -320,11 +320,13 @@ import matplotlib.pyplot as plt
 ZERO_EPS = 1e-9
 N_BINS = 25
 
-def _binned_curve(dist, h2, n_bins=N_BINS):
+def _binned_curve(dist, h2, n_bins=N_BINS, min_bin=8):
     m = np.isfinite(dist) & np.isfinite(h2)
     dist, h2 = np.asarray(dist)[m], np.asarray(h2)[m]
-    if len(dist) < 50:
+    if len(dist) < 20:
         return None
+    # Shrink bin count for small groups (e.g. ProbaConns within ~261 edges)
+    n_bins = max(5, min(n_bins, len(dist) // min_bin))
     qs = np.linspace(0, 1, n_bins + 1)
     edges = np.quantile(dist, qs)
     edges = np.unique(edges)
@@ -334,37 +336,45 @@ def _binned_curve(dist, h2, n_bins=N_BINS):
     out = {"x": [], "med": [], "q25": [], "q75": [], "med_nz": [], "p_zero": [], "n": []}
     for b in range(len(edges) - 1):
         v = h2[idx == b]
-        if len(v) < 10:
+        if len(v) < min_bin:
             continue
         out["x"].append(float(np.median(dist[idx == b])))
         out["med"].append(float(np.median(v)))
         out["q25"].append(float(np.percentile(v, 25)))
         out["q75"].append(float(np.percentile(v, 75)))
         nz = v[v > ZERO_EPS]
-        out["med_nz"].append(float(np.median(nz)) if len(nz) >= 10 else np.nan)
+        out["med_nz"].append(float(np.median(nz)) if len(nz) >= 5 else np.nan)
         out["p_zero"].append(float(np.mean(v <= ZERO_EPS)))
         out["n"].append(int(len(v)))
+    if len(out["x"]) < 2:
+        return None
     return {k: np.array(v) for k, v in out.items()}
 
 def _plot_dist(ax, dist_all, h2_all, same_all, xlabel, color_within="#d62728", color_across="#1f77b4"):
     plot_df = pd.DataFrame({"d": np.asarray(dist_all), "h": np.asarray(h2_all),
                             "s": np.asarray(same_all)}).dropna()
+    info = {}
     if plot_df.empty:
-        return
+        return info
     show = plot_df if len(plot_df) <= 20000 else plot_df.sample(20000, random_state=0)
-    ax.scatter(show["d"], show["h"], s=1, alpha=0.15, c="grey", rasterized=True)
+    ax.scatter(show["d"], show["h"], s=1, alpha=0.15, c="grey", rasterized=True, zorder=1)
     for label, grp, col in [("within (same net)", plot_df[plot_df["s"] == True], color_within),
                             ("across (diff net)", plot_df[plot_df["s"] == False], color_across)]:
         c = _binned_curve(grp["d"].values, grp["h"].values)
+        n_pts = 0 if c is None else len(c["x"])
+        n_nz = 0 if c is None else int(np.isfinite(c["med_nz"]).sum())
+        info[label] = (int(len(grp)), n_pts, n_nz)
         if c is None:
             continue
-        ax.fill_between(c["x"], c["q25"], c["q75"], color=col, alpha=0.15, step="mid")
-        ax.plot(c["x"], c["med"], color=col, lw=2, label=f"{label} median (all)")
-        ax.plot(c["x"], c["med_nz"], color=col, lw=1.2, ls="--", label=f"{label} median h2>0")
+        ax.fill_between(c["x"], c["q25"], c["q75"], color=col, alpha=0.15, step="mid", zorder=2)
+        ax.plot(c["x"], c["med"], color=col, lw=2.5, zorder=5, label=f"{label} median (all)")
+        if n_nz >= 2:
+            ax.plot(c["x"], c["med_nz"], color=col, lw=1.4, ls="--", zorder=4, label=f"{label} median h2>0")
     ax.set_xlabel(xlabel)
     ax.set_ylabel(r"Heritability ($h^2$)")
     ax.set_ylim(0, 1)
     ax.legend(fontsize=7, loc="upper right", framealpha=0.8)
+    return info
 
 for atlas in ["gordon","probaConns"]:
     for method in ["Twin","AdjHE-RE"]:
@@ -373,8 +383,9 @@ for atlas in ["gordon","probaConns"]:
             continue
         pzero = float(np.mean(sub["h2"].values <= ZERO_EPS))
         fig, ax=plt.subplots(figsize=(5,4))
-        _plot_dist(ax, sub["euclidean_dist"].values, sub["h2"].values, sub["same_network"].values,
+        info = _plot_dist(ax, sub["euclidean_dist"].values, sub["h2"].values, sub["same_network"].values,
                    "Euclidean centroid distance (mm)")
+        print(f"  [{atlas} {method}] euclid curves (n_edges, n_bins, n_bins_nz): {info}")
         ax.text(0.02, 0.96, f"zero h2: {100*pzero:.1f}% (<=1e-9)", transform=ax.transAxes,
                 fontsize=7, va="top", ha="left", bbox=dict(fc="white", ec="none", alpha=0.7))
         # No title per publication
@@ -386,8 +397,9 @@ for atlas in ["gordon","probaConns"]:
         # Also geodesic if available (currently all NaN, skip)
         if sub["geodesic_dist"].notna().sum()>10:
             fig, ax=plt.subplots(figsize=(5,4))
-            _plot_dist(ax, sub["geodesic_dist"].values, sub["h2"].values, sub["same_network"].values,
-                       "Geodesic distance (mm via wb_command)", color_within="#ff7f0e", color_across="#9467bd")
+            info_g = _plot_dist(ax, sub["geodesic_dist"].values, sub["h2"].values, sub["same_network"].values,
+                       "Geodesic distance (mm)", color_within="#ff7f0e", color_across="#9467bd")
+            print(f"  [{atlas} {method}] geodesic curves (n_edges, n_bins, n_bins_nz): {info_g}")
             pzero_g = float(np.mean(sub.dropna(subset=["geodesic_dist"])["h2"].values <= ZERO_EPS))
             ax.text(0.02, 0.96, f"zero h2: {100*pzero_g:.1f}% (<=1e-9)", transform=ax.transAxes,
                     fontsize=7, va="top", ha="left", bbox=dict(fc="white", ec="none", alpha=0.7))
