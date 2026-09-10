@@ -308,12 +308,12 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
                 # Simpler: mean of all outside edges incident to this network's parcels
                 fc_outside=np.nanmean(outside_vals) if len(outside_vals)>0 else np.nan
                 rows.append((net, sa_h2, fc_mean, fc_p90, fc_within, fc_outside))
-        df_net=pd.DataFrame(rows, columns=["network","sa_h2","fc_mean","fc_p90","fc_within","fc_outside"]).dropna()
-        print(f"[{atlas} {method} {sa_type}] df_net n={len(df_net)} (from {len(rows)} networks_keep={len(networks_keep)})")
-        if len(df_net) < 3:
-            continue
-        # Correlations
-        for metric in ["fc_mean","fc_p90","fc_within","fc_outside"]:
+            df_net=pd.DataFrame(rows, columns=["network","sa_h2","fc_mean","fc_p90","fc_within","fc_outside"]).dropna()
+            print(f"[{atlas} {method} {sa_type}] df_net n={len(df_net)} (from {len(rows)} networks_keep={len(networks_keep)})")
+            if len(df_net) < 3:
+                continue
+            # Correlations
+            for metric in ["fc_mean","fc_p90","fc_within","fc_outside"]:
                 x=df_net["sa_h2"].values
                 y=df_net[metric].values
                 # Pearson and Spearman
