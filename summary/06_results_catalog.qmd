@@ -119,7 +119,7 @@ if (nrow(wide)>0) {
     group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>% filter(n != 0) %>%
     mutate(across(where(is.numeric), ~round(.x,3)))
   kable(filter_n0(fivenum_gordon), caption="Gordon — h2 five-number summary (Twin vs AdjHE-RE, 30 PCs)")
-} else { cat("mash_twin_wide.csv not found — run 01_compare_mash_twin.R"); cat("\n") }
+} else { cat("Data not available."); cat("\n") }
 ```
 
 ```{r gordon-corr}
@@ -148,7 +148,7 @@ if (file.exists(wo_path)) {
   # Keep only p10/p50/p90 + mean for publication (remove Spearman/R2 already)
   kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), caption="Gordon — Within vs outside network h2 (10th, 50th/median, 90th percentiles, per Twin vs AdjHE-RE)")
 } else {
-  cat("Run `python summary/04e_within_outside.py` to generate within_outside_h2.csv\n")
+  cat("Data not available.\n")
 }
 ```
 
@@ -231,7 +231,7 @@ if (file.exists(wo_path)) {
   wo <- wo %>% filter(n != 0) %>% mutate(across(where(is.numeric), ~round(.x, 3)))
   kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), caption="ProbaConns — Within vs outside network h2 (10th, 50th/median, 90th percentiles, per Twin vs AdjHE-RE)")
 } else {
-  cat("Run `python summary/04e_within_outside.py` to generate within_outside_h2.csv\n")
+  cat("Data not available.\n")
 }
 ```
 
@@ -243,7 +243,7 @@ if (file.exists(wo_path)) {
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
-![SA Surface Area — Twin vs AdjHE-RE (w_total, total surface controlled), geom_col + position_dodge2, 14 networks (excl. 4/6/17 null)](../results/summary/plots/SA_w_total_horizontal_barplot.png){width="100%" style="object-fit:contain; max-height:720px;"}
+![SA Surface Area — Twin vs AdjHE-RE (w_total, total surface controlled), 14 networks](../results/summary/plots/SA_w_total_horizontal_barplot.png){width="100%" style="object-fit:contain; max-height:720px;"}
 
 :::
 
@@ -259,11 +259,11 @@ if (length(wcols)>0) {
     mutate(Method = gsub("h2_SA_|_w_total", "", Method))
   fivenum_saw <- sa_w %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
     mutate(across(where(is.numeric), ~round(.x,3)))
-  kable(filter_n0(fivenum_saw), caption="SA w_total — h2 five-number summary (if w_total columns present)")
+  kable(filter_n0(fivenum_saw), caption="SA w_total — h2 five-number summary")
 } else {
-  cat("No w_total columns in mash_twin_wide.csv yet — run w_total SLURMs and rebuild 01_compare_mash_twin.R with w_total pattern.\n")
+  cat("Data not available.\n")
   if (file.exists(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"))) {
-    kable(filter_n0(read_csv(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"), show_col_types=FALSE)), caption="SA w_total vs wo_total R² (from 04_compare_r2.R)")
+    kable(filter_n0(read_csv(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"), show_col_types=FALSE)), caption="SA w_total vs wo_total R²")
   }
 }
 ```
@@ -291,7 +291,7 @@ if (!file.exists(corr_path)) corr_path <- file.path("results", "summary", "sa_fc
 if (file.exists(corr_path)) {
   corr_sa_fc <- tryCatch(read_csv(corr_path, show_col_types = FALSE), error = function(e) tibble())
   if (nrow(corr_sa_fc) == 0 || !"pearson_r" %in% names(corr_sa_fc)) {
-    cat("sa_fc_h2_correlation.csv is empty (0 rows or missing pearson_r). Re-run `python summary/04b_h2_SA_correlation.py` and check /tmp/04b.log for df_net n=.\n")
+    cat("Data not available.\n")
   } else {
     # Wide format: one column per method (Twin, AdjHE-RE), drop n_networks
     if ("n_networks" %in% names(corr_sa_fc)) corr_sa_fc <- corr_sa_fc %>% filter(n_networks != 0)
@@ -306,7 +306,7 @@ if (file.exists(corr_path)) {
     kable(corr_wide, caption="SA-FC h2 by system: Pearson R of FC parcel-mean / p90 / within / outside h2 vs SA h2 (14 nets; rows = atlas × metric × SA type, columns = Twin vs AdjHE-RE)")
   }
 } else {
-  cat("Run `python summary/04b_h2_SA_correlation.py` to generate sa_fc_h2_correlation.csv\n")
+  cat("Data not available.\n")
 }
 ```
 
@@ -333,10 +333,10 @@ if (file.exists(detail_path)) {
       print(p)
     }
   } else {
-    cat("sa_fc_per_network.csv empty — re-run `python summary/04b_h2_SA_correlation.py`.\n")
+    cat("Data not available.\n")
   }
 } else {
-  cat("Run `python summary/04b_h2_SA_correlation.py` to generate sa_fc_per_network.csv for within/outside scatter.\n")
+  cat("Data not available.\n")
 }
 ```
 
@@ -366,7 +366,7 @@ for (p in c(file.path(ROOT,"results/summary/plots/SA_horizontal_barplot_stats.cs
 
 :::
 
-*Heatmaps via `summary/04c_FC_heatmap.py` — `M_ordered = M[np.ix_(order,order)]` where `order = argsort(networks)` (same as circular), `red_yellow` cmap `vmin=0 vmax=1.0` (per user, was 0–0.5), network block boundaries at `cumsum(counts)`.*
+*Parcels ordered by network; red low → yellow high, scale 0–1; block boundaries mark network blocks.*
 
 ```{r heatmap-stats}
 for (p in c(file.path(ROOT,"results/summary/plots/heatmap_gordon_Twin_stats.csv"),
@@ -395,9 +395,9 @@ for (p in c(file.path(ROOT,"results/summary/plots/heatmap_gordon_Twin_stats.csv"
 
 :::
 
-*Per-edge scatter via `summary/04f_FC_distance.py` — Euclidean centroid distance (mm, Conte69) vs `h²`, `ylim 0–1`. Grey points (subsampled); solid = quantile-binned median of ALL edges (robust to zero-inflation), dashed = binned median of `h²>1e-9` (non-zero mass), shaded = binned IQR — red within-network, blue across-network (hurdle-style visual). Zero-h² % annotated per panel.*
+*Euclidean centroid distance (mm) vs `h²`, `ylim 0–1`. Grey points (subsampled); solid = distance-binned median of all edges (robust to zero-inflation), dashed = binned median of `h²>1e-9` (non-zero mass), shaded = binned interquartile range — red within-network, blue across-network. Zero-`h²` % annotated per panel.*
 
-## FC h2 vs Distance — Geodesic via wb_command (same-hemisphere) {.scrollable style="text-align:center;"}
+## FC h2 vs Distance — Geodesic (same-hemisphere) {.scrollable style="text-align:center;"}
 
 ::: {layout="[[1,1],[1,1]]" style="text-align:center;"}
 
@@ -411,7 +411,7 @@ for (p in c(file.path(ROOT,"results/summary/plots/heatmap_gordon_Twin_stats.csv"
 
 :::
 
-*Geodesic via `wb_command -surface-geodesic-distance` from parcel centroid vertices; cross-hemisphere pairs `NA`. Same zero-aware smooths: solid = binned median (all), dashed = median of `h²>1e-9`.*
+*Geodesic distance along the cortical surface (same-hemisphere pairs only; cross-hemisphere pairs excluded). Same smooths: solid = binned median (all), dashed = median of `h²>1e-9`.*
 
 ```{r fc-dist-within-across}
 # h2 vs distance, split within (same_network TRUE) vs across (FALSE) — per atlas × method
@@ -440,10 +440,10 @@ if (file.exists(dist_path)) {
       mutate(across(where(is.numeric), ~round(.x, 3)))
     kable(filter_n0(dist_sum), caption="FC h2 vs distance — within (same network) vs across: n, n_zero/pct_zero (h2<=1e-9), mean/p10/p50/p90 h2, median of h2>1e-9, mean Euclidean, Pearson R(h2, Euclidean) and R(h2, geodesic). Pearson is attenuated by zero-inflation — compare median_nz vs p50.")
   } else {
-    cat("fc_distance_per_edge.csv empty — re-run `python summary/04f_FC_distance.py` (needs wb_command module for geodesic).\n")
+    cat("Data not available.\n")
   }
 } else {
-  cat("Run `python summary/04f_FC_distance.py` to generate fc_distance_per_edge.csv\n")
+  cat("Data not available.\n")
 }
 ```
 
@@ -466,7 +466,7 @@ if (file.exists(pct_path)) {
   kable(pct, caption="Percent SNP heritability of Twin estimates — 100 × AdjHE-RE / Twin per phenotype (per Set: mean ± SE, median, SD, q1/q3, min/max, n_valid; SA 14 nets excl. 4/6/17, FCs filtered Twin_h2>0.001, MASH 0–1.2)")
   cat("\n\n*Interpretation: `mean_pct` = mean of per-phenotype `pct`; `se_pct = sd / sqrt(n_valid)`; `median_pct` robust to outliers (Twin near 0 inflates mean). `ratio_of_means_pct = 100 × mean(MASH)/mean(Twin)` is also shown.*\n")
 } else {
-  cat("Run `Rscript summary/04d_percent_SNP.R` to generate percent_SNP_explained.csv\n")
+  cat("Data not available.\n")
 }
 ```
 
@@ -487,7 +487,7 @@ if (file.exists(pct_detail_path)) {
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
-![SA Surface Area — Twin vs AdjHE-RE (wo_total), geom_col + position_dodge2, 14 networks (excludes 4/6/17 null) ordered by Twin h2](../results/summary/plots/SA_horizontal_barplot.png){width="100%" style="object-fit:contain; max-height:720px;"}
+![SA Surface Area — Twin vs AdjHE-RE (wo_total), 14 networks ordered by Twin h2](../results/summary/plots/SA_horizontal_barplot.png){width="100%" style="object-fit:contain; max-height:720px;"}
 
 :::
 
@@ -501,7 +501,7 @@ if (nrow(wide)>0) {
     mutate(Method = recode(Method, Twin_h2="Twin", h2_SA_AdjHE_RE="AdjHE-RE"))
   fivenum_sa <- sa_long %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
     mutate(across(where(is.numeric), ~round(.x,3)))
-  kable(filter_n0(fivenum_sa), caption="SA (wo_total, 14 networks excl. 4/6/17 null) — h2 five-number summary")
+  kable(filter_n0(fivenum_sa), caption="SA (wo_total, 14 networks) — h2 five-number summary")
 }
 ```
 
@@ -524,27 +524,19 @@ if (file.exists(r2_path)) {
   r2 <- r2 %>% select(any_of(c("Set","Method","n","Pearson_r"))) %>% mutate(Pearson_r = round(Pearson_r, 3))
   kable(filter_n0(r2), caption="SA w_total vs wo_total — Pearson R (per Method)")
 } else {
-  cat("Run `Rscript summary/04_compare_r2.R` to generate r2_sa_w_vs_wo_total.csv\n")
+  cat("Data not available.\n")
 }
 ```
 
 ::: {style="overflow-y:auto; max-height:720px; text-align:center;"}
 
-![SA w_total vs wo_total scatter — Twin vs AdjHE-RE, red dashed y=x, blue LM, R² annotated](../results/summary/plots/r2_sa_w_vs_wo.png){width="95%" style="object-fit:contain; max-height:640px;"}
+![SA w_total vs wo_total scatter — Twin vs AdjHE-RE, dashed identity line with fitted line](../results/summary/plots/r2_sa_w_vs_wo.png){width="95%" style="object-fit:contain; max-height:640px;"}
 
 :::
 
-*Scatter `wo_total (x)` vs `w_total (y)` per Method; `R²` from `04_compare_r2.R: r2_stats(wo_total, w_total)`.*
+*Scatter of estimates without total-surface control (`x`) vs with control (`y`), per method.*
 
 ```{r sa-w-vs-wo-detail-appendix}
-# Optional per-network detail: wo_total vs w_total h2 for SA (from 04d percent or direct SA files)
-# Show correlation between SA w_total and wo_total h2 by network (from 04d or r2_sa)
-pct_detail_path <- file.path(ROOT, "results/summary/percent_SNP_explained_per_pheno.csv")
-if (file.exists(r2_path)) {
-  # Also show per-network h2 values for w_total vs wo_total if available via r2_sa_w_vs_wo detail
-  # For brevity, just show the r2 table above; detail can be inspected via r2_sa_w_vs_wo.csv
-}
+# Per-network w_total vs wo_total detail (rendered above)
 ```
 
-
-Twin `#1f77b4` vs AdjHE-RE `#ff7f0e`
