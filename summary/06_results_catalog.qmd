@@ -27,7 +27,7 @@ library(knitr)
 ROOT <- "/users/4/coffm049/papers/functionalBrainHerit"
 # For local render (Windows) the same relative paths work; ROOT not needed for images
 WIDE <- file.path(ROOT, "results/summary/mash_twin_wide.csv")
-wide <- tryCatch(read_csv(WIDE, show_col_types = FALSE), error = function(e) tibble())
+wide <- read_csv(WIDE, show_col_types = FALSE)
 
 fivenum_tbl <- function(x) {
   x <- x[is.finite(x)]
@@ -61,11 +61,11 @@ filter_n0 <- function(df) {
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:left; font-size:1.15em; line-height:1.6;"}
 
-- **FC heritability is low but concentrated within networks:** median SNP h² is just 0.024 (Gordon); Twin median is 0.177 within vs 0.119 across networks.
-- **Surface area peaks higher:** without total-surface control, SA Twin mean h² is 0.177, reaching ~0.401 in MTL and VIS.
-- **Twin–SNP gap:** Gordon mean h² is 0.129 (Twin) vs 0.053 (SNP) — the classic missing-heritability pattern.
-- **Distance decay flips by context:** Gordon Twin h² correlates negatively with distance across networks (R = −0.104) but positively within networks (R = 0.103).
-- **Zero-heritability connections are common:** 14.1% of across- and 7.9% of within-network connections sit at zero (h² ≤ 1e-9, Gordon Twin).
+- **low FC heritability mostly within networks:** median SNP h2 0.024 (Gordon); Twin median is 0.177 within vs 0.119 across networks
+- **Surface area h2 higher:** SA Twin mean h² is 0.177, reaching ~0.401 in MTL and VIS
+- **Twin–SNP gap:** Gordon mean h2 is 0.129 (Twin) vs 0.053 (SNP) — standard missing heritability gap
+- **h2 changes with distance:** Gordon Twin h2 decreases with distance across networks ($\rho$ = −0.104) but increases within networks (R = 0.103).
+- **Zero-heritability common:** 14.1% of across- and 7.9% of within-network connections sit at zero (h2 ≤ 1e-9, Gordon Twin).
 
 :::
 
@@ -116,49 +116,36 @@ filter_n0 <- function(df) {
 ```{r gordon-stats}
 #| fig-width: 14
 #| fig-height: 5
-if (nrow(wide)>0) {
-  gordon_wide <- wide %>% filter(Set=="gordon")
-  # Twin vs AdjHE-RE comparison for fivenum
-  gordon_long <- gordon_wide %>%
-    select(Pheno, Twin_h2, h2_gordon_AdjHE_RE) %>%
-    pivot_longer(c(Twin_h2, h2_gordon_AdjHE_RE), names_to="Method", values_to="h2") %>%
-    mutate(Method = recode(Method, Twin_h2="Twin", h2_gordon_AdjHE_RE="AdjHE-RE"))
-  # fivenum per Method — filter n=0 (per user)
-  fivenum_gordon <- gordon_long %>%
-    group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>% filter(n != 0) %>%
-    mutate(across(where(is.numeric), ~round(.x,3)))
-  kable(filter_n0(fivenum_gordon), caption="Gordon — h2 five-number summary (Twin vs AdjHE-RE, 30 PCs)")
-} else { cat("Data not available."); cat("\n") }
+
+gordon_wide <- wide %>% filter(Set=="gordon")
+# Twin vs AdjHE-RE comparison for fivenum
+gordon_long <- gordon_wide %>%
+  select(Pheno, Twin_h2, h2_gordon_AdjHE_RE) %>%
+  pivot_longer(c(Twin_h2, h2_gordon_AdjHE_RE), names_to="Method", values_to="h2") %>%
+  mutate(Method = recode(Method, Twin_h2="Twin", h2_gordon_AdjHE_RE="AdjHE-RE"))
+# fivenum per Method — filter n=0 (per user)
+fivenum_gordon <- gordon_long %>%
+  group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>% filter(n != 0) %>%
+  mutate(across(where(is.numeric), ~round(.x,3)))
+kable(filter_n0(fivenum_gordon), caption="Gordon — h2 five-number summary (Twin vs AdjHE-RE, 30 PCs)")
 ```
 
 ```{r gordon-corr}
-if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
-  corr <- read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="gordon")
-  if ("n" %in% names(corr)) corr <- corr %>% filter(n != 0)
-  # Only Pearson R per user (remove Spearman/R2)
-  corr <- corr %>% select(any_of(c("Set","MashMethod","n","Pearson_r"))) %>% mutate(Pearson_r = round(Pearson_r, 3))
-  kable(filter_n0(corr), caption="Gordon — Twin vs MASH Pearson R")
-} else if (nrow(wide)>0) {
-  tmp <- gordon_wide %>% select(Twin_h2, h2_gordon_AdjHE_RE) %>% drop_na()
-  if (nrow(tmp)>2) {
-    kable(tibble(Set="gordon", MashMethod="h2_gordon_AdjHE_RE", n=nrow(tmp), Pearson_r=round(cor(tmp$Twin_h2, tmp$h2_gordon_AdjHE_RE),3)) %>% filter(n != 0), caption="Gordon — Twin vs AdjHE-RE Pearson R")
-  }
-}
+corr <- read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="gordon")
+corr <- corr %>% filter(n != 0)
+# Only Pearson R per user (remove Spearman/R2)
+corr <- corr %>% select(any_of(c("Set","MashMethod","n","Pearson_r"))) %>% mutate(Pearson_r = round(Pearson_r, 3))
+kable(filter_n0(corr), caption="Gordon — Twin vs MASH Pearson R")
 ```
 
 ### Gordon — Within vs Outside Network h2 (10th, 50th, 90th)
 
 ```{r gordon-within-outside}
 wo_path <- file.path(ROOT, "results/summary/within_outside_h2.csv")
-if (!file.exists(wo_path)) wo_path <- file.path("results", "summary", "within_outside_h2.csv")
-if (file.exists(wo_path)) {
-  wo <- read_csv(wo_path, show_col_types=FALSE) %>% filter(atlas=="gordon")
-  wo <- wo %>% filter(n != 0) %>% mutate(across(where(is.numeric), ~round(.x, 3)))
-  # Keep only p10/p50/p90 + mean for publication (remove Spearman/R2 already)
-  kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), caption="Gordon — Within vs outside network h2 (10th, 50th/median, 90th percentiles, per Twin vs AdjHE-RE)")
-} else {
-  cat("Data not available.\n")
-}
+wo <- read_csv(wo_path, show_col_types=FALSE) %>% filter(atlas=="gordon")
+wo <- wo %>% filter(n != 0) %>% mutate(across(where(is.numeric), ~round(.x, 3)))
+# Keep only p10/p50/p90 + mean for publication (remove Spearman/R2 already)
+kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), caption="Gordon — Within vs outside network h2 (10th, 50th/median, 90th percentiles, per Twin vs AdjHE-RE)")
 ```
 
 ---
@@ -209,39 +196,30 @@ if (file.exists(wo_path)) {
 ## ProbaConns — Five-Number Summaries & Correlations
 
 ```{r proba-stats}
-if (nrow(wide)>0) {
-  proba_long <- wide %>% filter(Set=="probaConns") %>%
-    select(Pheno, Twin_h2, h2_proba_AdjHE_RE) %>%
-    pivot_longer(c(Twin_h2, h2_proba_AdjHE_RE), names_to="Method", values_to="h2") %>%
-    mutate(Method = recode(Method, Twin_h2="Twin", h2_proba_AdjHE_RE="AdjHE-RE"))
-  fivenum_proba <- proba_long %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
-    mutate(across(where(is.numeric), ~round(.x,3)))
-  kable(filter_n0(fivenum_proba), caption="ProbaConns — h2 five-number summary")
-}
+proba_long <- wide %>% filter(Set=="probaConns") %>%
+  select(Pheno, Twin_h2, h2_proba_AdjHE_RE) %>%
+  pivot_longer(c(Twin_h2, h2_proba_AdjHE_RE), names_to="Method", values_to="h2") %>%
+  mutate(Method = recode(Method, Twin_h2="Twin", h2_proba_AdjHE_RE="AdjHE-RE"))
+fivenum_proba <- proba_long %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
+  mutate(across(where(is.numeric), ~round(.x,3)))
+kable(filter_n0(fivenum_proba), caption="ProbaConns — h2 five-number summary")
 ```
 
 ```{r proba-corr}
-if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
-  corr <- read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="probaConns")
-  # Only Pearson R per user (remove Spearman/R2), filter n=0
-  if ("n" %in% names(corr)) corr <- corr %>% filter(n != 0)
-  corr <- corr %>% select(any_of(c("Set","MashMethod","n","Pearson_r"))) %>% mutate(Pearson_r = round(Pearson_r, 3))
-  kable(filter_n0(corr), caption="ProbaConns — Twin vs MASH Pearson R")
-}
+corr <- read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="probaConns")
+# Only Pearson R per user (remove Spearman/R2), filter n=0
+corr <- corr %>% filter(n != 0)
+corr <- corr %>% select(any_of(c("Set","MashMethod","n","Pearson_r"))) %>% mutate(Pearson_r = round(Pearson_r, 3))
+kable(filter_n0(corr), caption="ProbaConns — Twin vs MASH Pearson R")
 ```
 
 ### ProbaConns — Within vs Outside Network h2 (10th, 50th, 90th)
 
 ```{r proba-within-outside}
 wo_path <- file.path(ROOT, "results/summary/within_outside_h2.csv")
-if (!file.exists(wo_path)) wo_path <- file.path("results", "summary", "within_outside_h2.csv")
-if (file.exists(wo_path)) {
-  wo <- read_csv(wo_path, show_col_types=FALSE) %>% filter(atlas=="probaConns")
-  wo <- wo %>% filter(n != 0) %>% mutate(across(where(is.numeric), ~round(.x, 3)))
-  kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), caption="ProbaConns — Within vs outside network h2 (10th, 50th/median, 90th percentiles, per Twin vs AdjHE-RE)")
-} else {
-  cat("Data not available.\n")
-}
+wo <- read_csv(wo_path, show_col_types=FALSE) %>% filter(atlas=="probaConns")
+wo <- wo %>% filter(n != 0) %>% mutate(across(where(is.numeric), ~round(.x, 3)))
+kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), caption="ProbaConns — Within vs outside network h2 (10th, 50th/median, 90th percentiles, per Twin vs AdjHE-RE)")
 ```
 
 ---
@@ -259,22 +237,13 @@ if (file.exists(wo_path)) {
 ## SA w_total — Five-Number Summaries & Correlations
 
 ```{r sa-wtotal-stats}
-# Try w_total columns if 01_compare_mash_twin.R has been updated to include them;
-# otherwise this gracefully falls back to wo_total with a note.
 wcols <- grep("w_total", names(wide), value=TRUE)
-if (length(wcols)>0) {
-  sa_w <- wide %>% filter(Set=="SA") %>% select(Pheno, all_of(wcols), Twin_h2) %>%
-    pivot_longer(cols = all_of(wcols), names_to="Method", values_to="h2") %>%
-    mutate(Method = gsub("h2_SA_|_w_total", "", Method))
-  fivenum_saw <- sa_w %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
-    mutate(across(where(is.numeric), ~round(.x,3)))
-  kable(filter_n0(fivenum_saw), caption="SA w_total — h2 five-number summary")
-} else {
-  cat("Data not available.\n")
-  if (file.exists(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"))) {
-    kable(filter_n0(read_csv(file.path(ROOT,"results/summary/r2_sa_w_vs_wo_total.csv"), show_col_types=FALSE)), caption="SA w_total vs wo_total R²")
-  }
-}
+sa_w <- wide %>% filter(Set=="SA") %>% select(Pheno, all_of(wcols), Twin_h2) %>%
+  pivot_longer(cols = all_of(wcols), names_to="Method", values_to="h2") %>%
+  mutate(Method = gsub("h2_SA_|_w_total", "", Method))
+fivenum_saw <- sa_w %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
+  mutate(across(where(is.numeric), ~round(.x,3)))
+kable(filter_n0(fivenum_saw), caption="SA w_total — h2 five-number summary")
 ```
 
 ---
@@ -285,28 +254,18 @@ if (length(wcols)>0) {
 #| fig-width: 10
 #| fig-height: 5
 corr_path <- file.path(ROOT, "results/summary/sa_fc_h2_correlation.csv")
-# Fallback for Windows local render
-if (!file.exists(corr_path)) corr_path <- file.path("results", "summary", "sa_fc_h2_correlation.csv")
-if (file.exists(corr_path)) {
-  corr_sa_fc <- tryCatch(read_csv(corr_path, show_col_types = FALSE), error = function(e) tibble())
-  if (nrow(corr_sa_fc) == 0 || !"pearson_r" %in% names(corr_sa_fc)) {
-    cat("Data not available.\n")
-  } else {
-    # Wide format: one column per method (Twin, AdjHE-RE), drop n_networks
-    if ("n_networks" %in% names(corr_sa_fc)) corr_sa_fc <- corr_sa_fc %>% filter(n_networks != 0)
-    corr_wide <- corr_sa_fc %>%
-      select(any_of(c("atlas","method","metric","sa_type","pearson_r"))) %>%
-      mutate(pearson_r = round(pearson_r, 3)) %>%
-      pivot_wider(names_from = method, values_from = pearson_r) %>%
-      arrange(match(atlas, c("gordon","probaConns")), match(metric, c("fc_mean","fc_p90","fc_within","fc_outside")), sa_type)
-    # Order columns Twin then AdjHE-RE when both present
-    mcols <- intersect(c("Twin","AdjHE-RE"), names(corr_wide))
-    corr_wide <- corr_wide %>% select(any_of(c("atlas","metric","sa_type")), all_of(mcols))
-    kable(corr_wide, caption="SA-FC h2 by system: Pearson R of FC parcel-mean / p90 / within / outside h2 vs SA h2 (14 nets; rows = atlas × metric × SA type, columns = Twin vs AdjHE-RE)")
-  }
-} else {
-  cat("Data not available.\n")
-}
+corr_sa_fc <- read_csv(corr_path, show_col_types = FALSE)
+# Wide format: one column per method (Twin, AdjHE-RE), drop n_networks
+corr_sa_fc <- corr_sa_fc %>% filter(n_networks != 0)
+corr_wide <- corr_sa_fc %>%
+  select(any_of(c("atlas","method","metric","sa_type","pearson_r"))) %>%
+  mutate(pearson_r = round(pearson_r, 3)) %>%
+  pivot_wider(names_from = method, values_from = pearson_r) %>%
+  arrange(match(atlas, c("gordon","probaConns")), match(metric, c("fc_mean","fc_p90","fc_within","fc_outside")), sa_type)
+# Order columns Twin then AdjHE-RE when both present
+mcols <- intersect(c("Twin","AdjHE-RE"), names(corr_wide))
+corr_wide <- corr_wide %>% select(any_of(c("atlas","metric","sa_type")), all_of(mcols))
+kable(corr_wide, caption="SA-FC h2 by system: Pearson R of FC parcel-mean / p90 / within / outside h2 vs SA h2 (14 nets; rows = atlas × metric × SA type, columns = Twin vs AdjHE-RE)")
 ```
 
 ```{r sa-fc-scatter}
@@ -314,38 +273,24 @@ if (file.exists(corr_path)) {
 #| fig-height: 5
 # SA h2 (x) vs FC within-system / outside-system h2 (y) per network — within vs across w.r.t. SA
 detail_path <- file.path(ROOT, "results/summary/sa_fc_per_network.csv")
-if (!file.exists(detail_path)) detail_path <- file.path("results", "summary", "sa_fc_per_network.csv")
-if (file.exists(detail_path)) {
-  det <- tryCatch(read_csv(detail_path, show_col_types = FALSE), error = function(e) tibble())
-  if (nrow(det) > 0 && all(c("sa_h2","fc_within","fc_outside") %in% names(det))) {
-    det_long <- det %>% select(any_of(c("atlas","method","sa_type","network","sa_h2","fc_within","fc_outside"))) %>%
-      pivot_longer(c(fc_within, fc_outside), names_to = "metric", values_to = "fc_h2") %>%
-      mutate(metric = recode(metric, fc_within = "within-system", fc_outside = "outside-system")) %>%
-      filter(is.finite(sa_h2), is.finite(fc_h2))
-    if (nrow(det_long) > 0) {
-      p <- ggplot(det_long, aes(x = sa_h2, y = fc_h2, color = metric)) +
-        geom_point(size = 2, alpha = 0.8) +
-        geom_smooth(method = "lm", se = FALSE, linewidth = 0.6) +
-        facet_grid(method ~ atlas) +
-        labs(x = "SA h2 per network", y = "FC h2 per network", color = "FC edges") +
-        theme_minimal(base_size = 11)
-      print(p)
-    }
-  } else {
-    cat("Data not available.\n")
-  }
-} else {
-  cat("Data not available.\n")
-}
+det <- read_csv(detail_path, show_col_types = FALSE)
+det_long <- det %>% select(any_of(c("atlas","method","sa_type","network","sa_h2","fc_within","fc_outside"))) %>%
+  pivot_longer(c(fc_within, fc_outside), names_to = "metric", values_to = "fc_h2") %>%
+  mutate(metric = recode(metric, fc_within = "within-system", fc_outside = "outside-system")) %>%
+  filter(is.finite(sa_h2), is.finite(fc_h2))
+p <- ggplot(det_long, aes(x = sa_h2, y = fc_h2, color = metric)) +
+  geom_point(size = 2, alpha = 0.8) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 0.6) +
+  facet_grid(method ~ atlas) +
+  labs(x = "SA h2 per network", y = "FC h2 per network", color = "FC edges") +
+  theme_minimal(base_size = 11)
+print(p)
 ```
 
 ```{r sa-bar-stats}
-# Show SA barplot stats saved by 03_plot_sa_horizontal.R (instead of plot titles)
 for (p in c(file.path(ROOT,"results/summary/plots/SA_horizontal_barplot_stats.csv"),
             file.path(ROOT,"results/summary/plots/SA_w_total_horizontal_barplot_stats.csv"))) {
-  if (file.exists(p)) {
-    kable(filter_n0(read_csv(p, show_col_types=FALSE) %>% mutate(across(where(is.numeric), ~round(.x,3)))), caption=paste0("SA barplot stats: ", basename(p)))
-  }
+  kable(filter_n0(read_csv(p, show_col_types=FALSE) %>% mutate(across(where(is.numeric), ~round(.x,3)))), caption=paste0("SA barplot stats: ", basename(p)))
 }
 ```
 
@@ -372,9 +317,7 @@ for (p in c(file.path(ROOT,"results/summary/plots/heatmap_gordon_Twin_stats.csv"
             file.path(ROOT,"results/summary/plots/heatmap_gordon_AdjHERE_stats.csv"),
             file.path(ROOT,"results/summary/plots/heatmap_probaConns_Twin_stats.csv"),
             file.path(ROOT,"results/summary/plots/heatmap_probaConns_AdjHERE_stats.csv"))) {
-  if (file.exists(p)) {
-    kable(filter_n0(read_csv(p, show_col_types=FALSE) %>% mutate(across(where(is.numeric), ~round(.x,3)))), caption=paste0("Heatmap stats: ", basename(p)))
-  }
+  kable(filter_n0(read_csv(p, show_col_types=FALSE) %>% mutate(across(where(is.numeric), ~round(.x,3)))), caption=paste0("Heatmap stats: ", basename(p)))
 }
 ```
 
@@ -415,35 +358,26 @@ for (p in c(file.path(ROOT,"results/summary/plots/heatmap_gordon_Twin_stats.csv"
 ```{r fc-dist-within-across}
 # h2 vs distance, split within (same_network TRUE) vs across (FALSE) — per atlas × method
 dist_path <- file.path(ROOT, "results/summary/fc_distance_per_edge.csv")
-if (!file.exists(dist_path)) dist_path <- file.path("results", "summary", "fc_distance_per_edge.csv")
-if (file.exists(dist_path)) {
-  dd <- tryCatch(read_csv(dist_path, show_col_types = FALSE), error = function(e) tibble())
-  if (nrow(dd) > 0 && all(c("h2","euclidean_dist","same_network") %in% names(dd))) {
-    dd <- dd %>% mutate(group = if_else(same_network, "within", "across"))
-    dist_sum <- dd %>% group_by(atlas, method, group) %>%
-      summarise(
-        n = sum(is.finite(h2)),
-        n_zero = sum(h2 <= 1e-9, na.rm = TRUE),
-        pct_zero = 100 * mean(h2 <= 1e-9, na.rm = TRUE),
-        mean_h2 = mean(h2, na.rm = TRUE),
-        p10_h2 = quantile(h2, 0.10, na.rm = TRUE),
-        p50_h2 = quantile(h2, 0.50, na.rm = TRUE),
-        p90_h2 = quantile(h2, 0.90, na.rm = TRUE),
-        median_nz = suppressWarnings(median(h2[h2 > 1e-9], na.rm = TRUE)),
-        mean_euclid = mean(euclidean_dist, na.rm = TRUE),
-        pearson_h2_euclid = suppressWarnings(cor(h2, euclidean_dist, use = "pairwise.complete.obs")),
-        pearson_h2_geodesic = suppressWarnings(cor(h2, geodesic_dist, use = "pairwise.complete.obs")),
-        .groups = "drop"
-      ) %>%
-      filter(n != 0) %>%
-      mutate(across(where(is.numeric), ~round(.x, 3)))
-    kable(filter_n0(dist_sum), caption="FC h2 vs distance — within (same network) vs across: n, n_zero/pct_zero (h2<=1e-9), mean/p10/p50/p90 h2, median of h2>1e-9, mean Euclidean, Pearson R(h2, Euclidean) and R(h2, geodesic). Pearson is attenuated by zero-inflation — compare median_nz vs p50.")
-  } else {
-    cat("Data not available.\n")
-  }
-} else {
-  cat("Data not available.\n")
-}
+dd <- read_csv(dist_path, show_col_types = FALSE)
+dd <- dd %>% mutate(group = if_else(same_network, "within", "across"))
+dist_sum <- dd %>% group_by(atlas, method, group) %>%
+  summarise(
+    n = sum(is.finite(h2)),
+    n_zero = sum(h2 <= 1e-9, na.rm = TRUE),
+    pct_zero = 100 * mean(h2 <= 1e-9, na.rm = TRUE),
+    mean_h2 = mean(h2, na.rm = TRUE),
+    p10_h2 = quantile(h2, 0.10, na.rm = TRUE),
+    p50_h2 = quantile(h2, 0.50, na.rm = TRUE),
+    p90_h2 = quantile(h2, 0.90, na.rm = TRUE),
+    median_nz = suppressWarnings(median(h2[h2 > 1e-9], na.rm = TRUE)),
+    mean_euclid = mean(euclidean_dist, na.rm = TRUE),
+    pearson_h2_euclid = suppressWarnings(cor(h2, euclidean_dist, use = "pairwise.complete.obs")),
+    pearson_h2_geodesic = suppressWarnings(cor(h2, geodesic_dist, use = "pairwise.complete.obs")),
+    .groups = "drop"
+  ) %>%
+  filter(n != 0) %>%
+  mutate(across(where(is.numeric), ~round(.x, 3)))
+kable(filter_n0(dist_sum), caption="FC h2 vs distance — within (same network) vs across: n, n_zero/pct_zero (h2<=1e-9), mean/p10/p50/p90 h2, median of h2>1e-9, mean Euclidean, Pearson R(h2, Euclidean) and R(h2, geodesic). Pearson is attenuated by zero-inflation — compare median_nz vs p50.")
 ```
 
 ---
@@ -452,30 +386,14 @@ if (file.exists(dist_path)) {
 
 ```{r percent-snp}
 pct_path <- file.path(ROOT, "results/summary/percent_SNP_explained.csv")
-if (!file.exists(pct_path)) pct_path <- file.path("results", "summary", "percent_SNP_explained.csv")
-pct_detail_path <- file.path(ROOT, "results/summary/percent_SNP_explained_per_pheno.csv")
-if (!file.exists(pct_detail_path)) pct_detail_path <- file.path("results", "summary", "percent_SNP_explained_per_pheno.csv")
-if (file.exists(pct_path)) {
-  pct <- read_csv(pct_path, show_col_types = FALSE) %>% mutate(across(where(is.numeric), ~round(.x, 2)))
-  # Filter n=0
-  pct <- filter_n0(pct)
-  # Keep Set order gordon, probaConns, SA; select only needed cols for display (keep Pearson focus but percent table is separate)
-  pct <- pct %>% arrange(match(Set, c("gordon","probaConns","SA")))
-  # Only show mean/median + SE for publication (keep full for now but ensure n_valid !=0)
-  kable(pct, caption="Percent SNP heritability of Twin estimates — 100 × AdjHE-RE / Twin per phenotype (per Set: mean ± SE, median, SD, q1/q3, min/max, n_valid; SA 14 nets excl. 4/6/17, FCs filtered Twin_h2>0.001, MASH 0–1.2)")
-  cat("\n\n*Interpretation: `mean_pct` = mean of per-phenotype `pct`; `se_pct = sd / sqrt(n_valid)`; `median_pct` robust to outliers (Twin near 0 inflates mean). `ratio_of_means_pct = 100 × mean(MASH)/mean(Twin)` is also shown.*\n")
-} else {
-  cat("Data not available.\n")
-}
-```
-
-```{r percent-snp-detail}
-# Optional per-pheno detail (first few rows) — kept out of main table for brevity
-if (file.exists(pct_detail_path)) {
-  detail <- read_csv(pct_detail_path, show_col_types = FALSE) %>% mutate(across(where(is.numeric), ~round(.x, 2)))
-  # Show 5 most extreme per Set for inspection (optional)
-  # kable(detail %>% group_by(Set) %>% arrange(desc(pct)) %>% slice_head(n=5), caption="Top 5 pct per Set")
-}
+pct <- read_csv(pct_path, show_col_types = FALSE) %>% mutate(across(where(is.numeric), ~round(.x, 2)))
+# Filter n=0
+pct <- filter_n0(pct)
+# Keep Set order gordon, probaConns, SA; select only needed cols for display (keep Pearson focus but percent table is separate)
+pct <- pct %>% arrange(match(Set, c("gordon","probaConns","SA")))
+# Only show mean/median + SE for publication (keep full for now but ensure n_valid !=0)
+kable(pct, caption="Percent SNP heritability of Twin estimates — 100 × AdjHE-RE / Twin per phenotype (per Set: mean ± SE, median, SD, q1/q3, min/max, n_valid; SA 14 nets excl. 4/6/17, FCs filtered Twin_h2>0.001, MASH 0–1.2)")
+cat("\n\n*Interpretation: `mean_pct` = mean of per-phenotype `pct`; `se_pct = sd / sqrt(n_valid)`; `median_pct` robust to outliers (Twin near 0 inflates mean). `ratio_of_means_pct = 100 × mean(MASH)/mean(Twin)` is also shown.*\n")
 ```
 
 # Appendix: SA without total surface control (SA wo_total) {style="text-align:center;" .scrollable}
@@ -493,21 +411,17 @@ if (file.exists(pct_detail_path)) {
 ## SA wo_total — Five-Number Summaries & Correlations
 
 ```{r sa-stats-appendix}
-if (nrow(wide)>0) {
-  sa_long <- wide %>% filter(Set=="SA") %>%
-    select(Pheno, Twin_h2, h2_SA_AdjHE_RE) %>%
-    pivot_longer(c(Twin_h2, h2_SA_AdjHE_RE), names_to="Method", values_to="h2") %>%
-    mutate(Method = recode(Method, Twin_h2="Twin", h2_SA_AdjHE_RE="AdjHE-RE"))
-  fivenum_sa <- sa_long %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
-    mutate(across(where(is.numeric), ~round(.x,3)))
-  kable(filter_n0(fivenum_sa), caption="SA (wo_total, 14 networks) — h2 five-number summary")
-}
+sa_long <- wide %>% filter(Set=="SA") %>%
+  select(Pheno, Twin_h2, h2_SA_AdjHE_RE) %>%
+  pivot_longer(c(Twin_h2, h2_SA_AdjHE_RE), names_to="Method", values_to="h2") %>%
+  mutate(Method = recode(Method, Twin_h2="Twin", h2_SA_AdjHE_RE="AdjHE-RE"))
+fivenum_sa <- sa_long %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
+  mutate(across(where(is.numeric), ~round(.x,3)))
+kable(filter_n0(fivenum_sa), caption="SA (wo_total, 14 networks) — h2 five-number summary")
 ```
 
 ```{r sa-corr-appendix}
-if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
-  kable(filter_n0(read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="SA")), caption="SA — Twin vs MASH correlations (wo_total)")
-}
+kable(filter_n0(read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="SA")), caption="SA — Twin vs MASH correlations (wo_total)")
 ```
 
 ## SA w_total vs wo_total — Correlation & Comparison {.scrollable style="text-align:center;"}
@@ -515,16 +429,12 @@ if (file.exists(file.path(ROOT,"results/summary/correlations_by_set.csv"))) {
 *Comparison of SA heritability estimates with vs without total surface area control (per network, 14 nets excl. 4/6/17).*
 
 ```{r sa-w-vs-wo-corr-appendix}
-# Pearson R between w_total and wo_total per Method (Twin, AdjHE-RE) — only Pearson per user
+# Pearson R between w_total and wo_total per Method (Twin, AdjHE-RE)
 r2_path <- file.path(ROOT, "results/summary/r2_sa_w_vs_wo_total.csv")
-if (file.exists(r2_path)) {
-  r2 <- read_csv(r2_path, show_col_types = FALSE)
-  if ("n" %in% names(r2)) r2 <- r2 %>% filter(n != 0)
-  r2 <- r2 %>% select(any_of(c("Set","Method","n","Pearson_r"))) %>% mutate(Pearson_r = round(Pearson_r, 3))
-  kable(filter_n0(r2), caption="SA w_total vs wo_total — Pearson R (per Method)")
-} else {
-  cat("Data not available.\n")
-}
+r2 <- read_csv(r2_path, show_col_types = FALSE)
+r2 <- r2 %>% filter(n != 0)
+r2 <- r2 %>% select(any_of(c("Set","Method","n","Pearson_r"))) %>% mutate(Pearson_r = round(Pearson_r, 3))
+kable(filter_n0(r2), caption="SA w_total vs wo_total — Pearson R (per Method)")
 ```
 
 ::: {style="overflow-y:auto; max-height:720px; text-align:center;"}
@@ -534,8 +444,4 @@ if (file.exists(r2_path)) {
 :::
 
 *Scatter of estimates without total-surface control (`x`) vs with control (`y`), per method.*
-
-```{r sa-w-vs-wo-detail-appendix}
-# Per-network w_total vs wo_total detail (rendered above)
-```
 
