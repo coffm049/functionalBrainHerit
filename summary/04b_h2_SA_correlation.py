@@ -287,21 +287,31 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
                         if k.lower()==net.lower():
                             sa_h2=v.get(method, np.nan)
                             break
-                fc_mean=np.nanmean([parcel_mean[i] for i in idxs])
-                fc_p90=np.nanmean([parcel_p90[i] for i in idxs])
-                # Within-system: edges where both ends in same network
-                within_vals=[]
-                for ii in idxs:
-                    for jj in idxs:
-                        if ii < jj and not np.isnan(M[ii, jj]):
-                            within_vals.append(M[ii, jj])
-                fc_within=np.nanmean(within_vals) if len(within_vals)>0 else np.nan
-                rows.append((net, sa_h2, fc_mean, fc_p90, fc_within))
-            df_net=pd.DataFrame(rows, columns=["network","sa_h2","fc_mean","fc_p90","fc_within"]).dropna()
-            if len(df_net) < 3:
-                continue
-            # Correlations
-            for metric in ["fc_mean","fc_p90","fc_within"]:
+            fc_mean=np.nanmean([parcel_mean[i] for i in idxs])
+            fc_p90=np.nanmean([parcel_p90[i] for i in idxs])
+            # Within-system: edges where both ends in same network
+            within_vals=[]
+            for ii in idxs:
+                for jj in idxs:
+                    if ii < jj and not np.isnan(M[ii, jj]):
+                        within_vals.append(M[ii, jj])
+            fc_within=np.nanmean(within_vals) if len(within_vals)>0 else np.nan
+            # Outside-system: edges where one end in this network, other outside
+            outside_vals=[]
+            for ii in idxs:
+                for jj in range(N):
+                    if jj in idxs: continue
+                    if not np.isnan(M[ii, jj]):
+                        outside_vals.append(M[ii, jj])
+            # Average outside per parcel then mean across parcels in network (to avoid double count, use parcel_mean outside)
+            # Simpler: mean of all outside edges incident to this network's parcels
+            fc_outside=np.nanmean(outside_vals) if len(outside_vals)>0 else np.nan
+            rows.append((net, sa_h2, fc_mean, fc_p90, fc_within, fc_outside))
+        df_net=pd.DataFrame(rows, columns=["network","sa_h2","fc_mean","fc_p90","fc_within","fc_outside"]).dropna()
+        if len(df_net) < 3:
+            continue
+        # Correlations
+        for metric in ["fc_mean","fc_p90","fc_within","fc_outside"]:
                 x=df_net["sa_h2"].values
                 y=df_net[metric].values
                 # Pearson and Spearman
