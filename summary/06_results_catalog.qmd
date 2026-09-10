@@ -370,9 +370,9 @@ if (file.exists(pct_detail_path)) {
 }
 ```
 
-# Appendix: SA without total surface control (SA wo_total)
+# Appendix: SA without total surface control (SA wo_total) {style="text-align:center;" .scrollable}
 
-*All SA results above control for total surface area (`w_total`). This appendix collects the corresponding `wo_total` (without total surface) results for comparison.*
+*All SA results above control for total surface area (`w_total`). This appendix collects the corresponding `wo_total` (without total surface) results for comparison; all tables filtered `n≠0` and show `Pearson R` only.*
 
 ## SA wo_total — Surface Area Heritability {.scrollable style="text-align:center;"}
 
