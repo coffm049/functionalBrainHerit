@@ -293,10 +293,17 @@ if (file.exists(corr_path)) {
   if (nrow(corr_sa_fc) == 0 || !"pearson_r" %in% names(corr_sa_fc)) {
     cat("sa_fc_h2_correlation.csv is empty (0 rows or missing pearson_r). Re-run `python summary/04b_h2_SA_correlation.py` and check /tmp/04b.log for df_net n=.\n")
   } else {
-    # Filter n=0 and keep only Pearson R per user (remove Spearman/R2)
+    # Wide format: one column per method (Twin, AdjHE-RE), drop n_networks
     if ("n_networks" %in% names(corr_sa_fc)) corr_sa_fc <- corr_sa_fc %>% filter(n_networks != 0)
-    corr_sa_fc <- corr_sa_fc %>% select(any_of(c("atlas","method","metric","sa_type","n_networks","pearson_r"))) %>% mutate(pearson_r = round(pearson_r, 3))
-    kable(filter_n0(corr_sa_fc), caption="SA-FC h2 by system: Pearson R of parcel-mean / 90th percentile / within-system FC h2 vs SA h2 (14 nets, w_total + wo_total, per atlas × Twin vs AdjHE-RE)")
+    corr_wide <- corr_sa_fc %>%
+      select(any_of(c("atlas","method","metric","sa_type","pearson_r"))) %>%
+      mutate(pearson_r = round(pearson_r, 3)) %>%
+      pivot_wider(names_from = method, values_from = pearson_r) %>%
+      arrange(match(atlas, c("gordon","probaConns")), match(metric, c("fc_mean","fc_p90","fc_within","fc_outside")), sa_type)
+    # Order columns Twin then AdjHE-RE when both present
+    mcols <- intersect(c("Twin","AdjHE-RE"), names(corr_wide))
+    corr_wide <- corr_wide %>% select(any_of(c("atlas","metric","sa_type")), all_of(mcols))
+    kable(corr_wide, caption="SA-FC h2 by system: Pearson R of FC parcel-mean / p90 / within / outside h2 vs SA h2 (14 nets; rows = atlas × metric × SA type, columns = Twin vs AdjHE-RE)")
   }
 } else {
   cat("Run `python summary/04b_h2_SA_correlation.py` to generate sa_fc_h2_correlation.csv\n")
@@ -388,7 +395,7 @@ for (p in c(file.path(ROOT,"results/summary/plots/heatmap_gordon_Twin_stats.csv"
 
 :::
 
-*Per-edge scatter via `summary/04f_FC_distance.py` — Euclidean centroid distance (mm, Conte69) vs `h²`, `ylim 0–1`.*
+*Per-edge scatter via `summary/04f_FC_distance.py` — Euclidean centroid distance (mm, Conte69) vs `h²`, `ylim 0–1`. Grey points (subsampled); solid = quantile-binned median of ALL edges (robust to zero-inflation), dashed = binned median of `h²>1e-9` (non-zero mass), shaded = binned IQR — red within-network, blue across-network (hurdle-style visual). Zero-h² % annotated per panel.*
 
 ## FC h2 vs Distance — Geodesic via wb_command (same-hemisphere) {.scrollable style="text-align:center;"}
 
@@ -404,7 +411,7 @@ for (p in c(file.path(ROOT,"results/summary/plots/heatmap_gordon_Twin_stats.csv"
 
 :::
 
-*Geodesic via `wb_command -surface-geodesic-distance` from parcel centroid vertices; cross-hemisphere pairs `NA`.*
+*Geodesic via `wb_command -surface-geodesic-distance` from parcel centroid vertices; cross-hemisphere pairs `NA`. Same zero-aware smooths: solid = binned median (all), dashed = median of `h²>1e-9`.*
 
 ```{r fc-dist-within-across}
 # h2 vs distance, split within (same_network TRUE) vs across (FALSE) — per atlas × method
@@ -417,10 +424,13 @@ if (file.exists(dist_path)) {
     dist_sum <- dd %>% group_by(atlas, method, group) %>%
       summarise(
         n = sum(is.finite(h2)),
+        n_zero = sum(h2 <= 1e-9, na.rm = TRUE),
+        pct_zero = 100 * mean(h2 <= 1e-9, na.rm = TRUE),
         mean_h2 = mean(h2, na.rm = TRUE),
         p10_h2 = quantile(h2, 0.10, na.rm = TRUE),
         p50_h2 = quantile(h2, 0.50, na.rm = TRUE),
         p90_h2 = quantile(h2, 0.90, na.rm = TRUE),
+        median_nz = suppressWarnings(median(h2[h2 > 1e-9], na.rm = TRUE)),
         mean_euclid = mean(euclidean_dist, na.rm = TRUE),
         pearson_h2_euclid = suppressWarnings(cor(h2, euclidean_dist, use = "pairwise.complete.obs")),
         pearson_h2_geodesic = suppressWarnings(cor(h2, geodesic_dist, use = "pairwise.complete.obs")),
@@ -428,7 +438,7 @@ if (file.exists(dist_path)) {
       ) %>%
       filter(n != 0) %>%
       mutate(across(where(is.numeric), ~round(.x, 3)))
-    kable(filter_n0(dist_sum), caption="FC h2 vs distance — within (same network) vs across (different networks): n, mean/p10/p50/p90 h2, mean Euclidean, Pearson R(h2, Euclidean) and R(h2, geodesic)")
+    kable(filter_n0(dist_sum), caption="FC h2 vs distance — within (same network) vs across: n, n_zero/pct_zero (h2<=1e-9), mean/p10/p50/p90 h2, median of h2>1e-9, mean Euclidean, Pearson R(h2, Euclidean) and R(h2, geodesic). Pearson is attenuated by zero-inflation — compare median_nz vs p50.")
   } else {
     cat("fc_distance_per_edge.csv empty — re-run `python summary/04f_FC_distance.py` (needs wb_command module for geodesic).\n")
   }

@@ -306,24 +306,77 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
 df=pd.DataFrame(rows)
 df.to_csv(OUT_CSV, index=False)
 print(f"Wrote {OUT_CSV} with {len(df)} rows")
-# Simple scatter plots per atlas/method
+# Scatter + zero-aware smoothed curves per atlas/method.
+# h2 is heavy zero-inflated (AdjHE-RE truncated at 0; Twin near-0): a plain
+# mean/LOESS smooth is dragged to zero, so we show quantile-binned medians:
+#   solid = median of ALL edges per bin (robust to zeros),
+#   dashed = median of h2 > ZERO_EPS per bin (non-zero mass),
+#   shaded = binned IQR, split within (same network) vs across.
+# This is a hurdle-style visual: level (non-zero median) vs mass at zero.
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+ZERO_EPS = 1e-9
+N_BINS = 25
+
+def _binned_curve(dist, h2, n_bins=N_BINS):
+    m = np.isfinite(dist) & np.isfinite(h2)
+    dist, h2 = np.asarray(dist)[m], np.asarray(h2)[m]
+    if len(dist) < 50:
+        return None
+    qs = np.linspace(0, 1, n_bins + 1)
+    edges = np.quantile(dist, qs)
+    edges = np.unique(edges)
+    if len(edges) < 5:
+        return None
+    idx = np.clip(np.digitize(dist, edges[1:-1]), 0, len(edges) - 2)
+    out = {"x": [], "med": [], "q25": [], "q75": [], "med_nz": [], "p_zero": [], "n": []}
+    for b in range(len(edges) - 1):
+        v = h2[idx == b]
+        if len(v) < 10:
+            continue
+        out["x"].append(float(np.median(dist[idx == b])))
+        out["med"].append(float(np.median(v)))
+        out["q25"].append(float(np.percentile(v, 25)))
+        out["q75"].append(float(np.percentile(v, 75)))
+        nz = v[v > ZERO_EPS]
+        out["med_nz"].append(float(np.median(nz)) if len(nz) >= 10 else np.nan)
+        out["p_zero"].append(float(np.mean(v <= ZERO_EPS)))
+        out["n"].append(int(len(v)))
+    return {k: np.array(v) for k, v in out.items()}
+
+def _plot_dist(ax, dist_all, h2_all, same_all, xlabel, color_within="#d62728", color_across="#1f77b4"):
+    plot_df = pd.DataFrame({"d": np.asarray(dist_all), "h": np.asarray(h2_all),
+                            "s": np.asarray(same_all)}).dropna()
+    if plot_df.empty:
+        return
+    show = plot_df if len(plot_df) <= 20000 else plot_df.sample(20000, random_state=0)
+    ax.scatter(show["d"], show["h"], s=1, alpha=0.15, c="grey", rasterized=True)
+    for label, grp, col in [("within (same net)", plot_df[plot_df["s"] == True], color_within),
+                            ("across (diff net)", plot_df[plot_df["s"] == False], color_across)]:
+        c = _binned_curve(grp["d"].values, grp["h"].values)
+        if c is None:
+            continue
+        ax.fill_between(c["x"], c["q25"], c["q75"], color=col, alpha=0.15, step="mid")
+        ax.plot(c["x"], c["med"], color=col, lw=2, label=f"{label} median (all)")
+        ax.plot(c["x"], c["med_nz"], color=col, lw=1.2, ls="--", label=f"{label} median h2>0")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(r"Heritability ($h^2$)")
+    ax.set_ylim(0, 1)
+    ax.legend(fontsize=7, loc="upper right", framealpha=0.8)
+
 for atlas in ["gordon","probaConns"]:
     for method in ["Twin","AdjHE-RE"]:
         sub=df[(df["atlas"]==atlas) & (df["method"]==method)]
         if sub.empty:
             continue
+        pzero = float(np.mean(sub["h2"].values <= ZERO_EPS))
         fig, ax=plt.subplots(figsize=(5,4))
-        # Sample for speed if large
-        plot_df=sub.dropna(subset=["euclidean_dist","h2"])
-        if len(plot_df)>20000:
-            plot_df=plot_df.sample(20000, random_state=0)
-        ax.scatter(plot_df["euclidean_dist"], plot_df["h2"], s=1, alpha=0.2, c="#1f77b4")
-        ax.set_xlabel("Euclidean centroid distance (mm)")
-        ax.set_ylabel(r"Heritability ($h^2$)")
-        ax.set_ylim(0,1)
+        _plot_dist(ax, sub["euclidean_dist"].values, sub["h2"].values, sub["same_network"].values,
+                   "Euclidean centroid distance (mm)")
+        ax.text(0.02, 0.96, f"zero h2: {100*pzero:.1f}% (<=1e-9)", transform=ax.transAxes,
+                fontsize=7, va="top", ha="left", bbox=dict(fc="white", ec="none", alpha=0.7))
         # No title per publication
         fig.tight_layout(pad=0.5)
         out=PLOT_DIR / f"fc_distance_{atlas}_{method.replace('-','')}.png"
@@ -333,13 +386,11 @@ for atlas in ["gordon","probaConns"]:
         # Also geodesic if available (currently all NaN, skip)
         if sub["geodesic_dist"].notna().sum()>10:
             fig, ax=plt.subplots(figsize=(5,4))
-            plot_df=sub.dropna(subset=["geodesic_dist","h2"])
-            if len(plot_df)>20000:
-                plot_df=plot_df.sample(20000, random_state=0)
-            ax.scatter(plot_df["geodesic_dist"], plot_df["h2"], s=1, alpha=0.2, c="#ff7f0e")
-            ax.set_xlabel("Geodesic distance (mm via wb_command)")
-            ax.set_ylabel(r"Heritability ($h^2$)")
-            ax.set_ylim(0,1)
+            _plot_dist(ax, sub["geodesic_dist"].values, sub["h2"].values, sub["same_network"].values,
+                       "Geodesic distance (mm via wb_command)", color_within="#ff7f0e", color_across="#9467bd")
+            pzero_g = float(np.mean(sub.dropna(subset=["geodesic_dist"])["h2"].values <= ZERO_EPS))
+            ax.text(0.02, 0.96, f"zero h2: {100*pzero_g:.1f}% (<=1e-9)", transform=ax.transAxes,
+                    fontsize=7, va="top", ha="left", bbox=dict(fc="white", ec="none", alpha=0.7))
             fig.tight_layout(pad=0.5)
             out=PLOT_DIR / f"fc_distance_geodesic_{atlas}_{method.replace('-','')}.png"
             fig.savefig(out, dpi=300, bbox_inches="tight", pad_inches=0.05)
