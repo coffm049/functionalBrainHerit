@@ -16,6 +16,7 @@ For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-RE, 30 P
 
 Outputs:
   results/summary/sa_fc_h2_correlation.csv  (atlas, method, metric, n_networks, pearson_r, spearman_rho, p_pearson, etc.)
+  results/summary/sa_fc_per_network.csv  (atlas, method, sa_type, network, sa_h2, fc_mean, fc_p90, fc_within, fc_outside)
   Also per-atlas scatter plots if requested.
 
 Run:
@@ -31,6 +32,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WIDE = ROOT / "results/summary/mash_twin_wide.csv"
 OUT_CSV = ROOT / "results/summary/sa_fc_h2_correlation.csv"
 OUT_CSV.parent.mkdir(parents=True, exist_ok=True)
+OUT_DETAIL = ROOT / "results/summary/sa_fc_per_network.csv"
 
 # SA 14 networks (excludes 4,6,17 null)
 SA_NETWORKS = {1:"DMN",2:"VIS",3:"FP",5:"DAN",7:"VAN",8:"SAL",9:"CO",10:"SMD",11:"SML",12:"AUD",13:"Tpole",14:"MTL",15:"PMN",16:"PON"}
@@ -193,6 +195,7 @@ sa_maps = {"wo_total": sa_map_wo, "w_total": sa_map_w if sa_map_w else sa_map_wo
 
 # Build FC per-parcel summaries and correlate — for each SA type (wo_total, w_total) if available
 results=[]
+detail_rows=[]
 for atlas,N in [("gordon",352),("probaConns",80)]:
     # Determine SA types to test: wo_total always, w_total if available and distinct
     sa_types = ["wo_total"]
@@ -310,6 +313,11 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
                 rows.append((net, sa_h2, fc_mean, fc_p90, fc_within, fc_outside))
             df_net=pd.DataFrame(rows, columns=["network","sa_h2","fc_mean","fc_p90","fc_within","fc_outside"]).dropna()
             print(f"[{atlas} {method} {sa_type}] df_net n={len(df_net)} (from {len(rows)} networks_keep={len(networks_keep)})")
+            for _, r in df_net.iterrows():
+                detail_rows.append({"atlas": atlas, "method": method, "sa_type": sa_type,
+                                    "network": str(r["network"]), "sa_h2": float(r["sa_h2"]),
+                                    "fc_mean": float(r["fc_mean"]), "fc_p90": float(r["fc_p90"]),
+                                    "fc_within": float(r["fc_within"]), "fc_outside": float(r["fc_outside"])})
             if len(df_net) < 3:
                 continue
             # Correlations
@@ -337,7 +345,10 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
 out_cols=["atlas","method","metric","n_networks","sa_type","pearson_r","spearman_rho","p_pearson"]
 out=pd.DataFrame(results, columns=out_cols) if results else pd.DataFrame(columns=out_cols)
 out.to_csv(OUT_CSV, index=False)
-print(f"Wrote {OUT_CSV} with {len(out)} rows")
+detail_cols=["atlas","method","sa_type","network","sa_h2","fc_mean","fc_p90","fc_within","fc_outside"]
+detail=pd.DataFrame(detail_rows, columns=detail_cols) if detail_rows else pd.DataFrame(columns=detail_cols)
+detail.to_csv(OUT_DETAIL, index=False)
+print(f"Wrote {OUT_CSV} with {len(out)} rows + {OUT_DETAIL} with {len(detail)} rows")
 if len(out):
     print(out.to_string(index=False))
 else:
