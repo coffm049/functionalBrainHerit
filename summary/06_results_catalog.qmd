@@ -234,18 +234,6 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 
 :::
 
-## SA w_total — Five-Number Summaries & Correlations
-
-```{r sa-wtotal-stats}
-wcols <- grep("w_total", names(wide), value=TRUE)
-sa_w <- wide %>% filter(Set=="SA") %>% select(Pheno, all_of(wcols), Twin_h2) %>%
-  pivot_longer(cols = all_of(wcols), names_to="Method", values_to="h2") %>%
-  mutate(Method = gsub("h2_SA_|_w_total", "", Method))
-fivenum_saw <- sa_w %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
-  mutate(across(where(is.numeric), ~round(.x,3)))
-kable(filter_n0(fivenum_saw), caption="SA w_total — h2 five-number summary")
-```
-
 ---
 
 ## SA-FC System Correlation — FC parcel-mean / 90th percentile / within-system h2 vs SA h2
