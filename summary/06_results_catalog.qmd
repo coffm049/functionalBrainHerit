@@ -29,6 +29,19 @@ ROOT <- "/users/4/coffm049/papers/functionalBrainHerit"
 WIDE <- file.path(ROOT, "results/summary/mash_twin_wide.csv")
 wide <- read_csv(WIDE, show_col_types = FALSE)
 
+# Detect which SNP columns are available (prefer FE for FC, RE for SA; fall back to RE if FE missing)
+gordon_col <- if ("h2_gordon_AdjHE_FE" %in% names(wide)) "h2_gordon_AdjHE_FE" else "h2_gordon_AdjHE_RE"
+proba_col  <- if ("h2_proba_AdjHE_FE" %in% names(wide)) "h2_proba_AdjHE_FE" else "h2_proba_AdjHE_RE"
+sa_col     <- "h2_SA_AdjHE_RE"  # SA only has RE
+
+gordon_label <- if (gordon_col == "h2_gordon_AdjHE_FE") "AdjHE-FE" else "AdjHE-RE"
+proba_label  <- if (proba_col == "h2_proba_AdjHE_FE") "AdjHE-FE" else "AdjHE-RE"
+sa_label     <- "AdjHE-RE"
+
+# Image path suffixes
+gordon_img_sfx <- if (gordon_col == "h2_gordon_AdjHE_FE") "AdjHE" else "AdjHERE"
+proba_img_sfx  <- if (proba_col == "h2_proba_AdjHE_FE") "AdjHE" else "AdjHERE"
+
 fivenum_tbl <- function(x) {
   x <- x[is.finite(x)]
   if (length(x)==0) return(tibble(min=NA, q1=NA, median=NA, mean=NA, q3=NA, max=NA, n=0, sd=NA))
@@ -118,16 +131,16 @@ filter_n0 <- function(df) {
 #| fig-height: 5
 
 gordon_wide <- wide %>% filter(Set=="gordon")
-# Twin vs AdjHE-FE comparison for fivenum
+# Twin vs SNP comparison for fivenum
 gordon_long <- gordon_wide %>%
-  select(Pheno, Twin_h2, h2_gordon_AdjHE_FE) %>%
-  pivot_longer(c(Twin_h2, h2_gordon_AdjHE_FE), names_to="Method", values_to="h2") %>%
-  mutate(Method = recode(Method, Twin_h2="Twin", h2_gordon_AdjHE_FE="AdjHE-FE"))
+  select(Pheno, Twin_h2, all_of(gordon_col)) %>%
+  pivot_longer(c(Twin_h2, all_of(gordon_col)), names_to="Method", values_to="h2") %>%
+  mutate(Method = recode(Method, Twin_h2="Twin", !!gordon_col := gordon_label))
 # fivenum per Method — filter n=0 (per user)
 fivenum_gordon <- gordon_long %>%
   group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>% filter(n != 0) %>%
   mutate(across(where(is.numeric), ~round(.x,3)))
-kable(filter_n0(fivenum_gordon), caption="Gordon — h2 five-number summary (Twin vs AdjHE-FE, 30 PCs)")
+kable(filter_n0(fivenum_gordon), caption="Gordon — h2 five-number summary (Twin vs `r gordon_label`, 30 PCs)")
 ```
 
 ```{r gordon-corr}
@@ -145,10 +158,12 @@ wo_path <- file.path(ROOT, "results/summary/within_outside_h2.csv")
 wo <- read_csv(wo_path, show_col_types=FALSE) %>% filter(atlas=="gordon")
 wo <- wo %>% filter(n != 0) %>% mutate(across(where(is.numeric), ~round(.x, 3)))
 # Keep only p10/p50/p90 + mean for publication (remove Spearman/R2 already)
-kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), caption="Gordon — Within vs outside network h2 (10th, 50th/median, 90th percentiles, per Twin vs AdjHE-FE)")
+kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), caption="Gordon — Within vs outside network h2 (10th, 50th/median, 90th percentiles, per Twin vs `r gordon_label`)")
 ```
 
 ---
+
+# ---
 
 # ProbaConns — Network Topography {style="text-align:center;" .scrollable}
 
@@ -166,20 +181,19 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 
 ![ProbaConns Twin Surface](../results/summary/brain/probaConns/probaConns_twin_surface.png){width="100%" style="object-fit:contain;"}
 
-![ProbaConns AdjHE-FE Surface](../results/summary/brain/probaConns/probaConns_AdjHE_surface.png){width="100%" style="object-fit:contain;"}
+![ProbaConns `r proba_label` Surface](../results/summary/brain/probaConns/probaConns_`r proba_img_sfx`_surface.png){width="100%" style="object-fit:contain;"}
 
 ![ProbaConns Twin Chords](../results/summary/brain/probaConns/probaConns_twin_circular.png){width="100%" style="object-fit:contain;"}
 
-![ProbaConns AdjHE-FE Chords](../results/summary/brain/probaConns/probaConns_AdjHE_circular.png){width="100%" style="object-fit:contain;"}
+![ProbaConns `r proba_label` Chords](../results/summary/brain/probaConns/probaConns_`r proba_img_sfx`_circular.png){width="100%" style="object-fit:contain;"}
 
 :::
 
 :::
-
 
 ## ProbaConns — Manhattans {.scrollable style="text-align:center;"}
 
-*Sys-Sys ordered by SNP (`AdjHE-FE`) median `h²`, `Twin` same `x`-axis as SNP.*
+*Sys-Sys ordered by SNP (`r proba_label`) median `h²`, `Twin` same `x`-axis as SNP.*
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
 
@@ -187,7 +201,7 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 
 ![ProbaConns Twin Manhattan (SNP order)](../results/summary/plots/manhattan_probaConns_Twin.png){width="100%" style="object-fit:contain;"}
 
-![ProbaConns AdjHE-FE Manhattan (determines order)](../results/summary/plots/manhattan_probaConns_AdjHEFE.png){width="100%" style="object-fit:contain;"}
+![ProbaConns `r proba_label` Manhattan (determines order)](../results/summary/plots/manhattan_probaConns_`r proba_img_sfx`.png){width="100%" style="object-fit:contain;"}
 
 :::
 
@@ -197,12 +211,12 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 
 ```{r proba-stats}
 proba_long <- wide %>% filter(Set=="probaConns") %>%
-  select(Pheno, Twin_h2, h2_proba_AdjHE_FE) %>%
-  pivot_longer(c(Twin_h2, h2_proba_AdjHE_FE), names_to="Method", values_to="h2") %>%
-  mutate(Method = recode(Method, Twin_h2="Twin", h2_proba_AdjHE_FE="AdjHE-FE"))
+  select(Pheno, Twin_h2, all_of(proba_col)) %>%
+  pivot_longer(c(Twin_h2, all_of(proba_col)), names_to="Method", values_to="h2") %>%
+  mutate(Method = recode(Method, Twin_h2="Twin", !!proba_col := proba_label))
 fivenum_proba <- proba_long %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
   mutate(across(where(is.numeric), ~round(.x,3)))
-kable(filter_n0(fivenum_proba), caption="ProbaConns — h2 five-number summary")
+kable(filter_n0(fivenum_proba), caption="ProbaConns — h2 five-number summary (Twin vs `r proba_label`, 30 PCs)")
 ```
 
 ```{r proba-corr}
@@ -219,7 +233,7 @@ kable(filter_n0(corr), caption="ProbaConns — Twin vs MASH Pearson R")
 wo_path <- file.path(ROOT, "results/summary/within_outside_h2.csv")
 wo <- read_csv(wo_path, show_col_types=FALSE) %>% filter(atlas=="probaConns")
 wo <- wo %>% filter(n != 0) %>% mutate(across(where(is.numeric), ~round(.x, 3)))
-kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), caption="ProbaConns — Within vs outside network h2 (10th, 50th/median, 90th percentiles, per Twin vs AdjHE-FE)")
+kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), caption="ProbaConns — Within vs outside network h2 (10th, 50th/median, 90th percentiles, per Twin vs `r proba_label`)")
 ```
 
 ---

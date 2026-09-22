@@ -22,14 +22,27 @@ dir.create(dirname(OUT), recursive = TRUE, showWarnings = FALSE)
 wide <- tryCatch(read_csv(WIDE, show_col_types = FALSE), error = function(e) tibble())
 if (nrow(wide)==0) stop("mash_twin_wide.csv not found or empty: ", WIDE)
 
-# Map Set -> MASH column
-# gordon -> h2_gordon_AdjHE_FE, probaConns -> h2_proba_AdjHE_FE, SA -> h2_SA_AdjHE_RE
+# Map Set -> preferred MASH column (prefer FE for FC, RE for SA; fall back to RE if FE not available)
 # Note: column names use underscore (AdjHE_FE/AdjHE_RE) for files, display as AdjHE-FE/AdjHE-RE (hyphen)
-mash_col_for_set <- c(
+preferred_mash_col <- c(
   "gordon" = "h2_gordon_AdjHE_FE",
   "probaConns" = "h2_proba_AdjHE_FE",
   "SA" = "h2_SA_AdjHE_RE"
 )
+fallback_mash_col <- c(
+  "gordon" = "h2_gordon_AdjHE_RE",
+  "probaConns" = "h2_proba_AdjHE_RE",
+  "SA" = NA  # SA only has RE
+)
+
+mash_col_for_set <- preferred_mash_col
+for (set_name in names(mash_col_for_set)) {
+  if (!mash_col_for_set[[set_name]] %in% names(wide)) {
+    if (!is.na(fallback_mash_col[[set_name]]) && fallback_mash_col[[set_name]] %in% names(wide)) {
+      mash_col_for_set[[set_name]] <- fallback_mash_col[[set_name]]
+    }
+  }
+}
 
 # For SA, we want 14 networks excl. 4/6/17 per 01-07 labeling (as in 03_plot)
 sa_keep <- c(1,2,3,5,7,8,9,10,11,12,13,14,15,16)

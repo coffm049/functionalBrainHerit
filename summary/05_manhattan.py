@@ -393,7 +393,28 @@ for atlas in ["gordon", "probaConns", "SA"]:
     # Build both methods first so we can share SNP ordering between Twin and SNP per user request
     dfs = {}
     cols = {}
-    for method, col in [("Twin", "Twin_h2"), ("AdjHE-FE" if atlas != "SA" else "AdjHE-RE", f"h2_{atlas}_AdjHE_FE" if atlas != "SA" else "h2_SA_AdjHE_RE")]:
+    # Prefer FE for FC; fall back to RE if not present
+    if atlas != "SA":
+        col_pref = f"h2_{atlas}_AdjHE_FE"
+        col_alt = f"h2_{atlas}_AdjHE_RE"
+        snp_method = "AdjHE-FE"
+    else:
+        col_pref = f"h2_{atlas}_AdjHE_RE"
+        col_alt = None
+        snp_method = "AdjHE-RE"
+    col = col_pref
+    if col not in wide.columns and col_alt and col_alt in wide.columns:
+        col = col_alt
+        snp_method = "AdjHE-RE"
+    elif col not in wide.columns:
+        alt = col.replace("probaConns", "proba")
+        if alt in wide.columns:
+            col = alt
+        else:
+            print(f"skip {atlas} {snp_method}: {col_pref} not in wide")
+            continue
+
+    for method, col in [("Twin", "Twin_h2"), (snp_method, col)]:
         if col not in wide.columns:
             alt = col.replace("probaConns", "proba")
             if alt in wide.columns:
@@ -413,12 +434,11 @@ for atlas in ["gordon", "probaConns", "SA"]:
         cols[method] = col
     if not dfs:
         continue
-    # For Gordon/Proba (and SA for consistency), SNP (AdjHE-FE for FC, AdjHE-RE for SA) determines Sys-Sys ordering so Twin uses same x-axis
-    snp_key = "AdjHE-FE" if atlas != "SA" else "AdjHE-RE"
+    # For Gordon/Proba (and SA for consistency), SNP determines Sys-Sys ordering so Twin uses same x-axis
     shared_order = None
-    if snp_key in dfs and not dfs[snp_key].empty:
+    if snp_method in dfs and not dfs[snp_method].empty:
         # Use SNP to define ordering
-        shared_order = _get_ordering(dfs[snp_key], atlas, snp_key)
+        shared_order = _get_ordering(dfs[snp_method], atlas, snp_method)
     elif "Twin" in dfs:
         shared_order = _get_ordering(dfs["Twin"], atlas, "Twin")
     for method, df in dfs.items():
@@ -436,10 +456,30 @@ try:
     overview_rows = []
     for atlas in ["gordon", "probaConns", "SA"]:
         N = set_N[atlas]
-        for method, col in [("Twin", "Twin_h2"), ("AdjHE-FE" if atlas != "SA" else "AdjHE-RE", f"h2_{atlas}_AdjHE_FE" if atlas != "SA" else "h2_SA_AdjHE_RE")]:
+        if atlas != "SA":
+            col_pref = f"h2_{atlas}_AdjHE_FE"
+            col_alt = f"h2_{atlas}_AdjHE_RE"
+            snp_method = "AdjHE-FE"
+        else:
+            col_pref = f"h2_{atlas}_AdjHE_RE"
+            col_alt = None
+            snp_method = "AdjHE-RE"
+        col = col_pref
+        if col not in wide.columns and col_alt and col_alt in wide.columns:
+            col = col_alt
+            snp_method = "AdjHE-RE"
+        elif col not in wide.columns:
+            alt = col.replace("probaConns", "proba")
+            if alt in wide.columns:
+                col = alt
+            else:
+                continue
+        for method, col in [("Twin", "Twin_h2"), (snp_method, col)]:
             if col not in wide.columns:
-                col = col.replace("probaConns", "proba")
-                if col not in wide.columns:
+                alt = col.replace("probaConns", "proba")
+                if alt in wide.columns:
+                    col = alt
+                else:
                     continue
             sub = wide[wide["Set"] == atlas]
             if sub[col].dropna().empty:

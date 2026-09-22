@@ -237,13 +237,26 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
         # Also ensure canonical SA name for merging
         print(f"[{atlas}][{sa_type}] networks {sorted(set(networks))} -> keep {sorted(networks_keep)}")
 
-        for method, col in [("Twin","Twin_h2"), ("AdjHE-FE" if atlas!="SA" else "AdjHE-RE", f"h2_{atlas}_AdjHE_FE" if atlas!="SA" else "h2_SA_AdjHE_RE")]:
-            if col not in wide.columns:
-                alt=col.replace("probaConns","proba")
-                if alt in wide.columns:
-                    col=alt
-                else:
-                    continue
+        # Prefer FE for FC, RE for SA; fall back to the other if preferred not present
+        if atlas != "SA":
+            col_pref = f"h2_{atlas}_AdjHE_FE"
+            col_alt = f"h2_{atlas}_AdjHE_RE"
+            method_label = "AdjHE-FE"
+        else:
+            col_pref = f"h2_{atlas}_AdjHE_RE"
+            col_alt = None
+            method_label = "AdjHE-RE"
+        col = col_pref
+        if col not in wide.columns and col_alt and col_alt in wide.columns:
+            col = col_alt
+            method_label = "AdjHE-RE"
+        elif col not in wide.columns:
+            alt = col.replace("probaConns","proba")
+            if alt in wide.columns:
+                col = alt
+            else:
+                continue
+        for method, col in [("Twin","Twin_h2"), (method_label, col)]:
             sub=wide[wide["Set"]==atlas][["Pheno",col]].dropna()
             if sub.empty:
                 continue

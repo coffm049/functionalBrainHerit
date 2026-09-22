@@ -268,13 +268,20 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
     centroids, centroid_vertex = parcel_centroids(dlabel, N, SURF_L, SURF_R)
     # Try geodesic (will fallback to None) — now returns cache dict
     geo_cache=geodesic_distances_via_wb(SURF_L, SURF_R, centroids, centroid_vertex)
-    for method, col in [("Twin","Twin_h2"), ("AdjHE-FE", f"h2_{atlas}_AdjHE_FE")]:
-        if col not in wide.columns:
-            alt=col.replace("probaConns","proba")
-            if alt in wide.columns:
-                col=alt
-            else:
-                continue
+    # Prefer FE for FC; fall back to RE if not present
+    col_pref = f"h2_{atlas}_AdjHE_FE"
+    col_alt = f"h2_{atlas}_AdjHE_RE"
+    method_label = "AdjHE-FE"
+    if col_pref not in wide.columns and col_alt in wide.columns:
+        col_pref = col_alt
+        method_label = "AdjHE-RE"
+    elif col_pref not in wide.columns:
+        alt = col_pref.replace("probaConns","proba")
+        if alt in wide.columns:
+            col_pref = alt
+        else:
+            continue
+    for method, col in [("Twin","Twin_h2"), (method_label, col_pref)]:
         sub=wide[wide["Set"]==atlas][["Pheno",col]].dropna()
         if sub.empty:
             continue
