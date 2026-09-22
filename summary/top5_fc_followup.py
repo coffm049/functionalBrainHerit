@@ -85,11 +85,11 @@ def main():
     for e, a, na, b, nb, twin, snp in TOP5:
         m_raw = moments(df[e].values)
         m_raw = {"edge": e, "pa": a, "pb": b, "twin_h2": twin, "snp_h2": snp, **{f"raw_{k}": v for k, v in m_raw.items()}}
-        # complete-case residualization: age + female + site dummies + pc1..30
-        cols = ["age", "female"] + [f"pc{i}" for i in range(1, 31)]
-        sub = df[["IID", e, "abcd_site"] + cols].dropna()
-        site = pd.get_dummies(sub["abcd_site"], prefix="site", dtype=float)
-        X = np.column_stack([np.ones(len(sub)), sub[cols].astype(float).values, site.values])
+        # complete-case residualization: age + female/site dummies + pc1..30
+        cols = ["age"] + [f"pc{i}" for i in range(1, 31)]
+        sub = df[["IID", e, "abcd_site", "female"] + cols].dropna()
+        dummies = pd.get_dummies(sub[["abcd_site", "female"]], prefix=["site", "female"], dtype=float)
+        X = np.column_stack([np.ones(len(sub)), sub[cols].astype(float).values, dummies.values])
         y = sub[e].astype(float).values
         beta, *_ = np.linalg.lstsq(X, y, rcond=None)
         r = y - X @ beta
