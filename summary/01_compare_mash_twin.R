@@ -16,6 +16,11 @@ read_mash_stream <- function(pattern, label) {
     d <- suppressWarnings(read_csv(f, show_col_types = FALSE))
     if ("pheno" %in% names(d)) d <- rename(d, Pheno = pheno)
     if (!"Pheno" %in% names(d) || !"h2" %in% names(d)) return(empty_row)
+    # Filter out flagged estimates (keep only "ok" or NaN flags)
+    if ("flag" %in% names(d)) {
+      bad_flags <- c("ill_conditioned", "singular", "nan_solve", "h2_gt_1_invalid", "nonpos_det", "neg_sigma_g")
+      d <- d %>% filter(!str_detect(flag, paste(bad_flags, collapse = "|")))
+    }
     d <- d %>% mutate(var_h2 = as.numeric(`var(h2)`)) %>%
       select(Pheno, h2, var_h2, any_of("PCs"))
     d
