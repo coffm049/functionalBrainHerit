@@ -16,7 +16,7 @@
   "ids": null,
   "Naive": false,
   "pheno_filter": null,
-  "covar_filter": {"race_ethnicity": "White"},
+  "covar_filter": "race_ethnicity == White",
   "iid_col": "IID",
   "fid_col": "FID",
   "na_values": null
