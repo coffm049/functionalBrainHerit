@@ -1,8 +1,8 @@
 #!/usr/bin/env Rscript
-# Percent of twin heritability explained by SNP (MASH/AdjHE-RE) per phenotype set
+# Percent of twin heritability explained by SNP (MASH/AdjHE-FE for FC, AdjHE-RE for SA) per phenotype set
 # For each phenotype: pct = 100 * h2_MASH / h2_Twin
 # Summarize per Set (gordon, probaConns, SA) with mean, SD, SE, median, etc.
-# Input: results/summary/mash_twin_wide.csv (Twin_h2, h2_gordon_AdjHE_RE, h2_proba_AdjHE_RE, h2_SA_AdjHE_RE)
+# Input: results/summary/mash_twin_wide.csv (Twin_h2, h2_gordon_AdjHE_FE, h2_proba_AdjHE_FE, h2_SA_AdjHE_RE)
 # Output: results/summary/percent_SNP_explained.csv + per-set details
 # Also used in quarto 06_results_catalog.qmd
 
@@ -23,11 +23,11 @@ wide <- tryCatch(read_csv(WIDE, show_col_types = FALSE), error = function(e) tib
 if (nrow(wide)==0) stop("mash_twin_wide.csv not found or empty: ", WIDE)
 
 # Map Set -> MASH column
-# gordon -> h2_gordon_AdjHE_RE, probaConns -> h2_proba_AdjHE_RE, SA -> h2_SA_AdjHE_RE
-# Note: column names use underscore (AdjHE_RE) for files, display as AdjHE-RE (hyphen)
+# gordon -> h2_gordon_AdjHE_FE, probaConns -> h2_proba_AdjHE_FE, SA -> h2_SA_AdjHE_RE
+# Note: column names use underscore (AdjHE_FE/AdjHE_RE) for files, display as AdjHE-FE/AdjHE-RE (hyphen)
 mash_col_for_set <- c(
-  "gordon" = "h2_gordon_AdjHE_RE",
-  "probaConns" = "h2_proba_AdjHE_RE",
+  "gordon" = "h2_gordon_AdjHE_FE",
+  "probaConns" = "h2_proba_AdjHE_FE",
   "SA" = "h2_SA_AdjHE_RE"
 )
 

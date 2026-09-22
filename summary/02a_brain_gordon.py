@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Gordon (352 parcels) brain-space visualization — simple, hardcoded.
 
-Produces for twin and AdjHE-RE (90th-percentile node summary, publication-ready, no titles, minimal whitespace):
-  - <out>/gordon_{twin,AdjHE-RE}_surface.png  (both hemispheres, 0–0.5, colorbar not overlapping)
+Produces for twin and AdjHE-FE (90th-percentile node summary, publication-ready, no titles, minimal whitespace):
+  - <out>/gordon_{twin,AdjHE-FE}_surface.png  (both hemispheres, 0–0.5, colorbar not overlapping)
   - <out>/gordon_networks_surface.png      (categorical network topography, 14 nets, subcortical NA hidden)
-  - <out>/gordon_{twin,AdjHE-RE}_circular.png (h2 > 0.33, nodes grouped by network, publication-ready, 0.33-1.0 rescale)
+  - <out>/gordon_{twin,AdjHE-FE}_circular.png (h2 > 0.33, nodes grouped by network, publication-ready, 0.33-1.0 rescale)
 
 Run on the HPC where the dlabel / surfaces and .venv are available:
   bash summary/run_brain_viz.sh
@@ -379,12 +379,12 @@ def _display_tag(tag: str) -> str:
     m = method.lower()
     if m == "twin":
         method_disp = "Twin"
-    elif m in ("adjhe", "adjhe_re", "adjhe-re"):
-        method_disp = "AdjHE-RE"
+    elif m in ("adjhe", "adjhe_re", "adjhe-re", "adjhe_fe", "adjhe-fe"):
+        method_disp = "AdjHE-FE"
     elif m == "networks":
         return f"{atlas_disp} Networks"
     else:
-        method_disp = re.sub(r"AdjHE", "AdjHE-RE", method.replace("_", "-"), flags=re.IGNORECASE)
+        method_disp = re.sub(r"AdjHE", "AdjHE-FE", method.replace("_", "-"), flags=re.IGNORECASE)
         method_disp = method_disp[0].upper() + method_disp[1:] if method_disp else method_disp
     return f"{atlas_disp} {method_disp}"
 
@@ -498,7 +498,7 @@ sub = df[df["Set"] == "gordon"]
 
 matrices = {}
 node_vals = {}
-for method, col in [("twin", "Twin_h2"), ("AdjHE", "h2_gordon_AdjHE_RE")]:
+for method, col in [("twin", "Twin_h2"), ("AdjHE", "h2_gordon_AdjHE_FE")]:
     s = sub[["Pheno", col]].dropna()
     M = rebuild_pconn(s["Pheno"].values, s[col].values.astype(float), N)
     matrices[method] = M

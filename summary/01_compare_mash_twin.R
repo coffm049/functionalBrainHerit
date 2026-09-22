@@ -34,10 +34,10 @@ read_mash_stream <- function(pattern, label) {
 streams <- list(
   SA_AdjHE_RE     = c(pattern = "results/SA/AdjHE_RE_wo_total.csv",
                       label = "SA_AdjHE_RE"),
-  gordon_AdjHE_RE = c(pattern = "results/FCs/gordon/pconns.AdjHE.RE.*.csv",
-                      label = "gordon_AdjHE_RE"),
-  proba_AdjHE_RE  = c(pattern = "results/FCs/probaConns/probaConns.AdjHE.RE.*.csv",
-                      label = "proba_AdjHE_RE")
+  gordon_AdjHE_FE = c(pattern = "results/FCs/gordon/pconns.AdjHE.FE.*.csv",
+                      label = "gordon_AdjHE_FE"),
+  proba_AdjHE_FE  = c(pattern = "results/FCs/probaConns/probaConns.AdjHE.FE.*.csv",
+                      label = "proba_AdjHE_FE")
 )
 
 mash <- map_dfr(streams, function(s) read_mash_stream(s[["pattern"]], s[["label"]]),

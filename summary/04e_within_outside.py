@@ -2,7 +2,7 @@
 """
 Within vs outside network heritability — 10th, 50th, 90th percentiles.
 
-For each FC atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-RE, 30 PCs):
+For each FC atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-FE, 30 PCs):
   * Load networks per parcel (Gordon: gordon_modules.csv 352->14 via labelDict; Proba: abcd 0.75 via CIFTI + Sal<->SMl swap)
   * For each edge (oK -> i,j via triu_indices), classify as:
       - within: networks[i] == networks[j] and not NA
@@ -132,7 +132,7 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
         networks=load_proba_networks(dlabel, N)
     # Keep only cortical 14 for Gordon/Proba (filter NA)
     # But for within/outside classification, we need to handle NA: edges involving NA are excluded from both groups
-    for method, col in [("Twin","Twin_h2"), ("AdjHE-RE", f"h2_{atlas}_AdjHE_RE")]:
+    for method, col in [("Twin","Twin_h2"), ("AdjHE-FE", f"h2_{atlas}_AdjHE_FE")]:
         if col not in wide.columns:
             alt=col.replace("probaConns","proba")
             if alt in wide.columns:

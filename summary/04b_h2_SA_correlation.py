@@ -2,7 +2,7 @@
 """
 Correlation between FC heritability (per-parcel average / 90th percentile) and SA heritability by system.
 
-For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-RE, 30 PCs):
+For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-FE, 30 PCs):
   * Rebuild the full N x N FC h2 matrix from mash_twin_wide.csv (oK -> triu)
   * For each parcel p, compute:
       - mean_h2[p] = mean of row p (all edges incident to p, nan on diagonal)
@@ -237,7 +237,7 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
         # Also ensure canonical SA name for merging
         print(f"[{atlas}][{sa_type}] networks {sorted(set(networks))} -> keep {sorted(networks_keep)}")
 
-        for method, col in [("Twin","Twin_h2"), ("AdjHE-RE", f"h2_{atlas}_AdjHE_RE" if atlas!="SA" else "h2_SA_AdjHE_RE")]:
+        for method, col in [("Twin","Twin_h2"), ("AdjHE-FE" if atlas!="SA" else "AdjHE-RE", f"h2_{atlas}_AdjHE_FE" if atlas!="SA" else "h2_SA_AdjHE_RE")]:
             if col not in wide.columns:
                 alt=col.replace("probaConns","proba")
                 if alt in wide.columns:
@@ -278,17 +278,22 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
                     sa_h2_entry=sa_key
                 else:
                     sa_h2_entry=sa_key
-                # sa_h2_entry is dict with Twin/AdjHE-RE
+                # sa_h2_entry is dict with Twin/AdjHE-FE (FC) or Twin/AdjHE-RE (SA)
                 if isinstance(sa_h2_entry, dict):
-                    sa_h2=sa_h2_entry.get(method, np.nan)
+                    sa_h2 = sa_h2_entry.get(method, np.nan)
+                    if not np.isfinite(sa_h2):
+                        # SA has no FE run: fall back to SA AdjHE-RE for the SNP column
+                        sa_h2 = sa_h2_entry.get("AdjHE-RE", np.nan)
                 else:
-                    sa_h2=np.nan
+                    sa_h2 = np.nan
                 # Fallback to direct sa_map[net] if needed
                 if not np.isfinite(sa_h2):
                     # Try case-insensitive direct
-                    for k,v in sa_map.items():
-                        if k.lower()==net.lower():
-                            sa_h2=v.get(method, np.nan)
+                    for k, v in sa_map.items():
+                        if k.lower() == net.lower():
+                            sa_h2 = v.get(method, np.nan)
+                            if not np.isfinite(sa_h2):
+                                sa_h2 = v.get("AdjHE-RE", np.nan)
                             break
                 fc_mean=np.nanmean([parcel_mean[i] for i in idxs])
                 fc_p90=np.nanmean([parcel_p90[i] for i in idxs])

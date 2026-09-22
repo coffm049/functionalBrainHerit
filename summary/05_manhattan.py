@@ -2,7 +2,7 @@
 """Pairwise-system Manhattan — grouped by Sys-Sys, sorted by median h2.
 
 For each atlas (Gordon 352, ProbaConns 80, SA 17) and both methods
-(Twin, AdjHE-RE) from mash_twin_wide.csv (30 PCs):
+(Twin, SNP) from mash_twin_wide.csv (30 PCs): SNP is AdjHE-FE for FC atlases, AdjHE-RE for SA.
 
   x = edge index grouped by Sys-Sys network pair (e.g. DMN-VIS), ordered by
       largest median h2 within that Sys-Sys group (descending).
@@ -279,7 +279,7 @@ def build_long_for_set(wide, atlas, N, h2_col):
 
 
 def _get_ordering(df, atlas, method):
-    """Helper to get Sys-Sys ordering for an atlas — used to share SNP ordering between Twin and AdjHE-RE per user request."""
+    """Helper to get Sys-Sys ordering for an atlas — used to share SNP ordering between Twin and SNP per user request."""
     stats = df.groupby("connection")["h2"].agg(median="median", size="size")
     largest_20 = stats.sort_values("size", ascending=False).head(20).index.tolist()
     large_order = stats.loc[stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
@@ -287,7 +287,7 @@ def _get_ordering(df, atlas, method):
     return large_order, small_order, largest_20
 
 def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
-    # median h2 and size per Sys-Sys group — if shared_order provided (from SNP), use it for both Twin and AdjHE-RE per user
+    # median h2 and size per Sys-Sys group — if shared_order provided (from SNP), use it for both Twin and SNP per user
     if shared_order is not None:
         large_order, small_order, largest_20 = shared_order
     else:
@@ -390,10 +390,10 @@ wide = pd.read_csv(WIDE)
 set_N = {"gordon": 352, "probaConns": 80, "SA": 17}
 for atlas in ["gordon", "probaConns", "SA"]:
     N = set_N[atlas]
-    # Build both methods first so we can share SNP ordering between Twin and AdjHE-RE per user request
+    # Build both methods first so we can share SNP ordering between Twin and SNP per user request
     dfs = {}
     cols = {}
-    for method, col in [("Twin", "Twin_h2"), ("AdjHE-RE", f"h2_{atlas}_AdjHE_RE" if atlas != "SA" else "h2_SA_AdjHE_RE")]:
+    for method, col in [("Twin", "Twin_h2"), ("AdjHE-FE" if atlas != "SA" else "AdjHE-RE", f"h2_{atlas}_AdjHE_FE" if atlas != "SA" else "h2_SA_AdjHE_RE")]:
         if col not in wide.columns:
             alt = col.replace("probaConns", "proba")
             if alt in wide.columns:
@@ -413,11 +413,12 @@ for atlas in ["gordon", "probaConns", "SA"]:
         cols[method] = col
     if not dfs:
         continue
-    # For Gordon/Proba (and SA for consistency), SNP (AdjHE-RE) determines Sys-Sys ordering so Twin uses same x-axis
+    # For Gordon/Proba (and SA for consistency), SNP (AdjHE-FE for FC, AdjHE-RE for SA) determines Sys-Sys ordering so Twin uses same x-axis
+    snp_key = "AdjHE-FE" if atlas != "SA" else "AdjHE-RE"
     shared_order = None
-    if "AdjHE-RE" in dfs and not dfs["AdjHE-RE"].empty:
-        # Use AdjHE-RE to define ordering
-        shared_order = _get_ordering(dfs["AdjHE-RE"], atlas, "AdjHE-RE")
+    if snp_key in dfs and not dfs[snp_key].empty:
+        # Use SNP to define ordering
+        shared_order = _get_ordering(dfs[snp_key], atlas, snp_key)
     elif "Twin" in dfs:
         shared_order = _get_ordering(dfs["Twin"], atlas, "Twin")
     for method, df in dfs.items():
@@ -435,7 +436,7 @@ try:
     overview_rows = []
     for atlas in ["gordon", "probaConns", "SA"]:
         N = set_N[atlas]
-        for method, col in [("Twin", "Twin_h2"), ("AdjHE-RE", f"h2_{atlas}_AdjHE_RE" if atlas != "SA" else "h2_SA_AdjHE_RE")]:
+        for method, col in [("Twin", "Twin_h2"), ("AdjHE-FE" if atlas != "SA" else "AdjHE-RE", f"h2_{atlas}_AdjHE_FE" if atlas != "SA" else "h2_SA_AdjHE_RE")]:
             if col not in wide.columns:
                 col = col.replace("probaConns", "proba")
                 if col not in wide.columns:
@@ -456,13 +457,15 @@ try:
         overview["connection"] = pd.Categorical(overview["connection"], categories=ov_order, ordered=True)
         overview = overview.sort_values("connection").reset_index(drop=True).reset_index(drop=False).rename(columns={"index": "idx"})
         overview["index"] = overview["idx"]
-        # Facet: 3 rows (gordon/proba/SA) x 2 cols (Twin/AdjHE-RE)
+        # Facet: 3 rows (gordon/proba/SA) x 2 cols (Twin/SNP: AdjHE-FE for FC, AdjHE-RE for SA)
         fig, axes = plt.subplots(3, 2, figsize=(14, 9), sharey=True)
         axes = np.array(axes).flatten() if isinstance(axes, np.ndarray) else [axes]
         # Use same small-group threshold as manhattan_for_df (top 20 by size, then 100x grey)
         # For overview, compute per-facet small groups to keep grey tail visible
-        for ax_idx, (atlas, method) in enumerate(itertools.product(["gordon", "probaConns", "SA"], ["Twin", "AdjHE-RE"])):
-            ax = axes[ax_idx]
+        snp_by_atlas = {"gordon": "AdjHE-FE", "probaConns": "AdjHE-FE", "SA": "AdjHE-RE"}
+        for ax_idx, atlas in enumerate(["gordon", "probaConns", "SA"]):
+            for col_idx, method in enumerate(["Twin", snp_by_atlas[atlas]]):
+                ax = axes[ax_idx * 2 + col_idx]
             sub = overview[(overview["atlas"] == atlas) & (overview["method"] == method)].copy()
             if sub.empty:
                 ax.set_visible(False)

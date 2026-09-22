@@ -2,13 +2,13 @@
 """
 Heatmap of FC heritability (h2) ordered by Sys-Sys network labels.
 
-For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-RE, 30 PCs):
+For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-FE, 30 PCs):
   * Rebuild the full N x N h2 matrix from mash_twin_wide.csv
   * Order parcels by network (as in circular plot: argsort(networks))
   * Plot heatmap with networks as blocks, ordered by Sys-Sys labels, red (low) -> yellow (high), 0-1
   * Save as results/summary/plots/heatmap_{atlas}_{method}.png
 
-Publication-ready: minimal whitespace, no title numbers, stats to CSV, AdjHE-RE naming, 0-1 colorbar.
+  Publication-ready: minimal whitespace, no title numbers, stats to CSV, AdjHE-FE naming, 0-1 colorbar.
 
 Run:
   .venv/bin/python summary/04c_FC_heatmap.py
@@ -138,7 +138,7 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
     uniq, counts = np.unique(networks_ordered, return_counts=True)
     print(f"[{atlas}] order {networks_ordered[:10]}... uniq {list(zip(uniq, counts))}")
 
-    for method, col in [("Twin","Twin_h2"), ("AdjHE-RE", f"h2_{atlas}_AdjHE_RE")]:
+    for method, col in [("Twin","Twin_h2"), ("AdjHE-FE", f"h2_{atlas}_AdjHE_FE")]:
         if col not in wide.columns:
             alt=col.replace("probaConns","proba")
             if alt in wide.columns:
