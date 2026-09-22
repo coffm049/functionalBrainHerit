@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #SBATCH --ntasks=1
-#SBATCH --mem=32g
+#SBATCH --mem=64g
 #SBATCH --time=12:00:00
 #SBATCH --job-name=FCtop5_GCTA
 #SBATCH --mail-type=ALL
