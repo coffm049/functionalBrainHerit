@@ -6,8 +6,8 @@
 #SBATCH --mail-user=coffm049@umn.edu
 
 cd ~/software/MASH
-source /users/4/coffm049/miniconda3/etc/profile.d/conda.sh
+source /standard/projects/coffm049/miniconda3/etc/profile.d/conda.sh
 conda activate MASH
 
 # Estimates on each
-MASH --argfile /users/4/coffm049/papers/functionalBrainHerit/SA/GCTA_height.json
+MASH --argfile /standard/projects/coffm049/papers/functionalBrainHerit/SA/GCTA_height.json
