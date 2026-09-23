@@ -68,3 +68,5 @@ slurm-*.out
 # Generated results (MASH/twin outputs, summary tables, brain viz)
 results/
 
+.tex
+.docx
