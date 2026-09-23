@@ -3,7 +3,7 @@
   "covar": "/projects/standard/rando149/coffm049/ABCD/Results/02_Phenotypes/Covars_m_height.tsv",
   "prefix": "/projects/standard/rando149/coffm049/ABCD/Results/01_Gene_QC/filters/filter1/GRMs/no_rels/no_rels",
   "pheno": "/projects/standard/rando149/coffm049/ABCD/Results/02_Phenotypes/Height.tsv",
-  "out": "/standard/projects/coffm049/papers/functionalBrainHerit/results/SA/height",
+  "out": "/users/4/coffm049/papers/functionalBrainHerit/results/SA/height",
   "npc": [0, 10, 20],
   "mpheno": ["anthro_height_calc"],
   "k": 0,

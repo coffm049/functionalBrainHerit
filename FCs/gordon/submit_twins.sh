@@ -27,14 +27,14 @@ NJOBS=$(( (TOTAL + CHUNK - 1) / CHUNK ))
 echo "Submitting Gordon twin estimates: $NJOBS jobs (chunk=$CHUNK, total=$TOTAL)"
 
 cd "$REPO/FCs/gordon"
-mkdir -p /standard/projects/coffm049/papers/functionalBrainHerit/logs
+mkdir -p /users/4/coffm049/papers/functionalBrainHerit/logs
 
 ARGS=(--time="$TIME" --mem="$MEM" --array=0-$((NJOBS - 1)))
 [ -n "$PARTITION" ] && ARGS+=(-p "$PARTITION")
 ARGS+=(--export=ALL)
 ARGS+=(--job-name="gordon_twin")
-ARGS+=(--output="/standard/projects/coffm049/papers/functionalBrainHerit/logs/gordon_twin_%A_%a.out")
-ARGS+=(--error="/standard/projects/coffm049/papers/functionalBrainHerit/logs/gordon_twin_%A_%a.err")
+ARGS+=(--output="/users/4/coffm049/papers/functionalBrainHerit/logs/gordon_twin_%A_%a.out")
+ARGS+=(--error="/users/4/coffm049/papers/functionalBrainHerit/logs/gordon_twin_%A_%a.err")
 
 if [ "$DRY_RUN" = true ]; then
   echo "Would run: sbatch ${ARGS[@]} twinEsts.slurm"

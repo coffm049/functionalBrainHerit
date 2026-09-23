@@ -79,7 +79,7 @@ for (phenoName in phenoNames) {
 
 # 3) Combine and save
 out_df <- bind_rows(results)
-out <- paste0("/standard/projects/coffm049/papers/functionalBrainHerit/results/FCs/probaConns/herit_", iteration, ".Rds")
+out <- paste0("/users/4/coffm049/papers/functionalBrainHerit/results/FCs/probaConns/herit_", iteration, ".Rds")
 dir.create(dirname(out), recursive = TRUE, showWarnings = FALSE)
 saveRDS(out_df, out)
 cat("Saved ", out, "\n")

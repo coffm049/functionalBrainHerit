@@ -68,7 +68,7 @@ for (phenoName in phenoNames) {
 
 # 3) Combine and save
 out_df <- bind_rows(results)
-out <- "/standard/projects/coffm049/papers/functionalBrainHerit/results/SA/twinEsts/herit_w_total.Rds"
+out <- "/users/4/coffm049/papers/functionalBrainHerit/results/SA/twinEsts/herit_w_total.Rds"
 dir.create(dirname(out), recursive = TRUE, showWarnings = FALSE)
 saveRDS(out_df, out)
 cat("Saved ", out, "\n")
