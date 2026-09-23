@@ -53,34 +53,34 @@ for METHOD in $METHODS; do
       bash FCs/probaConns/submit.sh AdjHE RE
     fi
   elif [ "$METHOD" = "GCTA" ]; then
-    # GCTA has no FE/RE variants
+    # GCTA has no FE/RE variants - pass GCTA as KIND
     echo "--- Submitting GCTA for Gordon ---"
     if [ "$DRY_RUN" = true ]; then
-      echo "  Would run: bash FCs/gordon/submit.sh GCTA"
+      echo "  Would run: bash FCs/gordon/submit.sh GCTA GCTA"
     else
-      bash FCs/gordon/submit.sh GCTA
+      bash FCs/gordon/submit.sh GCTA GCTA
     fi
 
     echo "--- Submitting GCTA for ProbaConns ---"
     if [ "$DRY_RUN" = true ]; then
-      echo "  Would run: bash FCs/probaConns/submit.sh GCTA"
+      echo "  Would run: bash FCs/probaConns/submit.sh GCTA GCTA"
     else
-      bash FCs/probaConns/submit.sh GCTA
+      bash FCs/probaConns/submit.sh GCTA GCTA
     fi
   elif [ "$METHOD" = "HEreg" ]; then
-    # HEreg has no FE/RE variants
+    # HEreg has no FE/RE variants - pass HEreg as KIND
     echo "--- Submitting HEreg for Gordon ---"
     if [ "$DRY_RUN" = true ]; then
-      echo "  Would run: bash FCs/gordon/submit.sh HEreg"
+      echo "  Would run: bash FCs/gordon/submit.sh HEreg HEreg"
     else
-      bash FCs/gordon/submit.sh HEreg
+      bash FCs/gordon/submit.sh HEreg HEreg
     fi
 
     echo "--- Submitting HEreg for ProbaConns ---"
     if [ "$DRY_RUN" = true ]; then
-      echo "  Would run: bash FCs/probaConns/submit.sh HEreg"
+      echo "  Would run: bash FCs/probaConns/submit.sh HEreg HEreg"
     else
-      bash FCs/probaConns/submit.sh HEreg
+      bash FCs/probaConns/submit.sh HEreg HEreg
     fi
   fi
 done

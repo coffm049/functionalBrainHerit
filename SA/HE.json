@@ -4,12 +4,41 @@
   "prefix": "/projects/standard/rando149/coffm049/ABCD/Results/01_Gene_QC/filters/filter1/GRMs/no_rels/no_rels",
   "pheno": "/projects/standard/rando149/coffm049/ABCD/Results/02_Phenotypes/TotalCorticalRepresentation_ByPFN_ABCD.csv",
   "out": "/users/4/coffm049/papers/functionalBrainHerit/results/SA/HE",
-  "npc": [20],
-  "mpheno": ["network_surfarea1", "network_surfarea2", "network_surfarea3", "network_surfarea4", "network_surfarea5", "network_surfarea6", "network_surfarea7", "network_surfarea8", "network_surfarea9", "network_surfarea10", "network_surfarea11", "network_surfarea12", "network_surfarea13", "network_surfarea14", "network_surfarea15", "network_surfarea16", "network_surfarea17"],
+  "npc": [
+    20
+  ],
+  "mpheno": [
+    "network_surfarea1",
+    "network_surfarea2",
+    "network_surfarea3",
+    "network_surfarea4",
+    "network_surfarea5",
+    "network_surfarea6",
+    "network_surfarea7",
+    "network_surfarea8",
+    "network_surfarea9",
+    "network_surfarea10",
+    "network_surfarea11",
+    "network_surfarea12",
+    "network_surfarea13",
+    "network_surfarea14",
+    "network_surfarea15",
+    "network_surfarea16",
+    "network_surfarea17",
+    "anthro_height_calc"
+  ],
   "k": 0,
   "std": false,
-  "qcovar": ["age", "totalNetworkSurface"],
-  "covar_discrete": ["abcd_site", "female", "high.educ", "household_income"],
+  "qcovar": [
+    "age",
+    "totalNetworkSurface"
+  ],
+  "covar_discrete": [
+    "abcd_site",
+    "female",
+    "high_educ",
+    "household_income"
+  ],
   "loop_covars": false,
   "random_groups": null,
   "Method": "HEreg",
