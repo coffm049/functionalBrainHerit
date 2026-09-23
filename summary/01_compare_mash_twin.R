@@ -102,6 +102,10 @@ wide <- reduce(mash_cols, full_join, by = c("Set", "Pheno"))
 final <- twin %>% rename(Pheno = Phenotype) %>%
   full_join(wide, by = c("Set", "Pheno")) %>%
   arrange(Set, Pheno)
+
+final <- final %>% mutate(across(starts_with("h2_"),
+                                 ~ if_else(!is.na(Twin_h2) & .x > Twin_h2, NA_real_, .x)))
+
 write_csv(final, file.path(OUT, "mash_twin_wide.csv"))
 
 long <- final %>% pivot_longer(cols = starts_with("h2_") | all_of("Twin_h2"),
