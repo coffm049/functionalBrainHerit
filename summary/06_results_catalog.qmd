@@ -41,6 +41,9 @@ sa_label     <- "AdjHE-RE"
 # Image path suffixes
 gordon_img_sfx <- if (gordon_col == "h2_gordon_AdjHE_FE") "AdjHE" else "AdjHERE"
 proba_img_sfx  <- if (proba_col == "h2_proba_AdjHE_FE") "AdjHE" else "AdjHERE"
+# Manhattan producer uses method.replace('-','') -> "AdjHEFE"/"AdjHERE"
+gordon_manh_sfx <- if (gordon_col == "h2_gordon_AdjHE_FE") "AdjHEFE" else "AdjHERE"
+proba_manh_sfx  <- if (proba_col == "h2_proba_AdjHE_FE") "AdjHEFE" else "AdjHERE"
 
 fivenum_tbl <- function(x) {
   x <- x[is.finite(x)]
@@ -201,7 +204,7 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 
 ![ProbaConns Twin Manhattan (SNP order)](../results/summary/plots/manhattan_probaConns_Twin.png){width="100%" style="object-fit:contain;"}
 
-![ProbaConns `r proba_label` Manhattan (determines order)](../results/summary/plots/manhattan_probaConns_`r proba_img_sfx`.png){width="100%" style="object-fit:contain;"}
+![ProbaConns `r proba_label` Manhattan (determines order)](../results/summary/plots/manhattan_probaConns_`r proba_manh_sfx`.png){width="100%" style="object-fit:contain;"}
 
 :::
 
@@ -343,19 +346,32 @@ for (p in c(file.path(ROOT,"results/summary/plots/heatmap_gordon_Twin_stats.csv"
 
 ## FC h2 vs Distance — Geodesic (same-hemisphere) {.scrollable style="text-align:center;"}
 
-::: {layout="[[1,1],[1,1]]" style="text-align:center;"}
-
-![Gordon Twin h2 vs geodesic](../results/summary/plots/fc_distance_geodesic_gordon_Twin.png){width="100%" style="object-fit:contain;"}
-
-![Gordon AdjHE-FE h2 vs geodesic](../results/summary/plots/fc_distance_geodesic_gordon_AdjHEFE.png){width="100%" style="object-fit:contain;"}
-
-![ProbaConns Twin h2 vs geodesic](../results/summary/plots/fc_distance_geodesic_probaConns_Twin.png){width="100%" style="object-fit:contain;"}
-
-![ProbaConns AdjHE-FE h2 vs geodesic](../results/summary/plots/fc_distance_geodesic_probaConns_AdjHEFE.png){width="100%" style="object-fit:contain;"}
-
-:::
-
-*Geodesic distance along the cortical surface (same-hemisphere pairs only; cross-hemisphere pairs excluded). Same smooths: solid = binned median (all), dashed = median of `h²>1e-9`.*
+```{r geodesic-section, echo=FALSE, results='asis'}
+geodesic_files <- c(
+  "Gordon Twin"  = file.path(ROOT, "results/summary/plots/fc_distance_geodesic_gordon_Twin.png"),
+  "Gordon AdjHE-FE" = file.path(ROOT, "results/summary/plots/fc_distance_geodesic_gordon_AdjHEFE.png"),
+  "ProbaConns Twin" = file.path(ROOT, "results/summary/plots/fc_distance_geodesic_probaConns_Twin.png"),
+  "ProbaConns AdjHE-FE" = file.path(ROOT, "results/summary/plots/fc_distance_geodesic_probaConns_AdjHEFE.png")
+)
+existing <- geodesic_files[file.exists(geodesic_files)]
+if (length(existing) == 4) {
+  cat(':::: {layout="[[1,1],[1,1]]" style="text-align:center;"}\n\n')
+  for (nm in names(existing)) {
+    cat(sprintf('![%s](../results/summary/plots/%s){width="100%%" style="object-fit:contain;"}\n\n',
+                nm, basename(existing[nm])))
+  }
+  cat('::::\n\n')
+  cat('*Geodesic distance along the cortical surface (same-hemisphere pairs only; cross-hemisphere pairs excluded). Same smooths: solid = binned median (all), dashed = median of `h²>1e-9`.*\n\n')
+} else if (length(existing) > 0) {
+  cat('::: {style="text-align:center; font-style:italic; color:#666;"}\n')
+  cat('Geodesic plots not fully available (found ', length(existing), '/4). Showing available:\n\n')
+  for (nm in names(existing)) {
+    cat(sprintf('![%s](../results/summary/plots/%s){width="100%%" style="object-fit:contain;"}\n\n',
+                nm, basename(existing[nm])))
+  }
+  cat(':::\n\n')
+}
+```
 
 ```{r fc-dist-within-across}
 # h2 vs distance, split within (same_network TRUE) vs across (FALSE) — per atlas × method
