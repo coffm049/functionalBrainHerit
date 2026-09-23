@@ -13,7 +13,7 @@
   "loop_covars": false,
   "random_groups": null,
   "Method": "HEreg",
-  "ids": "/projects/standard/rando149/coffm049/filtered_ids.csv",
+  "ids": "/projects/standard/rando149/coffm049/filtered_ids.tsv",
   "Naive": false,
   "pheno_filter": null,
   "covar_filter": null,

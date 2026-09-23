@@ -1,6 +1,6 @@
 #!/bin/bash
 # Master script to submit all SNP heritability and twin estimates
-# Usage: bash submit_all_snp.sh [--methods METHOD_LIST] [--partition NAME] [--dry-run]
+# Usage: bash submit_all_twin_snp.sh [--methods METHOD_LIST] [--partition NAME] [--dry-run]
 
 set -euo pipefail
 
@@ -23,22 +23,65 @@ mkdir -p logs
 
 echo "=== Submitting SNP estimates ==="
 for METHOD in $METHODS; do
-  echo "--- Submitting $METHOD for Gordon ---"
-  if [ "$DRY_RUN" = true ]; then
-    echo "  Would run: bash FCs/gordon/submit.sh $METHOD FE"
-    echo "  Would run: bash FCs/gordon/submit.sh $METHOD RE"
-  else
-    bash FCs/gordon/submit.sh "$METHOD" FE
-    bash FCs/gordon/submit.sh "$METHOD" RE
-  fi
+  if [ "$METHOD" = "AdjHE" ]; then
+    # AdjHE has FE and RE variants
+    echo "--- Submitting AdjHE-FE for Gordon ---"
+    if [ "$DRY_RUN" = true ]; then
+      echo "  Would run: bash FCs/gordon/submit.sh AdjHE FE"
+    else
+      bash FCs/gordon/submit.sh AdjHE FE
+    fi
 
-  echo "--- Submitting $METHOD for ProbaConns ---"
-  if [ "$DRY_RUN" = true ]; then
-    echo "  Would run: bash FCs/probaConns/submit.sh $METHOD FE"
-    echo "  Would run: bash FCs/probaConns/submit.sh $METHOD RE"
-  else
-    bash FCs/probaConns/submit.sh "$METHOD" FE
-    bash FCs/probaConns/submit.sh "$METHOD" RE
+    echo "--- Submitting AdjHE-RE for Gordon ---"
+    if [ "$DRY_RUN" = true ]; then
+      echo "  Would run: bash FCs/gordon/submit.sh AdjHE RE"
+    else
+      bash FCs/gordon/submit.sh AdjHE RE
+    fi
+
+    echo "--- Submitting AdjHE-FE for ProbaConns ---"
+    if [ "$DRY_RUN" = true ]; then
+      echo "  Would run: bash FCs/probaConns/submit.sh AdjHE FE"
+    else
+      bash FCs/probaConns/submit.sh AdjHE FE
+    fi
+
+    echo "--- Submitting AdjHE-RE for ProbaConns ---"
+    if [ "$DRY_RUN" = true ]; then
+      echo "  Would run: bash FCs/probaConns/submit.sh AdjHE RE"
+    else
+      bash FCs/probaConns/submit.sh AdjHE RE
+    fi
+  elif [ "$METHOD" = "GCTA" ]; then
+    # GCTA has no FE/RE variants
+    echo "--- Submitting GCTA for Gordon ---"
+    if [ "$DRY_RUN" = true ]; then
+      echo "  Would run: bash FCs/gordon/submit.sh GCTA"
+    else
+      bash FCs/gordon/submit.sh GCTA
+    fi
+
+    echo "--- Submitting GCTA for ProbaConns ---"
+    if [ "$DRY_RUN" = true ]; then
+      echo "  Would run: bash FCs/probaConns/submit.sh GCTA"
+    else
+      bash FCs/probaConns/submit.sh GCTA
+    fi
+  elif [ "$METHOD" = "HEreg" ]; then
+    # HEreg has no FE/RE variants
+    echo "--- Submitting HEreg for Gordon ---"
+    if [ "$DRY_RUN" = true ]; then
+      echo "  Would run: bash FCs/gordon/submit.sh HEreg"
+    else
+      bash FCs/gordon/submit.sh HEreg
+    fi
+
+    echo "--- Submitting HEreg for ProbaConns ---"
+    if [ "$DRY_RUN" = true ]; then
+      echo "  Would run: bash FCs/probaConns/submit.sh HEreg"
+    else
+      bash FCs/probaConns/submit.sh HEreg
+    fi
   fi
 done
 
