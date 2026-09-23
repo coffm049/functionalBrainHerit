@@ -1,4 +1,5 @@
 library(tidyverse)
+library(arrow)
 library(mets)
 
 phenoNames <- c("o1")
@@ -30,5 +31,6 @@ df <- read_csv(#"/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotype
   left_join(pheno, by = c("FID", "IID")) %>%
   drop_na()
 
-mod <- summary(twinlm(value ~ site_id_l + age + female + household.income + high.educ, data = as.data.frame(df), DZ = "DZ", zyg = "zyg", id = "FID", type = "ace"))
+mod <- summary(twinlm(o1 ~ site_id_l + age + female + household.income + high.educ, data = as.data.frame(df), DZ = "DZ", zyg = "zyg", id = "FID", type = "ace"))
+print(mod)
 
