@@ -1,9 +1,14 @@
+# conda activate twinEst
 library(tidyverse)
 library(mets)
 
 # 17 PFN network surface-area phenotypes (current pipeline)
 pheno <- read_csv("/projects/standard/rando149/coffm049/ABCD/Results/02_Phenotypes/TotalCorticalRepresentation_ByPFN_ABCD.csv") %>%
   select(IID, network_surfarea1:network_surfarea17)
+
+# Filter to IDs in filtered_ids.csv (same as MASH)
+filtered_ids <- read_csv("/projects/standard/rando149/coffm049/filtered_ids.csv", col_names = c("IID"))
+pheno <- inner_join(pheno, filtered_ids, by = "IID")
 
 # Attach family ID (IDs.txt has no header) and total surface area
 IDs <- read_table("/projects/standard/rando149/coffm049/ABCD/Results/IDs/IDs.txt",
@@ -22,6 +27,10 @@ df <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes
   drop_na() %>%
   left_join(pheno, by = c("FID", "IID")) %>%
   drop_na() %>%
+  # Filter to FIDs with at least 2 members (twin pairs)
+  add_count(FID) %>%
+  filter(n >= 2) %>%
+  select(-n) %>%
   pivot_longer(cols = network_surfarea1:network_surfarea17, names_to = "phenotype") %>%
   nest(data = -phenotype) %>%
   mutate(herit = map(data, function(d) {
@@ -31,6 +40,6 @@ df <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes
       error = function(e) structure(list(error = conditionMessage(e)), class = "twinlm_error"))
   }, .progress = TRUE))
 
-out <- "/users/4/coffm049/papers/functionalBrainHerit/results/SA/twinEsts/herit_w_total.Rds"
+out <- "/standard/projects/coffm049/papers/functionalBrainHerit/results/SA/twinEsts/herit_w_total.Rds"
 dir.create(dirname(out), recursive = TRUE, showWarnings = FALSE)
 saveRDS(df, out)
