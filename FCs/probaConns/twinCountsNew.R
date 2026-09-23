@@ -1,3 +1,4 @@
+library(arrow)
 library(tidyverse)
 library(mets)
 
@@ -32,3 +33,5 @@ df <- read_csv(#"/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotype
 
 mod <- summary(twinlm(value ~ site_id_l + age + female + household.income + high.educ, data = as.data.frame(df), DZ = "DZ", zyg = "zyg", id = "FID", type = "ace"))
 
+library(arrow)
+library(arrow)
