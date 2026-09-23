@@ -5,12 +5,12 @@ set -euo pipefail
 
 METHOD=$1
 KIND=$2
-WORKINGDIRECTORY=/users/4/coffm049/papers/functionalBrainHerit/FCs/probaConns
+WORKINGDIRECTORY=/standard/projects/coffm049/papers/functionalBrainHerit/FCs/probaConns
 cd "$WORKINGDIRECTORY"
 
 # MASH writes logs into the parent of 'out'; create them first
-mkdir -p /users/4/coffm049/papers/functionalBrainHerit/results/FCs/probaConns \
-         /users/4/coffm049/papers/functionalBrainHerit/results/FCs/probaConns/probaConns
+mkdir -p /standard/projects/coffm049/papers/functionalBrainHerit/results/FCs/probaConns \
+         /standard/projects/coffm049/papers/functionalBrainHerit/results/FCs/probaConns/probaConns
 
 # probabilistic connectomes: 3160 FC phenotypes (o0..o3159)
 CHUNK=10
@@ -40,7 +40,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-source /users/4/coffm049/miniconda3/etc/profile.d/conda.sh
+source /standard/projects/coffm049/miniconda3/etc/profile.d/conda.sh
 conda activate MASH
 
 NJOBS=$(python ../make_configs.py --template "$TEMPLATE" --method "$METHOD" --kind "$KIND" \
@@ -49,10 +49,10 @@ NJOBS=$(python ../make_configs.py --template "$TEMPLATE" --method "$METHOD" --ki
 ARGS=(--time="$TIME" --mem="$MEM" --array=0-$((NJOBS - 1)))
 [ -n "$PARTITION" ] && ARGS+=(-p "$PARTITION")
 ARGS+=(--export=ALL,METHOD="$METHOD",KIND="$KIND",WORKINGDIRECTORY="$WORKINGDIRECTORY")
-mkdir -p /users/4/coffm049/papers/functionalBrainHerit/logs
+mkdir -p /standard/projects/coffm049/papers/functionalBrainHerit/logs
 ARGS+=(--job-name="FCproba_${METHOD}_${KIND}")
-ARGS+=(--output="/users/4/coffm049/papers/functionalBrainHerit/logs/FCproba_${METHOD}_${KIND}_%A_%a.out")
-ARGS+=(--error="/users/4/coffm049/papers/functionalBrainHerit/logs/FCproba_${METHOD}_${KIND}_%A_%a.err")
+ARGS+=(--output="/standard/projects/coffm049/papers/functionalBrainHerit/logs/FCproba_${METHOD}_${KIND}_%A_%a.out")
+ARGS+=(--error="/standard/projects/coffm049/papers/functionalBrainHerit/logs/FCproba_${METHOD}_${KIND}_%A_%a.err")
 
 echo "Submitting $NJOBS jobs for $METHOD $KIND (chunk=$CHUNK phenos):"
 sbatch "${ARGS[@]}" run.slurm

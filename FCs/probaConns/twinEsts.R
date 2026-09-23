@@ -12,21 +12,14 @@ CHUNK = 20
 # probaConns: 3160 edges -> 158 chunks of 20 (o0..o3159, 0-indexed)
 phenoNames <- paste0("o", (iteration * CHUNK) : ((iteration + 1) * CHUNK - 1))
 
-pheno <- read_parquet(
-  "/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/probaConns.parquet",
-  col_select = c("IID", phenoNames)
-) %>% distinct(IID, .keep_all = TRUE)
+# 1) Load covariates + filtered IDs + FID mapping ONCE
+cat("Loading covariates and ID maps...\n")
+filtered_ids <- read_csv("/projects/standard/rando149/coffm049/filtered_ids.csv", col_names = c("IID"), show_col_types = FALSE)
 
-# Filter to IDs in filtered_ids.csv (same as MASH)
-filtered_ids <- read_csv("/projects/standard/rando149/coffm049/filtered_ids.csv", col_names = c("IID"))
-pheno <- inner_join(pheno, filtered_ids, by = "IID")
-
-# Family IDs for twin pairing
 IDs <- read_table("/projects/standard/rando149/coffm049/ABCD/Results/IDs/IDs.txt",
                   col_names = c("FID", "IID"))
-pheno <- left_join(pheno, IDs, by = "IID") %>% distinct()
 
-df <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/Covars2.csv") %>%
+covars <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/Covars2.csv", show_col_types = FALSE) %>%
   select(FID, IID, age, female, site_id_l, household.income, high.educ, genetic_zygosity_status_1) %>%
   mutate(zyg = case_when(
     grepl("mono", genetic_zygosity_status_1, ignore.case = TRUE) ~ "MZ",
@@ -35,21 +28,58 @@ df <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes
   )) %>%
   select(-genetic_zygosity_status_1) %>%
   drop_na() %>%
-  left_join(pheno, by = c("FID", "IID")) %>%
-  drop_na() %>%
+  inner_join(IDs, by = c("FID", "IID")) %>%
+  inner_join(filtered_ids, by = "IID") %>%
   # Filter to FIDs with at least 2 members (twin pairs)
   add_count(FID) %>%
   filter(n >= 2) %>%
-  select(-n) %>%
-  pivot_longer(cols = starts_with("o"), names_to = "phenotype") %>%
-  nest(data = -phenotype) %>%
-  mutate(herit = map(data, function(d) {
-    tryCatch(
-      summary(twinlm(value ~ site_id_l + age + female + household.income + high.educ,
-                     data = as.data.frame(d), DZ = "DZ", zyg = "zyg", id = "FID", type = "ace")),
-      error = function(e) structure(list(error = conditionMessage(e)), class = "twinlm_error"))
-  }))
+  select(-n)
 
+cat("Covariate base: ", nrow(covars), " individuals, ", length(unique(covars$FID)), " families\n")
+
+# 2) Loop through phenotypes ONE AT A TIME
+results <- list()
+for (phenoName in phenoNames) {
+  cat("  Processing ", phenoName, "...\n")
+  
+  # Read ONLY this phenotype column + IID
+  pheno <- read_parquet(
+    "/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/FCsTopo/probaConns.parquet",
+    col_select = c("IID", phenoName)
+  ) %>% distinct(IID, .keep_all = TRUE) %>%
+    inner_join(filtered_ids, by = "IID")
+  
+  # Join with covariates
+  d <- left_join(covars, pheno, by = c("FID", "IID")) %>%
+    drop_na(all_of(phenoName))
+  
+  if (nrow(d) < 50) {
+    cat("    Skipping ", phenoName, ": only ", nrow(d), " obs\n")
+    results[[phenoName]] <- tibble(
+      phenotype = phenoName,
+      herit = list(structure(list(error = "insufficient data"), class = "twinlm_error"))
+    )
+    next
+  }
+  
+  # Estimate
+  est <- tryCatch(
+    summary(twinlm(
+      as.formula(paste(phenoName, "~ site_id_l + age + female + household.income + high.educ")),
+      data = as.data.frame(d), DZ = "DZ", zyg = "zyg", id = "FID", type = "ace"
+    )),
+    error = function(e) structure(list(error = conditionMessage(e)), class = "twinlm_error")
+  )
+  
+  results[[phenoName]] <- tibble(
+    phenotype = phenoName,
+    herit = list(est)
+  )
+}
+
+# 3) Combine and save
+out_df <- bind_rows(results)
 out <- paste0("/standard/projects/coffm049/papers/functionalBrainHerit/results/FCs/probaConns/herit_", iteration, ".Rds")
 dir.create(dirname(out), recursive = TRUE, showWarnings = FALSE)
-saveRDS(df, out)
+saveRDS(out_df, out)
+cat("Saved ", out, "\n")

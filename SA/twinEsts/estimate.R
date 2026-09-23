@@ -3,20 +3,22 @@ library(tidyverse)
 library(mets)
 
 # 17 PFN network surface-area phenotypes (current pipeline)
-pheno <- read_csv("/projects/standard/rando149/coffm049/ABCD/Results/02_Phenotypes/TotalCorticalRepresentation_ByPFN_ABCD.csv") %>%
-  select(IID, network_surfarea1:network_surfarea17)
+phenoNames <- paste0("network_surfarea", 1:17)
 
-# Filter to IDs in filtered_ids.csv (same as MASH)
-filtered_ids <- read_csv("/projects/standard/rando149/coffm049/filtered_ids.csv", col_names = c("IID"))
-pheno <- inner_join(pheno, filtered_ids, by = "IID")
+# 1) Load covariates + filtered IDs + FID mapping ONCE
+cat("Loading covariates and ID maps...\n")
+filtered_ids <- read_csv("/projects/standard/rando149/coffm049/filtered_ids.csv", col_names = c("IID"), show_col_types = FALSE)
 
-# Attach family ID (IDs.txt has no header) and total surface area
 IDs <- read_table("/projects/standard/rando149/coffm049/ABCD/Results/IDs/IDs.txt",
                   col_names = c("FID", "IID"))
-pheno <- left_join(pheno, IDs, by = "IID") %>% distinct() %>%
-  mutate(totalNetworkSurface = rowSums(select(., starts_with("network_surfarea"))))
 
-df <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/Covars2.csv") %>%
+pheno <- read_csv("/projects/standard/rando149/coffm049/ABCD/Results/02_Phenotypes/TotalCorticalRepresentation_ByPFN_ABCD.csv", show_col_types = FALSE) %>%
+  select(IID, all_of(phenoNames)) %>%
+  inner_join(filtered_ids, by = "IID") %>%
+  left_join(IDs, by = "IID") %>% distinct() %>%
+  mutate(totalNetworkSurface = rowSums(select(., all_of(phenoNames))))
+
+covars <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes/Covars2.csv", show_col_types = FALSE) %>%
   select(FID, IID, age, female, site_id_l, household.income, high.educ, genetic_zygosity_status_1) %>%
   mutate(zyg = case_when(
     grepl("mono", genetic_zygosity_status_1, ignore.case = TRUE) ~ "MZ",
@@ -25,21 +27,48 @@ df <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenotypes
   )) %>%
   select(-genetic_zygosity_status_1) %>%
   drop_na() %>%
-  left_join(pheno, by = c("FID", "IID")) %>%
-  drop_na() %>%
+  inner_join(pheno, by = c("FID", "IID")) %>%
   # Filter to FIDs with at least 2 members (twin pairs)
   add_count(FID) %>%
   filter(n >= 2) %>%
-  select(-n) %>%
-  pivot_longer(cols = network_surfarea1:network_surfarea17, names_to = "phenotype") %>%
-  nest(data = -phenotype) %>%
-  mutate(herit = map(data, function(d) {
-    tryCatch(
-      summary(twinlm(value ~ site_id_l + age + female + household.income + high.educ + totalNetworkSurface,
-                     data = as.data.frame(d), DZ = "DZ", zyg = "zyg", id = "FID", type = "ace")),
-      error = function(e) structure(list(error = conditionMessage(e)), class = "twinlm_error"))
-  }, .progress = TRUE))
+  select(-n)
 
+cat("Covariate base: ", nrow(covars), " individuals, ", length(unique(covars$FID)), " families\n")
+
+# 2) Loop through phenotypes ONE AT A TIME
+results <- list()
+for (phenoName in phenoNames) {
+  cat("  Processing ", phenoName, "...\n")
+  
+  d <- covars %>% drop_na(all_of(phenoName))
+  
+  if (nrow(d) < 50) {
+    cat("    Skipping ", phenoName, ": only ", nrow(d), " obs\n")
+    results[[phenoName]] <- tibble(
+      phenotype = phenoName,
+      herit = list(structure(list(error = "insufficient data"), class = "twinlm_error"))
+    )
+    next
+  }
+  
+  # Estimate
+  est <- tryCatch(
+    summary(twinlm(
+      as.formula(paste(phenoName, "~ site_id_l + age + female + household.income + high.educ + totalNetworkSurface")),
+      data = as.data.frame(d), DZ = "DZ", zyg = "zyg", id = "FID", type = "ace"
+    )),
+    error = function(e) structure(list(error = conditionMessage(e)), class = "twinlm_error")
+  )
+  
+  results[[phenoName]] <- tibble(
+    phenotype = phenoName,
+    herit = list(est)
+  )
+}
+
+# 3) Combine and save
+out_df <- bind_rows(results)
 out <- "/standard/projects/coffm049/papers/functionalBrainHerit/results/SA/twinEsts/herit_w_total.Rds"
 dir.create(dirname(out), recursive = TRUE, showWarnings = FALSE)
-saveRDS(df, out)
+saveRDS(out_df, out)
+cat("Saved ", out, "\n")
