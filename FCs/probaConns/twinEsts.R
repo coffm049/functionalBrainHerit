@@ -6,7 +6,19 @@ library(tidyverse)
 library(mets)
 
 args = commandArgs(trailingOnly = TRUE)
-iteration = as.numeric(args[1])
+
+to_num <- function(x) suppressWarnings(as.numeric(x))
+iteration <- NULL
+if (length(args) >= 1 && !is.na(to_num(args[1]))) {
+  iteration <- to_num(args[1])
+} else {
+  task <- Sys.getenv("SLURM_ARRAY_TASK_ID")
+  if (task != "" && !is.na(to_num(task))) iteration <- to_num(task)
+}
+if (is.null(iteration) || iteration < 0 || iteration > 157) {
+  stop("No valid SLURM_ARRAY_TASK_ID / iteration argument provided (expected 0-157)")
+}
+cat("iteration =", iteration, "\n")
 
 CHUNK = 20
 # probaConns: 3160 edges -> 158 chunks of 20 (o0..o3159, 0-indexed)

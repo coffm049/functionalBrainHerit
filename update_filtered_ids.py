@@ -17,10 +17,23 @@ BROAD = f"{P}/filtered_ids_broad.tsv"
 GORDON = f"{P}/ABCD/Workflow/02_Phenotypes/FCsTopo/pconns.parquet"
 PROBA = f"{P}/ABCD/Workflow/02_Phenotypes/FCsTopo/probaConns.parquet"
 
+# Every SNP config must be a subset of the GRM it reads. Configs use either the
+# full or the no_rels GRM, so intersect with both id files to be safe.
+GRM_NO_RELS = f"{P}/ABCD/Results/01_Gene_QC/filters/filter1/GRMs/no_rels/no_rels.grm.id"
+GRM_FULL = f"{P}/ABCD/Results/01_Gene_QC/filters/filter1/GRMs/full/full.grm.id"
+GRMS = [GRM_NO_RELS, GRM_FULL]
+
 
 def parquet_iids(path):
     tbl = pq.read_table(path, columns=["IID"])
     return set(tbl.column("IID").to_pylist())
+
+
+def grm_iids(path):
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"Missing GRM id file {path}")
+    df = pd.read_table(path, header=None, names=["FID", "IID"], dtype=str)
+    return set(df.IID)
 
 
 def main():
@@ -29,13 +42,17 @@ def main():
     for f in (GORDON, PROBA):
         if not os.path.isfile(f):
             raise FileNotFoundError(f"Missing {f}")
+    for f in GRMS:
+        if not os.path.isfile(f):
+            raise FileNotFoundError(f"Missing GRM id file {f}")
 
     cur = pd.read_table(IDS, header=None, names=["FID", "IID"], dtype=str)
     cur_ids = set(cur.IID)
     gordon_ids = parquet_iids(GORDON)
     proba_ids = parquet_iids(PROBA)
 
-    common = cur_ids & gordon_ids & proba_ids
+    grm_id_sets = {os.path.basename(os.path.dirname(g)): grm_iids(g) for g in GRMS}
+    common = cur_ids & gordon_ids & proba_ids & set.intersection(*grm_id_sets.values())
     if not common:
         raise ValueError("Empty common pool - check parquet IID columns")
 
@@ -51,6 +68,8 @@ def main():
     print(f"Current pool      : {len(cur_ids)} subjects")
     print(f"Gordon parquet    : {len(gordon_ids)} unique IIDs (in current: {len(cur_ids & gordon_ids)})")
     print(f"ProbaConns parquet: {len(proba_ids)} unique IIDs (in current: {len(cur_ids & proba_ids)})")
+    for name, s in grm_id_sets.items():
+        print(f"GRM {name:<10s}: {len(s)} IIDs (in current: {len(cur_ids & s)})")
     print(f"COMMON pool       : {len(common)} subjects -> wrote {IDS}")
 
 
