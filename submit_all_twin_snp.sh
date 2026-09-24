@@ -88,8 +88,8 @@ done
 echo "--- Submitting SA estimates ---"
 for M in $METHODS; do
   case $M in
-    AdjHE) echo "Submitting SA AdjHE-RE..."; [ "$DRY_RUN" = true ] && echo "  Would run: sbatch SA/SLURM_AdjHE_RE_with_total.sh" || sbatch SA/SLURM_AdjHE_RE_with_total.sh ;;
-    GCTA) echo "Submitting SA GCTA..."; [ "$DRY_RUN" = true ] && echo "  Would run: sbatch SA/GCTA_height.SLURM" || sbatch SA/GCTA_height.SLURM ;;
+    AdjHE) echo "Submitting SA AdjHE-RE..."; [ "$DRY_RUN" = true ] && echo "  Would run: sbatch SA/SLURM_AdjHE_RE_wo_total.sh" || sbatch SA/SLURM_AdjHE_RE_wo_total.sh ;;
+    GCTA) echo "Submitting SA GCTA..."; [ "$DRY_RUN" = true ] && echo "  Would run: sbatch SA/SLURM_GCTA.sh" || sbatch SA/SLURM_GCTA.sh ;;
     HEreg) echo "Submitting SA HEreg..."; [ "$DRY_RUN" = true ] && echo "  Would run: sbatch SA/SLURM_HEreg.sh" || sbatch SA/SLURM_HEreg.sh ;;
   esac
 done

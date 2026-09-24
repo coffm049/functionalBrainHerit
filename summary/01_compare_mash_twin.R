@@ -39,20 +39,26 @@ read_mash_stream <- function(pattern, label) {
 streams <- list(
   SA_AdjHE_RE        = c(pattern = "results/SA/AdjHE_RE_wo_total.csv",
                          label = "SA_AdjHE_RE"),
+  SA_GCTA            = c(pattern = "results/SA/GCTA.csv",
+                         label = "SA_GCTA"),
+  SA_HEreg           = c(pattern = "results/SA/HE.csv",
+                         label = "SA_HEreg"),
   gordon_AdjHE_FE    = c(pattern = "results/FCs/gordon/pconns.AdjHE.FE.*.csv",
                          label = "gordon_AdjHE_FE"),
   gordon_AdjHE_RE    = c(pattern = "results/FCs/gordon/pconns.AdjHE.RE.*.csv",
                          label = "gordon_AdjHE_RE"),
-  gordon_GCTA        = c(pattern = "results/FCs/gordon/pconn.0_*.csv",
+  gordon_GCTA        = c(pattern = "results/FCs/gordon/pconns.GCTA.GCTA.*.csv",
                          label = "gordon_GCTA"),
+  gordon_HEreg       = c(pattern = "results/FCs/gordon/pconns.HEreg.HEreg.*.csv",
+                         label = "gordon_HEreg"),
   proba_AdjHE_FE     = c(pattern = "results/FCs/probaConns/probaConns.AdjHE.FE.*.csv",
                          label = "proba_AdjHE_FE"),
   proba_AdjHE_RE     = c(pattern = "results/FCs/probaConns/probaConns.AdjHE.RE.*.csv",
                          label = "proba_AdjHE_RE"),
-  proba_GCTA         = c(pattern = "results/FCs/probaConns/probaConns_*.csv",
+  proba_GCTA         = c(pattern = "results/FCs/probaConns/probaConns.GCTA.GCTA.*.csv",
                          label = "proba_GCTA"),
-  SA_GCTA            = c(pattern = "results/SA/GCTA_*.csv",
-                         label = "SA_GCTA")
+  proba_HEreg        = c(pattern = "results/FCs/probaConns/probaConns.HEreg.HEreg.*.csv",
+                         label = "proba_HEreg")
 )
 
 mash <- map_dfr(streams, function(s) read_mash_stream(s[["pattern"]], s[["label"]]),

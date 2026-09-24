@@ -31,7 +31,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--template", required=True, help="Template JSON (feExample2.json or reExample2.json)")
     parser.add_argument("--method", required=True, help="Estimation method (AdjHE, GCTA, HEreg, ...)")
-    parser.add_argument("--kind", required=True, choices=["FE", "RE"], help="Fixed-effects or random-effects/site run")
+    parser.add_argument("--kind", required=True, choices=["FE", "RE", "GCTA", "HEreg"],
+                        help="Fixed-effects or random-effects/site run (GCTA/HEreg have no FE/RE split)")
     parser.add_argument("--chunk", type=int, required=True, help="Number of phenotypes per config")
     parser.add_argument("--total", type=int, required=True, help="Total number of phenotype columns (o0..o(total-1))")
     parser.add_argument("--prefix", required=True, help="Output basename prefix (e.g. pconns)")
