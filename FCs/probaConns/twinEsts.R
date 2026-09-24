@@ -64,7 +64,7 @@ for (phenoName in phenoNames) {
     inner_join(filtered_ids, by = "IID")
   
   # Join with covariates
-  d <- left_join(covars, pheno, by = c("FID", "IID")) %>%
+  d <- left_join(covars, pheno, by = "IID") %>%
     drop_na(all_of(phenoName))
   
   if (nrow(d) < 50) {
