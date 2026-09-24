@@ -1,20 +1,18 @@
 #!/bin/bash
 # Master script to submit all SNP heritability and twin estimates
-# Usage: bash submit_all_twin_snp.sh [--methods METHOD_LIST] [--partition NAME] [--snp-only] [--dry-run]
+# Usage: bash submit_all_twin_snp.sh [--methods METHOD_LIST] [--partition NAME] [--dry-run]
 
 set -euo pipefail
 
 REPO=/users/4/coffm049/papers/functionalBrainHerit
 METHODS="AdjHE GCTA HEreg"
 PARTITION=""
-SNP_ONLY=false
 DRY_RUN=false
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --methods) METHODS=$2; shift 2 ;;
     --partition) PARTITION=$2; shift 2 ;;
-    --snp-only) SNP_ONLY=true; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
     *) echo "Unknown: $1"; exit 1 ;;
   esac
@@ -97,22 +95,18 @@ for M in $METHODS; do
 done
 
 echo ""
-if [ "$SNP_ONLY" = false ]; then
-  echo "=== Submitting Twin estimates (conda env: twinEst) ==="
-  if [ "$DRY_RUN" = true ]; then
-    echo "  Would run: sbatch FCs/gordon/twinEsts.SLURM"
-    echo "  Would run: sbatch FCs/probaConns/twinEsts.SLURM"
-    echo "  Would run: sbatch SA/twinEsts/estimate.SLURM"
-  else
-    echo "Submitting Gordon twins..."
-    sbatch FCs/gordon/twinEsts.SLURM
-    echo "Submitting ProbaConns twins..."
-    sbatch FCs/probaConns/twinEsts.SLURM
-    echo "Submitting SA twins..."
-    sbatch SA/twinEsts/estimate.SLURM
-  fi
+echo "=== Submitting Twin estimates (conda env: twinEst) ==="
+if [ "$DRY_RUN" = true ]; then
+  echo "  Would run: sbatch FCs/gordon/twinEsts.SLURM"
+  echo "  Would run: sbatch FCs/probaConns/twinEsts.SLURM"
+  echo "  Would run: sbatch SA/twinEsts/estimate.SLURM"
 else
-  echo "=== Skipping twin estimates (--snp-only) ==="
+  echo "Submitting Gordon twins..."
+  sbatch FCs/gordon/twinEsts.SLURM
+  echo "Submitting ProbaConns twins..."
+  sbatch FCs/probaConns/twinEsts.SLURM
+  echo "Submitting SA twins..."
+  sbatch SA/twinEsts/estimate.SLURM
 fi
 
 echo ""
