@@ -7,7 +7,9 @@ phenoNames <- paste0("network_surfarea", 1:17)
 
 # 1) Load covariates + filtered IDs + FID mapping ONCE
 cat("Loading covariates and ID maps...\n")
-filtered_ids <- read_csv("/projects/standard/rando149/coffm049/filtered_ids.csv", col_names = c("IID"), show_col_types = FALSE)
+filtered_ids <- read_table("/projects/standard/rando149/coffm049/filtered_ids.tsv",
+                           col_names = c("FID", "IID"), show_col_types = FALSE) %>%
+  select(IID)
 
 IDs <- read_table("/projects/standard/rando149/coffm049/ABCD/Results/IDs/IDs.txt",
                   col_names = c("FID", "IID"))
