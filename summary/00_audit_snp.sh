@@ -13,6 +13,14 @@
 #   make_configs.py:26-27           last chunk is short when total % chunk != 0
 #   SA/*.json                       17 phenotypes, one CSV per method
 #
+# Rows per file = chunk phenotypes x len(npc): MASH emits one row per
+# (phenotype x npc value), tagged by the 'PCs' column
+# (MASH/src/Estimate/estimators/all_estimators.py:455, itertools.product).
+# The npc field is read from the template each submit.sh selects:
+#   gordon fe/re npc=[0,20] -> x2   proba re  npc=[0,20] -> x2
+#   gordon gcta/he npc=[20] -> x1   others   npc=[20]    -> x1
+# 01_compare_mash_twin.R:33-36 already collapses these by filtering PCs == npc.
+#
 # This script never writes to results/ and never submits jobs.
 
 set -uo pipefail
@@ -25,22 +33,22 @@ cd "$ROOT" || exit 1
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-# key|glob|chunk|total|expected_files
+# key|glob|chunk|total|expected_files|npc_multiplier
 STREAMS=(
-  "gordon_AdjHE_FE|results/FCs/gordon/pconns.AdjHE.FE.*.csv|208|61776|297"
-  "gordon_AdjHE_RE|results/FCs/gordon/pconns.AdjHE.RE.*.csv|208|61776|297"
-  "gordon_GCTA|results/FCs/gordon/pconns.GCTA.GCTA.*.csv|100|61776|618"
-  "gordon_HEreg|results/FCs/gordon/pconns.HEreg.HEreg.*.csv|208|61776|297"
-  "proba_AdjHE_FE|results/FCs/probaConns/probaConns.AdjHE.FE.*.csv|10|3160|316"
-  "proba_AdjHE_RE|results/FCs/probaConns/probaConns.AdjHE.RE.*.csv|40|3160|79"
-  "proba_GCTA|results/FCs/probaConns/probaConns.GCTA.GCTA.*.csv|10|3160|316"
-  "proba_HEreg|results/FCs/probaConns/probaConns.HEreg.HEreg.*.csv|10|3160|316"
+  "gordon_AdjHE_FE|results/FCs/gordon/pconns.AdjHE.FE.*.csv|208|61776|297|2"
+  "gordon_AdjHE_RE|results/FCs/gordon/pconns.AdjHE.RE.*.csv|208|61776|297|2"
+  "gordon_GCTA|results/FCs/gordon/pconns.GCTA.GCTA.*.csv|100|61776|618|1"
+  "gordon_HEreg|results/FCs/gordon/pconns.HEreg.HEreg.*.csv|208|61776|297|1"
+  "proba_AdjHE_FE|results/FCs/probaConns/probaConns.AdjHE.FE.*.csv|10|3160|316|1"
+  "proba_AdjHE_RE|results/FCs/probaConns/probaConns.AdjHE.RE.*.csv|40|3160|79|2"
+  "proba_GCTA|results/FCs/probaConns/probaConns.GCTA.GCTA.*.csv|10|3160|316|1"
+  "proba_HEreg|results/FCs/probaConns/probaConns.HEreg.HEreg.*.csv|10|3160|316|1"
 )
 
 # pass stream table to R
 : > "$tmp/streams.tsv"
 for spec in "${STREAMS[@]}"; do
-  IFS='|' read -r key glob chunk total expect <<< "$spec"
+  IFS='|' read -r key glob chunk total expect mult <<< "$spec"
   printf '%s\t%s\n' "$key" "$glob" >> "$tmp/streams.tsv"
 done
 
@@ -49,18 +57,18 @@ hdr() { printf '\n===== %s =====\n' "$1"; }
 
 ################################################################################
 hdr "1. STREAM INVENTORY"
-printf '%-18s %6s %7s  %s\n' STREAM FILES EXPECT "ROW-SIZE HISTOGRAM (count x rows)"
+printf '%-18s %6s %7s %8s  %s\n' STREAM FILES EXPECT EXPROWS "ROW-SIZE HISTOGRAM (count x rows)"
 for spec in "${STREAMS[@]}"; do
-  IFS='|' read -r key glob chunk total expect <<< "$spec"
+  IFS='|' read -r key glob chunk total expect mult <<< "$spec"
   files=( $glob )
   n=${#files[@]}
   if [ "$n" -eq 0 ]; then
-    printf '%-18s %6d %7d  MISSING\n' "$key" 0 "$expect"
+    printf '%-18s %6d %7d %8s  MISSING\n' "$key" 0 "$expect" "$(( chunk * mult ))"
     continue
   fi
   hist=$(for f in "${files[@]}"; do echo $(( $(wc -l < "$f") - 1 )); done \
          | sort -n | uniq -c | awk '{printf "%dx%s ", $1, $2}')
-  printf '%-18s %6d %7d  %s\n' "$key" "$n" "$expect" "$hist"
+  printf '%-18s %6d %7d %8d  %s\n' "$key" "$n" "$expect" "$(( chunk * mult ))" "$hist"
 done
 
 ################################################################################
@@ -76,7 +84,7 @@ done
 ################################################################################
 hdr "3. INDEX GAPS AND ROW-SIZE ANOMALIES"
 for spec in "${STREAMS[@]}"; do
-  IFS='|' read -r key glob chunk total expect <<< "$spec"
+  IFS='|' read -r key glob chunk total expect mult <<< "$spec"
   files=( $glob )
   [ ${#files[@]} -gt 0 ] || continue
 
@@ -88,7 +96,8 @@ for spec in "${STREAMS[@]}"; do
   done
   sort -n -k1,1 "$inv" > "$inv.s"
 
-  tailrows=$(( total % chunk ))
+  exp_rows=$(( chunk * mult ))
+  tailrows=$(( (total % chunk) * mult ))
 
   gaps=$(awk -F'\t' '
     prev != "" && $1+0 != prev+1 { printf "%d-%d ", prev+1, $1-1 }
@@ -101,10 +110,11 @@ for spec in "${STREAMS[@]}"; do
     printf '%-18s no gaps\n' "$key"
   fi
 
-  anom=$(awk -F'\t' -v c="$chunk" -v t="$tailrows" \
+  anom=$(awk -F'\t' -v c="$exp_rows" -v t="$tailrows" \
     '$2+0 != c+0 && (t == 0 || $2+0 != t+0)' "$inv.s")
   if [ -n "$anom" ]; then
-    printf '%-18s ANOMALY (expect %s rows, tail %s):\n' "$key" "$chunk" "$tailrows"
+    printf '%-18s ANOMALY (expect %s phenos x %s npc = %s rows, tail %s):\n' \
+      "$key" "$chunk" "$mult" "$exp_rows" "$tailrows"
     acount=$(printf '%s\n' "$anom" | wc -l)
     printf '%s\n' "$anom" | head -n 10 |
       while IFS=$'\t' read -r ix rw path; do
@@ -175,7 +185,7 @@ fi
 hdr "5. VERDICTS"
 printf '%-18s %-12s %s\n' STREAM VERDICT DETAIL
 for spec in "${STREAMS[@]}"; do
-  IFS='|' read -r key glob chunk total expect <<< "$spec"
+  IFS='|' read -r key glob chunk total expect mult <<< "$spec"
   files=( $glob )
   n=${#files[@]}
 
