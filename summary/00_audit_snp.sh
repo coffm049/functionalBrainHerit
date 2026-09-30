@@ -7,11 +7,16 @@
 # gaps, row-size anomalies, N used, flag distribution, and a KEEP / INCOMPLETE /
 # STALE / ANOMALY / RERUN verdict.
 #
+# KEEP+ means coverage only: section 4 produced no N output, so staleness is
+# UNVERIFIED. Do not treat KEEP+ as proof the results were computed on the
+# current sample.
+#
 # Expected shapes derived from the submit scripts:
 #   FCs/gordon/submit.sh:16-27      TOTAL=61776, CHUNK=208 (FE/RE/HEreg), 100 (GCTA)
 #   FCs/probaConns/submit.sh:16-27  TOTAL=3160,  CHUNK=10 (FE/GCTA/HEreg), 40 (RE)
 #   make_configs.py:26-27           last chunk is short when total % chunk != 0
-#   SA/*.json                       17 phenotypes, one CSV per method
+#   SA/*.json                       18 mpheno (17 network_surfarea +
+#                                    anthro_height_calc), one CSV per method
 #
 # Rows per file = chunk phenotypes x len(npc): MASH emits one row per
 # (phenotype x npc value), tagged by the 'PCs' column
@@ -45,15 +50,21 @@ STREAMS=(
   "proba_HEreg|results/FCs/probaConns/probaConns.HEreg.HEreg.*.csv|10|3160|316|1"
 )
 
-# pass stream table to R
-: > "$tmp/streams.tsv"
-for spec in "${STREAMS[@]}"; do
-  IFS='|' read -r key glob chunk total expect mult <<< "$spec"
-  printf '%s\t%s\n' "$key" "$glob" >> "$tmp/streams.tsv"
-done
-
 ################################################################################
 hdr() { printf '\n===== %s =====\n' "$1"; }
+
+# Rows a SA run must have = len(npc) x len(mpheno), read from its template so
+# the check stays correct when a template gains a phenotype.
+sa_expected() {
+  awk '
+    /"npc"[[:space:]]*:/    { sec = "npc"; next }
+    /"mpheno"[[:space:]]*:/ { sec = "ph";  next }
+    /^[[:space:]]*\]/       { sec = "";    next }
+    sec == "npc" && /^[[:space:]]*[0-9]/ { npc++ }
+    sec == "ph"  && /^[[:space:]]*"/     { ph++ }
+    END { print (npc + 0) * (ph + 0) }
+  ' "$1"
+}
 
 ################################################################################
 hdr "1. STREAM INVENTORY"
@@ -72,14 +83,41 @@ for spec in "${STREAMS[@]}"; do
 done
 
 ################################################################################
-hdr "2. SA FILES (one CSV per method, 17 phenotypes)"
+hdr "2. SA FILES (expected rows = len(npc) x len(mpheno) from SA/<name>.json)"
+printf '%-24s %5s %5s  %-9s  %s\n' FILE ROWS EXP STATUS MODIFIED
+: > "$tmp/sa.tsv"
 found_sa=0
 for f in results/SA/*.csv; do
   [ -e "$f" ] || continue
   found_sa=1
-  printf '%-36s %5d rows  %s\n' "$f" "$(( $(wc -l < "$f") - 1 ))" "$(date -r "$f" '+%Y-%m-%d %H:%M')"
+  b=$(basename "$f" .csv)
+  rows=$(( $(wc -l < "$f") - 1 ))
+  when=$(date -r "$f" '+%Y-%m-%d %H:%M')
+  tpl="SA/$b.json"
+  exp=""
+  [ -f "$tpl" ] && exp=$(sa_expected "$tpl")
+  status="OK"
+  if [ ! -f "$tpl" ]; then
+    status="NO_TPL"
+  elif ! [ "${exp:-0}" -gt 0 ] 2>/dev/null; then
+    status="BAD_TPL"
+  elif [ "$rows" -ne "$exp" ]; then
+    status="STALE"
+  fi
+  printf '%-24s %5d %5s  %-9s  %s\n' "$b" "$rows" "${exp:--}" "$status" "$when"
+  printf '%s\t%s\t%s\t%s\n' "$b" "$rows" "${exp:--}" "$status" >> "$tmp/sa.tsv"
 done
 [ "$found_sa" -eq 0 ] && echo "no SA csv files found"
+
+# A template with no output was never run (or was cleaned out).
+for tpl in SA/*.json; do
+  [ -e "$tpl" ] || continue
+  b=$(basename "$tpl" .json)
+  [ -f "results/SA/$b.csv" ] && continue
+  exp=$(sa_expected "$tpl")
+  printf '%-24s %5s %5s  %-9s\n' "$b" "-" "$exp" "NO_OUTPUT"
+  printf '%s\t%s\t%s\t%s\n' "$b" "-" "$exp" "NO_OUTPUT" >> "$tmp/sa.tsv"
+done
 
 ################################################################################
 hdr "3. INDEX GAPS AND ROW-SIZE ANOMALIES"
@@ -129,61 +167,96 @@ done
 hdr "4. N USED AND FLAG DISTRIBUTION (first 5 files per stream)"
 if [ -f "$POOL" ]; then
   pool_n=$(wc -l < "$POOL")
-  echo "current filtered_ids.tsv N = $pool_n"
+  pool_n="${pool_n// /}"
+  pool_mtime=$(date -r "$POOL" '+%Y-%m-%d %H:%M')
+  echo "current filtered_ids.tsv: N=$pool_n  modified $pool_mtime"
 else
   pool_n=""
+  pool_mtime=""
   echo "WARNING: pool not found at $POOL - N comparison will be skipped"
 fi
 echo
 
-cat > "$tmp/naudit.R" <<'RSCRIPT'
-suppressMessages({library(readr); library(dplyr)})
-root <- Sys.getenv("AUDIT_ROOT")
-sl  <- read.delim(Sys.getenv("AUDIT_TSV"), header = FALSE, stringsAsFactors = FALSE,
-                   col.names = c("key", "pattern"))
-out <- file(Sys.getenv("AUDIT_OUT"), open = "wt")
-for (i in seq_len(nrow(sl))) {
-  fs <- Sys.glob(file.path(root, sl$pattern[i]))
-  if (!length(fs)) next
-  fs <- sort(fs)[seq_len(min(5, length(fs)))]
-  d <- tryCatch(suppressMessages(bind_rows(lapply(fs, read_csv, show_col_types = FALSE))),
-                error = function(e) NULL)
-  if (is.null(d) || !nrow(d)) {
-    cat(sprintf("%-18s READ_ERROR\n", sl$key[i]))
-    cat(sprintf("%s\tNA\n", sl$key[i]), file = out)
-    next
-  }
-  nvals <- if ("n" %in% names(d)) {
-    u <- unique(na.omit(as.character(d$n))); paste(u, collapse = ",")
-  } else "NA"
-  fl <- if ("flag" %in% names(d)) {
-    tb <- table(d$flag)
-    paste(sprintf("%s=%d", names(tb), as.integer(tb)), collapse = " ")
-  } else "no flag column"
-  h2med <- if ("h2" %in% names(d)) sprintf("%.3f", median(d$h2, na.rm = TRUE)) else "NA"
-  cat(sprintf("%-18s sampled=%4d rows  N=%-10s med_h2=%-7s flags: %s\n",
-              sl$key[i], nrow(d), nvals, h2med, fl))
-  cat(sprintf("%s\t%s\n", sl$key[i], nvals), file = out)
-}
-close(out)
-RSCRIPT
+# Sample size column is 'N' (uppercase), set per method at
+# MASH/src/Estimate/estimators/all_estimators.py:170,175,193,201; the
+# phenotype column is 'pheno'. N is per-phenotype and can vary slightly with
+# missingness, so track min/max rather than assuming one value.
+# Deliberately awk and not R: tying this check to a conda env made the STALE
+# verdict silently skippable whenever R failed to launch.
+for spec in "${STREAMS[@]}"; do
+  IFS='|' read -r key glob chunk total expect mult <<< "$spec"
+  files=( $glob )
+  [ ${#files[@]} -gt 0 ] || continue
+  sample=()
+  for f in "${files[@]}"; do
+    sample+=("$f")
+    [ ${#sample[@]} -ge 5 ] && break
+  done
 
-(
-  source /users/4/coffm049/miniconda3/etc/profile.d/conda.sh 2>/dev/null
-  conda activate gdc 2>/dev/null
-  AUDIT_ROOT="$ROOT" AUDIT_TSV="$tmp/streams.tsv" AUDIT_OUT="$tmp/n_used.tsv" \
-    Rscript --vanilla "$tmp/naudit.R"
-)
-rc=$?
-if [ $rc -ne 0 ] || [ ! -s "$tmp/n_used.tsv" ]; then
-  echo "R audit unavailable (rc=$rc); N/flag checks skipped."
-else
+  awk -F',' -v key="$key" -v mp="$tmp/n_used.tsv" '
+    FNR == 1 {
+      if (++fn > 5) exit
+      ncol = fcol = 0
+      for (i = 1; i <= NF; i++) {
+        h = $i; gsub(/["\r]/, "", h)
+        if (h == "N") ncol = i
+        else if (h == "flag") fcol = i
+      }
+      next
+    }
+    {
+      rows++
+      if (ncol) {
+        v = $ncol; gsub(/["\r]/, "", v) ; v += 0
+        if (v > 0) {
+          if (nmax == 0 || v > nmax) nmax = v
+          if (nmin == 0 || v < nmin) nmin = v
+        }
+      }
+      if (fcol) { v = $fcol; gsub(/["\r]/, "", v); fv[v]++ }
+    }
+    END {
+      ns = "NA"
+      if (nmax > 0) ns = (nmin == nmax) ? nmax : nmin "-" nmax
+      fs = ""
+      for (k in fv) fs = fs (fs == "" ? "" : " ") k "=" fv[k]
+      if (fs == "") fs = "no flag column"
+      printf "%-18s sampled=%4d rows  N=%-12s flags: %s\n", key, rows, ns, fs
+      printf "%s\t%s\n", key, ns >> mp
+    }' "${sample[@]}"
+done
+
+# Secondary signal: CSVs written before the pool file's last edit cannot have
+# used the pool's current contents.
+if [ -n "$pool_mtime" ]; then
+  n_total=$(find results/FCs results/SA -name '*.csv' 2>/dev/null | wc -l)
+  n_pre=$(find results/FCs results/SA -name '*.csv' ! -newer "$POOL" 2>/dev/null | wc -l)
   echo
+  echo "CSVs older than filtered_ids.tsv: $n_pre / $n_total  (predate the pool's last edit)"
+  if [ "$n_pre" -gt 0 ]; then
+    echo "  sample of those:"
+    find results/FCs results/SA -name '*.csv' ! -newer "$POOL" 2>/dev/null | head -5 | sed 's/^/    /'
+  fi
+fi
+
+# The awk loop above writes n_used.tsv; if it produced nothing, staleness
+# cannot be evaluated and the verdicts must say so rather than look clean.
+rc=0
+[ -s "$tmp/n_used.tsv" ] || rc=1
+if [ "$rc" -ne 0 ]; then
+  echo "N check produced no output: coverage verified, staleness was NOT."
 fi
 
 ################################################################################
 hdr "5. VERDICTS"
 printf '%-18s %-12s %s\n' STREAM VERDICT DETAIL
+
+# n_checked is 0 only when section 4 produced no n_used.tsv at all. In that
+# case nothing below can detect staleness, so say so rather than printing a
+# clean KEEP that implies sample-size verification.
+n_checked=0
+[ "$rc" -eq 0 ] && [ -s "$tmp/n_used.tsv" ] && n_checked=1
+
 for spec in "${STREAMS[@]}"; do
   IFS='|' read -r key glob chunk total expect mult <<< "$spec"
   files=( $glob )
@@ -198,7 +271,7 @@ for spec in "${STREAMS[@]}"; do
   [ -f "$tmp/$key.gaps" ] && gaps=$(cat "$tmp/$key.gaps")
 
   obs_n=""
-  if [ -s "$tmp/n_used.tsv" ]; then
+  if [ "$n_checked" -eq 1 ]; then
     obs_n=$(awk -F'\t' -v k="$key" '$1 == k { print $2; exit }' "$tmp/n_used.tsv")
   fi
 
@@ -209,15 +282,53 @@ for spec in "${STREAMS[@]}"; do
   if [ -n "$gaps" ]; then
     verdict="INCOMPLETE"; detail="$detail, gaps $gaps"
   fi
-  if [ -n "$pool_n" ] && [ -n "$obs_n" ] && [ "$obs_n" != "NA" ] && [ "$obs_n" != "$pool_n" ]; then
-    verdict="STALE"; detail="$detail, N=$obs_n vs pool=$pool_n"
+  # Results are stale only if they used MORE subjects than the current pool
+  # contains - that cannot be a subset of the current pool, so the run must
+  # predate it. Fewer subjects than the pool is expected (phenotype
+  # missingness / per-phenotype drops), so it is reported but not flagged.
+  nmax="${obs_n##*-}"
+  nmax="${nmax//[^0-9]/}"
+  if [ -n "$nmax" ] && [ -n "$pool_n" ]; then
+    if [ "$nmax" -gt "$pool_n" ]; then
+      verdict="STALE"; detail="$detail, N=$obs_n exceeds pool=$pool_n"
+    elif [ "$nmax" -lt "$pool_n" ]; then
+      detail="$detail, N=$obs_n < pool=$pool_n"
+    else
+      detail="$detail, N=$obs_n"
+    fi
+  elif [ "$n_checked" -eq 1 ]; then
+    detail="$detail, N=NA"
   fi
   if [ -f "$tmp/$key.anom" ]; then
     acount=$(wc -l < "$tmp/$key.anom")
     detail="$detail, $acount row-size anomalies (see section 3)"
     [ "$verdict" = "KEEP" ] && verdict="ANOMALY"
   fi
+  if [ "$n_checked" -ne 1 ]; then
+    verdict="$verdict+"
+    detail="$detail, N UNVERIFIED (section 4 failed)"
+  fi
   printf '%-18s %-12s %s\n' "$key" "$verdict" "$detail"
 done
+
+if [ -s "$tmp/sa.tsv" ]; then
+  printf '\n%-24s %-12s %s\n' SA_FILE VERDICT DETAIL
+  while IFS=$'\t' read -r b rows exp status; do
+    case "$status" in
+      OK)        v="KEEP";      d="rows=$rows matches template" ;;
+      STALE)     v="STALE";     d="rows=$rows but SA/$b.json expects $exp - rerun" ;;
+      NO_TPL)    v="UNKNOWN";   d="rows=$rows, no SA/$b.json to check against" ;;
+      BAD_TPL)   v="UNKNOWN";   d="could not read npc/mpheno from SA/$b.json" ;;
+      NO_OUTPUT) v="NO_OUTPUT";  d="SA/$b.json exists, results/SA/$b.csv absent" ;;
+      *)         v="UNKNOWN";   d="status=$status" ;;
+    esac
+    printf '%-24s %-12s %s\n' "SA/$b" "$v" "$d"
+  done < "$tmp/sa.tsv"
+fi
+
+if [ "$n_checked" -ne 1 ]; then
+  printf '\n%s\n' "NOTE: KEEP+ = coverage only. Staleness (N vs pool) was NOT checked."
+  printf '%s\n'       "      Section 4 produced no output; fix it before trusting these verdicts."
+fi
 
 printf '\n%s\n' "Audit complete. Rerun this after each submission batch."
