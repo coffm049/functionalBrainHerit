@@ -28,6 +28,20 @@ case "$KIND" in
   *) echo "KIND must be FE, RE, GCTA or HEreg"; exit 1 ;;
 esac
 
+# Submit from a pre-normalized copy of the template when summary/prep_iids.sh
+# has produced one (it canonicalizes sub-/NDAR_INV IIDs and points the config
+# at the copies). Falls back to the template itself, so this still works
+# standalone without a prenormalization step.
+IIDFIX=${IIDFIX:-/scratch.global/coffm049/abcdEsts}
+TPLFILE=$TEMPLATE
+NORM="$IIDFIX/$(basename "$WORKINGDIRECTORY").${TEMPLATE%.json}.iidfix.json"
+if [ -f "$NORM" ]; then
+  TPLFILE=$NORM
+  echo "Using pre-normalized inputs: $TPLFILE"
+else
+  echo "No pre-normalized template found at $NORM - using $TEMPLATE"
+fi
+
 shift 2
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -43,7 +57,7 @@ done
 source /users/4/coffm049/miniconda3/etc/profile.d/conda.sh
 conda activate MASH
 
-NJOBS=$(python ../make_configs.py --template "$TEMPLATE" --method "$METHOD" --kind "$KIND" \
+NJOBS=$(python ../make_configs.py --template "$TPLFILE" --method "$METHOD" --kind "$KIND" \
   --chunk "$CHUNK" --total "$TOTAL" --prefix "$PREFIX" --all)
 
 ARGS=(--time="$TIME" --mem="$MEM" --array=0-$((NJOBS - 1)))

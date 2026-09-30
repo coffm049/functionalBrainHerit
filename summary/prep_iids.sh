@@ -18,7 +18,9 @@
 #   OUT=/scratch/x bash summary/prep_iids.sh        # choose destination
 #   DRY_RUN=1 bash summary/prep_iids.sh             # report only, write nothing
 #   bash summary/prep_iids.sh FCs/gordon/reExample2.json
-#     -> also writes <OUT>/<template>.iidfix.json with paths swapped
+#     -> also writes <OUT>/<dataset>.<template>.iidfix.json with paths swapped
+#        (dataset = basename of the template's directory, so gordon and
+#        probaConns templates that share a filename cannot collide)
 #
 # The destination is created (mkdir -p) before anything is written into it.
 #
@@ -281,14 +283,31 @@ PY
 done
 
 #--- optional: emit configs whose paths point at the normalized copies --------
+# Before touching any config, decide whether this run is safe to submit from.
+# A copy that failed verification is always fatal. A parquet we could not copy
+# is fatal only when OTHER inputs were rewritten: that combination would leave
+# MASH joining normalized ids against un-normalized phenotypes, which is
+# exactly the silent empty join this script exists to prevent. (A plain
+# MISSING file fails loudly downstream, so it stays a warning.)
+hard=$(awk -F'\t' 'NR>1 && ($2=="FAIL" || $2=="NO_IID_COL") {c++} END{print c+0}' "$PATHS")
+pyskip=$(awk -F'\t' 'NR>1 && $2=="NO_PYARROW" {c++} END{print c+0}' "$PATHS")
+rew=$(awk -F'\t' 'NR>1 && $2=="REWRITTEN" {c++} END{print c+0}' "$PATHS")
+if [ "$hard" -gt 0 ] || { [ "$pyskip" -gt 0 ] && [ "$rew" -gt 0 ]; }; then
+  say "ERROR: inputs failed verification (hard=$hard no_pyarrow=$pyskip rewritten=$rew)"
+  say "       not writing configs - fix the inputs and rerun"
+  exit 1
+fi
+
 # Pure sed over paths.tsv: every row whose destination differs from its source
 # becomes one s|old|new|g expression, so no JSON parsing (and no python) is
 # needed and only path strings can change.
 for tpl in "$@"; do
   base=$(basename "$tpl")
-  if [ ! -f "$tpl" ]; then say "SKIP   config $base  missing: $tpl"; continue; fi
-  if [ "$DRY_RUN" = 1 ]; then say "DRY    config $base"; continue; fi
-  outjson="$OUT/${base%.json}.iidfix.json"
+  ds=$(basename "$(dirname "$tpl")")
+  [ "$ds" = "." ] && ds=local
+  if [ ! -f "$tpl" ]; then say "SKIP   config $ds/$base  missing: $tpl"; continue; fi
+  if [ "$DRY_RUN" = 1 ]; then say "DRY    config $ds/$base"; continue; fi
+  outjson="$OUT/$ds.${base%.json}.iidfix.json"
   args=(); n=0
   while IFS=$'\t' read -r nm st src dst; do
     [ "$nm" = "name" ] && continue                    # header row
@@ -300,15 +319,15 @@ for tpl in "$@"; do
   done < "$PATHS"
   if [ "$n" -eq 0 ]; then
     cp "$tpl" "$outjson"
-    say "OK     config $base -> $outjson (no path changes needed)"
+    say "OK     config $ds/$base -> $outjson (no path changes needed)"
     continue
   fi
   sed "${args[@]}" "$tpl" > "$outjson"
   if cmp -s "$tpl" "$outjson"; then
-    say "WARN   config $base unchanged - none of the rewritten paths appear in it"
+    say "WARN   config $ds/$base unchanged - none of the rewritten paths appear in it"
     rm -f "$outjson"
   else
-    say "OK     config $base -> $outjson ($n path substitution(s))"
+    say "OK     config $ds/$base -> $outjson ($n path substitution(s))"
   fi
 done
 
@@ -321,6 +340,6 @@ say "Paths MASH should read:"
 awk -F'\t' 'NR > 1 && $1 !~ /^grm_prefix/ && $4 != "-" { printf "  %-14s %s\n", $1, $4 }' "$PATHS" | tee -a "$REPORT"
 awk -F'\t' '$1 ~ /^grm_prefix/ && $4 != $3 { printf "  %-14s %s\n", $1, $4 }' "$PATHS" | tee -a "$REPORT"
 say ""
-say "Smoke-test one chunk with the rewritten config:"
-say "  conda activate MASH && MASH --argfile $OUT/<template>.iidfix.json"
+say "Smoke-test one chunk with a rewritten config:"
+say "  conda activate MASH && MASH --argfile $OUT/<dataset>.<template>.iidfix.json"
 say "Full report: $REPORT"

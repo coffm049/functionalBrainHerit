@@ -18,4 +18,9 @@ conda activate MASH
 mkdir -p /users/4/coffm049/papers/functionalBrainHerit/results/SA
 mkdir -p /users/4/coffm049/papers/functionalBrainHerit/logs
 
-MASH --argfile /users/4/coffm049/papers/functionalBrainHerit/SA/GCTA.json
+# Prefer a pre-normalized copy of this config if summary/prep_iids.sh made one
+ARGFILE=/users/4/coffm049/papers/functionalBrainHerit/SA/GCTA.json
+IIDFIX=${IIDFIX:-/scratch.global/coffm049/abcdEsts}
+NORM="$IIDFIX/SA.$(basename "${ARGFILE%.json}").iidfix.json"
+if [ -f "$NORM" ]; then ARGFILE=$NORM; echo "Using pre-normalized inputs: $ARGFILE"; fi
+MASH --argfile "$ARGFILE"
