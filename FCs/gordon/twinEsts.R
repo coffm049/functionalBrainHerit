@@ -26,9 +26,10 @@ phenoNames <- paste0("o", (iteration * CHUNK) : ((iteration + 1) * CHUNK - 1))
 
 # 1) Load covariates + filtered IDs + FID mapping ONCE
 cat("Loading covariates and ID maps...\n")
-filtered_ids <- read_table("/projects/standard/rando149/coffm049/filtered_ids_broad.tsv",
+filtered_ids <- read_table("/projects/standard/rando149/coffm049/ABCD/Results/IDs/rels.txt",
                            col_names = c("FID", "IID"), show_col_types = FALSE) %>%
-  select(IID)
+  mutate(IID = sub("^(sub-|NDAR_INV|NDARINV)", "sub-", IID)) %>%
+  distinct(IID)
 
 IDs <- read_table("/projects/standard/rando149/coffm049/ABCD/Results/IDs/IDs.txt",
                   col_names = c("FID", "IID"))
@@ -50,6 +51,8 @@ covars <- read_csv("/projects/standard/rando149/coffm049/ABCD/Workflow/02_Phenot
   select(-n)
 
 cat("Covariate base: ", nrow(covars), " individuals, ", length(unique(covars$FID)), " families\n")
+if (nrow(covars) < 100)
+  stop("Twin base collapsed: ", nrow(covars), " individuals, ", length(unique(covars$FID)), " families")
 
 # 2) Loop through phenotypes ONE AT A TIME
 results <- list()

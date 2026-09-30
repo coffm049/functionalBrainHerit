@@ -86,7 +86,15 @@ extract_twin <- function(x) {
 read_twin_set <- function(patterns, set) {
   files <- unlist(lapply(patterns, function(p) Sys.glob(file.path(ROOT, p))))
   if (length(files) == 0) { message("No twin RDS for ", set); return(tibble()) }
-  bind_rows(lapply(files, readRDS)) %>%
+  rds <- bind_rows(lapply(files, readRDS))
+  # Gate: warn loudly if mostly all-error
+  if ("herit" %in% names(rds)) {
+    err_count <- sum(sapply(rds$herit, function(h) inherits(h, "twinlm_error")))
+    tot <- length(rds$herit)
+    if (tot > 0 && err_count / tot >= 0.8)
+      warning(sprintf("%s: %d/%d twin estimates are errors (%.0f%%); likely failed run", set, err_count, tot, 100*err_count/tot))
+  }
+  rds %>%
     { .tmp <- .
       id_col <- setdiff(names(.tmp), c("herit", "data"))
       if (length(id_col) != 1) stop(paste("twin id col ambiguous:", paste(names(.tmp), collapse = ",")))
