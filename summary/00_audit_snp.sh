@@ -22,8 +22,10 @@
 # (phenotype x npc value), tagged by the 'PCs' column
 # (MASH/src/Estimate/estimators/all_estimators.py:455, itertools.product).
 # The npc field is read from the template each submit.sh selects:
-#   gordon fe/re npc=[0,20] -> x2   proba re  npc=[0,20] -> x2
-#   gordon gcta/he npc=[20] -> x1   others   npc=[20]    -> x1
+#   gordon/proba gcta/he npc=[20]  -> x1    proba fe  npc=[20]   -> x1
+#   gordon fe             npc=[0,20] -> x2   proba re  npc=[0,20] -> x2
+#   gordon re             npc=[10,20] -> x2  (npc 0 dropped to fight
+#                                             ill_conditioned RE estimates)
 # 01_compare_mash_twin.R:33-36 already collapses these by filtering PCs == npc.
 #
 # This script never writes to results/ and never submits jobs.
@@ -164,7 +166,7 @@ for spec in "${STREAMS[@]}"; do
 done
 
 ################################################################################
-hdr "4. N USED AND FLAG DISTRIBUTION (first 5 files per stream)"
+hdr "4. N USED AND FLAG DISTRIBUTION (first 5 FC files per stream, all SA csvs)"
 if [ -f "$POOL" ]; then
   pool_n=$(wc -l < "$POOL")
   pool_n="${pool_n// /}"
@@ -181,8 +183,68 @@ echo
 # MASH/src/Estimate/estimators/all_estimators.py:170,175,193,201; the
 # phenotype column is 'pheno'. N is per-phenotype and can vary slightly with
 # missingness, so track min/max rather than assuming one value.
+# Flags are counted PER npc value (the 'PCs' column) so a rerun that changes
+# npc can actually be judged: ill_conditioned at npc=0 but ok at npc=20 is a
+# completely different verdict from ill_conditioned at both.
 # Deliberately awk and not R: tying this check to a conda env made the STALE
 # verdict silently skippable whenever R failed to launch.
+flag_summary() {
+  local key=$1
+  shift
+  [ $# -gt 0 ] || return 0
+  awk -F',' -v key="$key" -v mp="$tmp/n_used.tsv" -v bp="$tmp/flags.tsv" '
+    FNR == 1 {
+      if (++fn > 5) exit
+      ncol = fcol = pcol = 0
+      for (i = 1; i <= NF; i++) {
+        h = $i; gsub(/["\r]/, "", h)
+        if (h == "N") ncol = i
+        else if (h == "flag") fcol = i
+        else if (h == "PCs") pcol = i
+      }
+      next
+    }
+    {
+      rows++
+      if (ncol) {
+        v = $ncol; gsub(/["\r]/, "", v); v += 0
+        if (v > 0) {
+          if (nmax == 0 || v > nmax) nmax = v
+          if (nmin == 0 || v < nmin) nmin = v
+        }
+      }
+      if (fcol) {
+        v = $fcol; gsub(/["\r]/, "", v)
+        p = "?"
+        if (pcol) {
+          p = $pcol; gsub(/["\r]/, "", p)
+          if (p == "") p = "?"
+        }
+        k = p "|" v
+        if (k in fv) fv[k]++
+        else { fv[k] = 1; ord[++no] = k }
+      }
+    }
+    END {
+      ns = "NA"
+      if (nmax > 0) ns = (nmin == nmax) ? nmax : nmin "-" nmax
+      fs = ""
+      bad = 0
+      for (i = 1; i <= no; i++) {
+        split(ord[i], a, /\|/)
+        fs = fs (fs == "" ? "" : ", ") "npc" a[1] ":" a[2] "=" fv[ord[i]]
+        # same bad-flag list 01_compare_mash_twin.R:21 drops on
+        if (a[2] ~ /(ill_conditioned|singular|nan_solve|h2_gt_1_invalid|nonpos_det|neg_sigma_g)/)
+          bad += fv[ord[i]]
+      }
+      if (fs == "") fs = "no flag column"
+      printf "%-20s sampled=%4d rows  N=%-12s flags: %s\n", key, rows, ns, fs
+      printf "%s\t%s\n", key, ns >> mp
+      printf "%s\t%d\t%d\n", key, bad, rows >> bp
+    }' "$@"
+}
+
+: > "$tmp/flags.tsv"
 for spec in "${STREAMS[@]}"; do
   IFS='|' read -r key glob chunk total expect mult <<< "$spec"
   files=( $glob )
@@ -192,38 +254,13 @@ for spec in "${STREAMS[@]}"; do
     sample+=("$f")
     [ ${#sample[@]} -ge 5 ] && break
   done
+  flag_summary "$key" "${sample[@]}"
+done
 
-  awk -F',' -v key="$key" -v mp="$tmp/n_used.tsv" '
-    FNR == 1 {
-      if (++fn > 5) exit
-      ncol = fcol = 0
-      for (i = 1; i <= NF; i++) {
-        h = $i; gsub(/["\r]/, "", h)
-        if (h == "N") ncol = i
-        else if (h == "flag") fcol = i
-      }
-      next
-    }
-    {
-      rows++
-      if (ncol) {
-        v = $ncol; gsub(/["\r]/, "", v) ; v += 0
-        if (v > 0) {
-          if (nmax == 0 || v > nmax) nmax = v
-          if (nmin == 0 || v < nmin) nmin = v
-        }
-      }
-      if (fcol) { v = $fcol; gsub(/["\r]/, "", v); fv[v]++ }
-    }
-    END {
-      ns = "NA"
-      if (nmax > 0) ns = (nmin == nmax) ? nmax : nmin "-" nmax
-      fs = ""
-      for (k in fv) fs = fs (fs == "" ? "" : " ") k "=" fv[k]
-      if (fs == "") fs = "no flag column"
-      printf "%-18s sampled=%4d rows  N=%-12s flags: %s\n", key, rows, ns, fs
-      printf "%s\t%s\n", key, ns >> mp
-    }' "${sample[@]}"
+# SA streams are read by 01 too and carry the same flag column.
+for f in results/SA/*.csv; do
+  [ -e "$f" ] || continue
+  flag_summary "SA/$(basename "$f" .csv)" "$f"
 done
 
 # Secondary signal: CSVs written before the pool file's last edit cannot have
@@ -256,6 +293,27 @@ printf '%-18s %-12s %s\n' STREAM VERDICT DETAIL
 # clean KEEP that implies sample-size verification.
 n_checked=0
 [ "$rc" -eq 0 ] && [ -s "$tmp/n_used.tsv" ] && n_checked=1
+
+# Does every sampled row carry a flag that 01_compare_mash_twin.R:22 drops?
+# A stream can be complete and not stale yet still contribute nothing.
+FLAG_TXT=""; FLAG_VERDICT=""
+flag_detail() {
+  local k=$1 line fbad ftot
+  FLAG_TXT=""; FLAG_VERDICT=""
+  [ -s "$tmp/flags.tsv" ] || return 0
+  line=$(awk -F'\t' -v k="$k" '$1 == k { print $2 "\t" $3; exit }' "$tmp/flags.tsv")
+  [ -n "$line" ] || return 0
+  fbad=${line%%$'\t'*}
+  ftot=${line##*$'\t'}
+  case "$fbad$ftot" in *[!0-9]*) return 0 ;; esac
+  [ "$ftot" -gt 0 ] || return 0
+  if [ "$fbad" -eq "$ftot" ]; then
+    FLAG_VERDICT="ALL_FLAGGED"
+    FLAG_TXT="all $ftot sampled rows flagged, 01 drops them"
+  elif [ "$fbad" -gt 0 ]; then
+    FLAG_TXT="$fbad/$ftot sampled rows flagged"
+  fi
+}
 
 for spec in "${STREAMS[@]}"; do
   IFS='|' read -r key glob chunk total expect mult <<< "$spec"
@@ -304,6 +362,11 @@ for spec in "${STREAMS[@]}"; do
     detail="$detail, $acount row-size anomalies (see section 3)"
     [ "$verdict" = "KEEP" ] && verdict="ANOMALY"
   fi
+  flag_detail "$key"
+  if [ -n "$FLAG_TXT" ]; then
+    detail="$detail, $FLAG_TXT"
+    [ -n "$FLAG_VERDICT" ] && case "$verdict" in KEEP|ANOMALY) verdict="$FLAG_VERDICT" ;; esac
+  fi
   if [ "$n_checked" -ne 1 ]; then
     verdict="$verdict+"
     detail="$detail, N UNVERIFIED (section 4 failed)"
@@ -322,6 +385,9 @@ if [ -s "$tmp/sa.tsv" ]; then
       NO_OUTPUT) v="NO_OUTPUT";  d="SA/$b.json exists, results/SA/$b.csv absent" ;;
       *)         v="UNKNOWN";   d="status=$status" ;;
     esac
+    flag_detail "SA/$b"
+    [ -n "$FLAG_TXT" ] && d="$d; $FLAG_TXT"
+    [ -n "$FLAG_VERDICT" ] && case "$v" in KEEP) v="$FLAG_VERDICT" ;; esac
     printf '%-24s %-12s %s\n' "SA/$b" "$v" "$d"
   done < "$tmp/sa.tsv"
 fi
