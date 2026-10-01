@@ -220,6 +220,22 @@ done
 
 hr
 #--- parquet inputs: awk/sed cannot touch these, use pyarrow ------------------
+#
+# MEMORY: run this script inside a large allocation. pconns.parquet is
+# ~10,123 x 61,776 float64 (~5 GB) and the pyarrow check below loads all of
+# it, then re-serializes every non-IID column twice (to_csv, once for
+# sig_before and once for sig_after) to prove only the ID column changed.
+# Realistic peak is ~15-20 GB, so a default or 32 GB allocation can OOM here.
+# probaConns.parquet is 5,552 x 3,160 (~0.14 GB) and never hits this.
+#
+# An OOM kill is silent from Python's point of view: the interpreter dies
+# before printing, so $res is empty and the case below reports
+#   FAIL   pheno_pconns  no output
+# That message means "the python child died", not "the script failed".
+# Confirm with dmesg / sacct (exit 137, State OUT_OF_MEMORY), then rerun
+# under:  srun -N 1 --mem=64gb -t 2:00:00 -p interactive --pty bash
+# 64g is safe: account already has GCTAbigN.SLURM and archive/GCTA.SLURM
+# asking for it.
 for p in "$BASE/ABCD/Workflow/02_Phenotypes/FCsTopo/pconns.parquet" \
          "$BASE/ABCD/Workflow/02_Phenotypes/FCsTopo/probaConns.parquet"; do
   name="pheno_$(basename "$p" .parquet)"
