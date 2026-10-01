@@ -2,7 +2,7 @@
 """
 Correlation between FC heritability (per-parcel average / 90th percentile) and SA heritability by system.
 
-For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-FE, 30 PCs):
+For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-FE, 20 PCs):
   * Rebuild the full N x N FC h2 matrix from mash_twin_wide.csv (oK -> triu)
   * For each parcel p, compute:
       - mean_h2[p] = mean of row p (all edges incident to p, nan on diagonal)

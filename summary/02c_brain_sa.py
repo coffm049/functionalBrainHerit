@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SA (network surface area, 17 Gordon networks) brain-surface visualization — simple & hardcoded.
 
-Follows 03b-topoh2Ests2Brain.py: SA heritability (twin vs AdjHE, 30 PCs) is
+Follows 03b-topoh2Ests2Brain.py: SA heritability (twin vs AdjHE, 20 PCs) is
 per-network (not per-edge), so values are mapped directly via the Gordon
 networks dlabel — no pconn rebuild / node-summary needed.
 
@@ -239,7 +239,7 @@ OUTDIR.mkdir(parents=True, exist_ok=True)
 df = pd.read_csv(WIDE)
 sub = df[df["Set"] == "SA"]
 
-# Build per-network SA h2 dicts for twin and AdjHE (30 PCs)
+# Build per-network SA h2 dicts for twin and AdjHE (20 PCs)
 sa = {}
 for method, col in [("twin", "Twin_h2"), ("AdjHE", "h2_SA_AdjHE_RE")]:
     s = sub[["Pheno", col]].dropna()

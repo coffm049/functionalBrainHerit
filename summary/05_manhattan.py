@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
 """Pairwise-system Manhattan — grouped by Sys-Sys, sorted by median h2.
 
-For each atlas (Gordon 352, ProbaConns 80, SA 17) and both methods
-(Twin, SNP) from mash_twin_wide.csv (30 PCs): SNP is AdjHE-FE for FC atlases, AdjHE-RE for SA.
+For each atlas (Gordon 352, ProbaConns 80, SA 17) and each method present in
+mash_twin_wide.csv (20 PCs):
+
+  gordon / probaConns : Twin, AdjHE-FE, AdjHE-RE, GCTA
+  SA                  : Twin, AdjHE-RE, GCTA   (no FE template exists)
+
+All methods for an atlas share one x-axis: the primary SNP method fixes the
+Sys-Sys order (AdjHE-FE for the FC atlases, AdjHE-RE for SA) and everything
+else, Twin included, is drawn against it.
 
   x = edge index grouped by Sys-Sys network pair (e.g. DMN-VIS), ordered by
       largest median h2 within that Sys-Sys group (descending).
@@ -12,6 +19,7 @@ For each atlas (Gordon 352, ProbaConns 80, SA 17) and both methods
   x-axis and shown in grey.
 
 Outputs: results/summary/plots/manhattan_{Set}_{Method}.png
+         results/summary/plots/manhattan_overview.png  (atlas x method grid)
 Run: .venv/bin/python summary/05_manhattan.py
 """
 import math
@@ -388,172 +396,199 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
 
 wide = pd.read_csv(WIDE)
 set_N = {"gordon": 352, "probaConns": 80, "SA": 17}
+
+# Which h2 columns to plot, per atlas, in panel order. SA has no AdjHE-FE
+# template (see SA_TEMPLATES in submit_all_twin_snp.sh), so its spec is short
+# by one method. probaConns columns are named h2_proba_* because
+# 01_compare_mash_twin.R keys them by stream label "proba_<method>" rather
+# than by Set "probaConns".
+METHOD_SPECS = {
+    "gordon": [
+        ("Twin", "Twin_h2"),
+        ("AdjHE-FE", "h2_gordon_AdjHE_FE"),
+        ("AdjHE-RE", "h2_gordon_AdjHE_RE"),
+        ("GCTA", "h2_gordon_GCTA"),
+    ],
+    "probaConns": [
+        ("Twin", "Twin_h2"),
+        ("AdjHE-FE", "h2_proba_AdjHE_FE"),
+        ("AdjHE-RE", "h2_proba_AdjHE_RE"),
+        ("GCTA", "h2_proba_GCTA"),
+    ],
+    "SA": [
+        ("Twin", "Twin_h2"),
+        ("AdjHE-RE", "h2_SA_AdjHE_RE"),
+        ("GCTA", "h2_SA_GCTA"),
+    ],
+}
+
+# One x-axis per atlas: this method fixes the Sys-Sys order and every other
+# method (Twin included) is drawn against it.
+ORDER_METHOD = {"gordon": "AdjHE-FE", "probaConns": "AdjHE-FE", "SA": "AdjHE-RE"}
+
+# Column order of the overview grid — union of every method any atlas uses.
+OVERVIEW_COLS = ["Twin", "AdjHE-FE", "AdjHE-RE", "GCTA"]
+
+
+def _resolve_col(col):
+    """The column present in `wide`, tolerating a renamed proba stream label."""
+    if col in wide.columns:
+        return col
+    alt = col.replace("h2_proba_", "h2_probaConns_")
+    return alt if alt in wide.columns else None
+
+
+def specs_for(atlas):
+    """(method, column) pairs for `atlas` that actually carry data."""
+    sub = wide[wide["Set"] == atlas]
+    out = []
+    for method, col in METHOD_SPECS[atlas]:
+        got = _resolve_col(col)
+        if got is None:
+            print(f"skip {atlas} {method}: {col} not in wide")
+            continue
+        if sub[got].dropna().empty:
+            print(f"skip {atlas} {method}: no data in {got}")
+            continue
+        out.append((method, got))
+    return out
+
+
 for atlas in ["gordon", "probaConns", "SA"]:
     N = set_N[atlas]
-    # Build both methods first so we can share SNP ordering between Twin and SNP per user request
-    dfs = {}
-    cols = {}
-    # Prefer FE for FC; fall back to RE if not present
-    if atlas != "SA":
-        col_pref = f"h2_{atlas}_AdjHE_FE"
-        col_alt = f"h2_{atlas}_AdjHE_RE"
-        snp_method = "AdjHE-FE"
-    else:
-        col_pref = f"h2_{atlas}_AdjHE_RE"
-        col_alt = None
-        snp_method = "AdjHE-RE"
-    col = col_pref
-    if col not in wide.columns and col_alt and col_alt in wide.columns:
-        col = col_alt
-        snp_method = "AdjHE-RE"
-    elif col not in wide.columns:
-        alt = col.replace("probaConns", "proba")
-        if alt in wide.columns:
-            col = alt
-        else:
-            print(f"skip {atlas} {snp_method}: {col_pref} not in wide")
-            continue
+    specs = specs_for(atlas)
+    if not specs:
+        continue
 
-    for method, col in [("Twin", "Twin_h2"), (snp_method, col)]:
-        if col not in wide.columns:
-            alt = col.replace("probaConns", "proba")
-            if alt in wide.columns:
-                col = alt
-            else:
-                print(f"skip {atlas} {method}: {col} not in wide")
-                continue
-        sub = wide[wide["Set"] == atlas]
-        if sub[col].dropna().empty:
-            print(f"skip {atlas} {method}: no data in {col}")
-            continue
+    dfs = {}
+    for method, col in specs:
         df = build_long_for_set(wide, atlas, N, col)
         if df.empty:
             print(f"skip {atlas} {method}: empty df")
             continue
         dfs[method] = df
-        cols[method] = col
     if not dfs:
         continue
-    # For Gordon/Proba (and SA for consistency), SNP determines Sys-Sys ordering so Twin uses same x-axis
-    shared_order = None
-    if snp_method in dfs and not dfs[snp_method].empty:
-        # Use SNP to define ordering
-        shared_order = _get_ordering(dfs[snp_method], atlas, snp_method)
-    elif "Twin" in dfs:
-        shared_order = _get_ordering(dfs["Twin"], atlas, "Twin")
-    for method, df in dfs.items():
-        # Use shared SNP ordering for both methods when available (per user: Gordon SNP determines order, Twin same)
-        order_to_use = shared_order
-        # For SA, also use shared if available
-        out = PLOT_DIR / f"manhattan_{atlas}_{method.replace('-','')}.png"
-        manhattan_for_df(df, atlas, method, out, shared_order=order_to_use)
 
-# ---- Manhattan Overview (3 rows x 2 cols, faceted, same styling as individual panels) ----
-# Regenerates manhattan_overview.png so it matches the updated individual panels
-# (full x-axis span, Sys-Sys labels logic, 100x grey tail).
+    # Derive the shared Sys-Sys order from the primary SNP method; fall back to
+    # the first available method if that column is missing from this run.
+    order_src = ORDER_METHOD[atlas] if ORDER_METHOD[atlas] in dfs else None
+    if order_src is None:
+        for method, _ in specs:
+            if method in dfs:
+                order_src = method
+                break
+    shared_order = _get_ordering(dfs[order_src], atlas, order_src) if order_src else None
+
+    for method, df in dfs.items():
+        out = PLOT_DIR / f"manhattan_{atlas}_{method.replace('-', '')}.png"
+        manhattan_for_df(df, atlas, method, out, shared_order=shared_order)
+
+# ---- Manhattan Overview: rows = atlas, cols = method ----
+# Regenerated alongside the individual panels so every method appears, not
+# only the primary SNP. (The previous version drew just one method per atlas:
+# the drawing block was indented outside the method loop, so `ax` was left
+# pointing at the last method and `method` held that same value.)
 try:
-    import itertools
     overview_rows = []
     for atlas in ["gordon", "probaConns", "SA"]:
-        N = set_N[atlas]
-        if atlas != "SA":
-            col_pref = f"h2_{atlas}_AdjHE_FE"
-            col_alt = f"h2_{atlas}_AdjHE_RE"
-            snp_method = "AdjHE-FE"
-        else:
-            col_pref = f"h2_{atlas}_AdjHE_RE"
-            col_alt = None
-            snp_method = "AdjHE-RE"
-        col = col_pref
-        if col not in wide.columns and col_alt and col_alt in wide.columns:
-            col = col_alt
-            snp_method = "AdjHE-RE"
-        elif col not in wide.columns:
-            alt = col.replace("probaConns", "proba")
-            if alt in wide.columns:
-                col = alt
-            else:
-                continue
-        for method, col in [("Twin", "Twin_h2"), (snp_method, col)]:
-            if col not in wide.columns:
-                alt = col.replace("probaConns", "proba")
-                if alt in wide.columns:
-                    col = alt
-                else:
-                    continue
-            sub = wide[wide["Set"] == atlas]
-            if sub[col].dropna().empty:
-                continue
-            df = build_long_for_set(wide, atlas, N, col)
+        for method, col in specs_for(atlas):
+            df = build_long_for_set(wide, atlas, set_N[atlas], col)
             if df.empty:
                 continue
             df["atlas"] = atlas
             df["method"] = method
             overview_rows.append(df)
+
     if overview_rows:
         overview = pd.concat(overview_rows, ignore_index=True)
-        # Global ordering by mean h2 per connection (descending) — same as per-panel large_order logic
+        # Global ordering by mean h2 per connection (descending) - same basis
+        # as the per-panel large_order logic
         ov_order = overview.groupby("connection")["h2"].mean().sort_values(ascending=False).index.tolist()
         overview["connection"] = pd.Categorical(overview["connection"], categories=ov_order, ordered=True)
         overview = overview.sort_values("connection").reset_index(drop=True).reset_index(drop=False).rename(columns={"index": "idx"})
         overview["index"] = overview["idx"]
-        # Facet: 3 rows (gordon/proba/SA) x 2 cols (Twin/SNP: AdjHE-FE for FC, AdjHE-RE for SA)
-        fig, axes = plt.subplots(3, 2, figsize=(14, 9), sharey=True)
-        axes = np.array(axes).flatten() if isinstance(axes, np.ndarray) else [axes]
-        # Use same small-group threshold as manhattan_for_df (top 20 by size, then 100x grey)
-        # For overview, compute per-facet small groups to keep grey tail visible
-        snp_by_atlas = {"gordon": "AdjHE-FE", "probaConns": "AdjHE-FE", "SA": "AdjHE-RE"}
-        for ax_idx, atlas in enumerate(["gordon", "probaConns", "SA"]):
-            for col_idx, method in enumerate(["Twin", snp_by_atlas[atlas]]):
-                ax = axes[ax_idx * 2 + col_idx]
-            sub = overview[(overview["atlas"] == atlas) & (overview["method"] == method)].copy()
-            if sub.empty:
-                ax.set_visible(False)
-                continue
-            # Per-facet stats for large20 / divider (mirrors manhattan_for_df)
-            stats = sub.groupby("connection")["h2"].agg(median="median", size="size")
-            largest_20 = stats.sort_values("size", ascending=False).head(20).index.tolist()
-            # divider for small tail
-            # need index column for divider calc
-            small_order = [c for c in ov_order if c not in largest_20 and c in stats.index]
-            if small_order:
-                try:
-                    divider = sub.loc[sub["connection"].isin(small_order), "index"].min()
-                    if pd.isna(divider):
-                        divider = None
-                except Exception:
-                    divider = None
-            else:
+
+        atlases = ["gordon", "probaConns", "SA"]
+        disp = {"gordon": "Gordon", "probaConns": "ProbaConns", "SA": "SA"}
+        alt_colors = ["#1f77b4", "#ff7f0e"]
+        ncol = len(OVERVIEW_COLS)
+        fig, axes = plt.subplots(len(atlases), ncol, figsize=(4.4 * ncol, 9),
+                                 sharey=True, squeeze=False)
+
+        for r, atlas in enumerate(atlases):
+            for c, method in enumerate(OVERVIEW_COLS):
+                ax = axes[r][c]
+                title = f"{disp[atlas]} - {method}"
+                sub = overview[(overview["atlas"] == atlas) & (overview["method"] == method)].copy()
+
+                if sub.empty:
+                    if any(m == method for m, _ in METHOD_SPECS[atlas]):
+                        # method exists for this atlas but produced no rows
+                        ax.set_visible(False)
+                    else:
+                        # method has no template here (SA / AdjHE-FE). Keep the
+                        # cell as a labelled placeholder so AdjHE-RE and GCTA
+                        # stay aligned with the FC rows instead of packing left.
+                        ax.set_title(title, fontsize=9, fontweight="bold", color="0.55")
+                        ax.set_xticks([])
+                        ax.set_yticks([])
+                        for sp in ax.spines.values():
+                            sp.set_visible(False)
+                        ax.text(0.5, 0.5, "n/a", transform=ax.transAxes,
+                                ha="center", va="center", color="0.55", fontsize=11)
+                    continue
+
+                # Per-facet stats for large20 / divider (mirrors manhattan_for_df).
+                # observed=True matters: `connection` is a global categorical, so
+                # the default would report every other atlas' connections at size 0.
+                stats = sub.groupby("connection", observed=True)["h2"].agg(median="median", size="size")
+                largest_20 = stats.sort_values("size", ascending=False).head(20).index.tolist()
+                large_order = stats.loc[stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
+                small_order = [cc for cc in ov_order if cc not in largest_20 and cc in stats.index]
+
                 divider = None
-            if divider is not None:
-                mask_small = sub["connection"].isin(small_order)
-                sub["plot_index"] = np.where(mask_small, (sub["index"].astype(float) - float(divider)) / 100.0 + float(divider), sub["index"].astype(float))
-            else:
-                sub["plot_index"] = sub["index"].astype(float)
-            alt_colors = ["#1f77b4", "#ff7f0e"]
-            # Re-derive large_order for this facet (median desc) to get correct alternating colors
-            large_order = stats.loc[stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
-            for name, group in sub.groupby("connection", observed=True):
-                is_large = name in largest_20
-                if not is_large:
-                    col, alpha, sz = "grey", 0.35, 5
+                if small_order:
+                    try:
+                        d = sub.loc[sub["connection"].isin(small_order), "index"].min()
+                        if not pd.isna(d):
+                            divider = float(d)
+                    except Exception:
+                        divider = None
+
+                if divider is not None:
+                    mask_small = sub["connection"].isin(small_order)
+                    sub["plot_index"] = np.where(
+                        mask_small,
+                        (sub["index"].astype(float) - divider) / 100.0 + divider,
+                        sub["index"].astype(float),
+                    )
                 else:
-                    col = alt_colors[large_order.index(name) % 2] if name in large_order else alt_colors[0]
-                    alpha, sz = 0.85, 6
-                ax.scatter(group["plot_index"], group["h2"], color=col, s=sz, alpha=alpha, zorder=10, linewidths=0.2, edgecolors="black" if is_large else "none")
-            # full x-axis span (compressed)
-            xmax = float(sub["plot_index"].max()) if len(sub) else 1
-            xmin = float(sub["plot_index"].min()) if len(sub) else 0
-            pad = (xmax - xmin) * 0.015 if xmax > xmin else 1
-            ax.set_xlim([xmin - pad, xmax + pad])
-            ax.set_ylim([0, 1])
-            disp = {"gordon": "Gordon", "probaConns": "ProbaConns", "SA": "SA"}.get(atlas, atlas)
-            ax.set_title(f"{disp} — {method}", fontsize=9, fontweight="bold")
-            ax.set_ylabel(r"$h^2$", fontsize=8)
-            ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
-            ax.set_yticks([0, 0.5, 1])
-            ax.tick_params(axis="y", labelsize=7)
-        fig.suptitle("Manhattan Overview — ordered by h² magnitude (y 0–1, <1.5% grey 100× compressed, full x-axis)", fontsize=12, fontweight="bold")
+                    sub["plot_index"] = sub["index"].astype(float)
+
+                for name, group in sub.groupby("connection", observed=True):
+                    is_large = name in largest_20
+                    if is_large:
+                        col_c = alt_colors[large_order.index(name) % 2] if name in large_order else alt_colors[0]
+                        alpha, sz = 0.85, 6
+                    else:
+                        col_c, alpha, sz = "grey", 0.35, 5
+                    ax.scatter(group["plot_index"], group["h2"], color=col_c, s=sz, alpha=alpha,
+                               zorder=10, linewidths=0.2, edgecolors="black" if is_large else "none")
+
+                xmax = float(sub["plot_index"].max())
+                xmin = float(sub["plot_index"].min())
+                pad = (xmax - xmin) * 0.015 if xmax > xmin else 1
+                ax.set_xlim([xmin - pad, xmax + pad])
+                ax.set_ylim([0, 1])
+                ax.set_title(title, fontsize=9, fontweight="bold")
+                ax.set_ylabel(r"$h^2$", fontsize=8)
+                ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
+                ax.set_yticks([0, 0.5, 1])
+                ax.tick_params(axis="y", labelsize=7)
+
+        fig.suptitle("Manhattan Overview - ordered by h2 magnitude (y 0-1, <1.5% grey 100x compressed, full x-axis)",
+                     fontsize=12, fontweight="bold")
         fig.tight_layout(rect=[0, 0, 1, 0.96])
         out_ov = PLOT_DIR / "manhattan_overview.png"
         fig.savefig(out_ov, dpi=300, bbox_inches="tight", pad_inches=0.12)

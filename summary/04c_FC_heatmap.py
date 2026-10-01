@@ -2,7 +2,7 @@
 """
 Heatmap of FC heritability (h2) ordered by Sys-Sys network labels.
 
-For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-FE, 30 PCs):
+For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-FE, 20 PCs):
   * Rebuild the full N x N h2 matrix from mash_twin_wide.csv
   * Order parcels by network (as in circular plot: argsort(networks))
   * Plot heatmap with networks as blocks, ordered by Sys-Sys labels, red (low) -> yellow (high), 0-1

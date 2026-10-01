@@ -41,9 +41,8 @@ sa_label     <- "AdjHE-RE"
 # Image path suffixes
 gordon_img_sfx <- if (gordon_col == "h2_gordon_AdjHE_FE") "AdjHE" else "AdjHERE"
 proba_img_sfx  <- if (proba_col == "h2_proba_AdjHE_FE") "AdjHE" else "AdjHERE"
-# Manhattan producer uses method.replace('-','') -> "AdjHEFE"/"AdjHERE"
-gordon_manh_sfx <- if (gordon_col == "h2_gordon_AdjHE_FE") "AdjHEFE" else "AdjHERE"
-proba_manh_sfx  <- if (proba_col == "h2_proba_AdjHE_FE") "AdjHEFE" else "AdjHERE"
+# Manhattan panels use literal method names (Twin / AdjHEFE / AdjHERE / GCTA),
+# one figure per atlas x method, all sharing the SNP-ordered x-axis.
 
 fivenum_tbl <- function(x) {
   x <- x[is.finite(x)]
@@ -113,15 +112,19 @@ filter_n0 <- function(df) {
 
 ## Gordon — "Manhattans" {.scrollable style="text-align:center;"}
 
-*Sys-Sys ordered by SNP (`AdjHE-FE`) median `h²` (20 largest by size, alternating `Twin` blue `AdjHE-FE` orange, grey tail `100×`), `Twin` uses same SNP `x`-axis for direct comparison.*
+*Sys-Sys ordered by SNP (`AdjHE-FE`) median `h²` (20 largest by size, alternating `Twin` blue `AdjHE-FE` orange, grey tail `100×`). Every method — `Twin`, `AdjHE-FE`, `AdjHE-RE`, `GCTA` — shares that one SNP `x`-axis for direct comparison.*
 
-::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
+::: {style="overflow-y:auto; max-height:1400px; text-align:center;"}
 
-::: {layout="[[1],[1]]" style="text-align:center;"}
+::: {layout="[[1],[1],[1],[1]]" style="text-align:center;"}
 
 ![Gordon Twin "Manhattan" — Sys-Sys pairs, SNP determines order, Twin same x-axis](../results/summary/plots/manhattan_gordon_Twin.png){width="100%" style="object-fit:contain;"}
 
-![Gordon AdjHE-FE Manhattan (SNP order)](../results/summary/plots/manhattan_gordon_AdjHEFE.png){width="100%" style="object-fit:contain;"}
+![Gordon AdjHE-FE Manhattan (SNP order — determines the x-axis)](../results/summary/plots/manhattan_gordon_AdjHEFE.png){width="100%" style="object-fit:contain;"}
+
+![Gordon AdjHE-RE Manhattan (same SNP x-axis)](../results/summary/plots/manhattan_gordon_AdjHERE.png){width="100%" style="object-fit:contain;"}
+
+![Gordon GCTA Manhattan (same SNP x-axis)](../results/summary/plots/manhattan_gordon_GCTA.png){width="100%" style="object-fit:contain;"}
 
 :::
 
@@ -143,7 +146,7 @@ gordon_long <- gordon_wide %>%
 fivenum_gordon <- gordon_long %>%
   group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>% filter(n != 0) %>%
   mutate(across(where(is.numeric), ~round(.x,3)))
-kable(filter_n0(fivenum_gordon), caption="Gordon — h2 five-number summary (Twin vs `r gordon_label`, 30 PCs)")
+kable(filter_n0(fivenum_gordon), caption="Gordon — h2 five-number summary (Twin vs `r gordon_label`, 20 PCs)")
 ```
 
 ```{r gordon-corr}
@@ -196,15 +199,19 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 
 ## ProbaConns — Manhattans {.scrollable style="text-align:center;"}
 
-*Sys-Sys ordered by SNP (`r proba_label`) median `h²`, `Twin` same `x`-axis as SNP.*
+*Sys-Sys ordered by SNP (`r proba_label`) median `h²`; `Twin`, `AdjHE-FE`, `AdjHE-RE` and `GCTA` all use that same SNP `x`-axis.*
 
-::: {style="overflow-y:auto; max-height:820px; text-align:center;"}
+::: {style="overflow-y:auto; max-height:1400px; text-align:center;"}
 
-::: {layout="[[1],[1]]" style="text-align:center;"}
+::: {layout="[[1],[1],[1],[1]]" style="text-align:center;"}
 
 ![ProbaConns Twin Manhattan (SNP order)](../results/summary/plots/manhattan_probaConns_Twin.png){width="100%" style="object-fit:contain;"}
 
-![ProbaConns `r proba_label` Manhattan (determines order)](../results/summary/plots/manhattan_probaConns_`r proba_manh_sfx`.png){width="100%" style="object-fit:contain;"}
+![ProbaConns AdjHE-FE Manhattan (determines order)](../results/summary/plots/manhattan_probaConns_AdjHEFE.png){width="100%" style="object-fit:contain;"}
+
+![ProbaConns AdjHE-RE Manhattan (same SNP x-axis)](../results/summary/plots/manhattan_probaConns_AdjHERE.png){width="100%" style="object-fit:contain;"}
+
+![ProbaConns GCTA Manhattan (same SNP x-axis)](../results/summary/plots/manhattan_probaConns_GCTA.png){width="100%" style="object-fit:contain;"}
 
 :::
 
@@ -219,7 +226,7 @@ proba_long <- wide %>% filter(Set=="probaConns") %>%
   mutate(Method = recode(Method, Twin_h2="Twin", !!proba_col := proba_label))
 fivenum_proba <- proba_long %>% group_by(Method) %>% summarise(fivenum_tbl(h2), .groups="drop") %>%
   mutate(across(where(is.numeric), ~round(.x,3)))
-kable(filter_n0(fivenum_proba), caption="ProbaConns — h2 five-number summary (Twin vs `r proba_label`, 30 PCs)")
+kable(filter_n0(fivenum_proba), caption="ProbaConns — h2 five-number summary (Twin vs `r proba_label`, 20 PCs)")
 ```
 
 ```{r proba-corr}

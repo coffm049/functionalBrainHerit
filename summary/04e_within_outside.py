@@ -2,7 +2,7 @@
 """
 Within vs outside network heritability — 10th, 50th, 90th percentiles.
 
-For each FC atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-FE, 30 PCs):
+For each FC atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-FE, 20 PCs):
   * Load networks per parcel (Gordon: gordon_modules.csv 352->14 via labelDict; Proba: abcd 0.75 via CIFTI + Sal<->SMl swap)
   * For each edge (oK -> i,j via triu_indices), classify as:
       - within: networks[i] == networks[j] and not NA

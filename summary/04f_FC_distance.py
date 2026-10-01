@@ -2,7 +2,7 @@
 """
 FC heritability vs distance — per edge, both Twin and AdjHE-FE, Euclidean + geodesic.
 
-For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-FE, 30 PCs):
+For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-FE, 20 PCs):
   * Rebuild N x N h2 matrix from mash_twin_wide.csv
   * Compute parcel centroids from Conte69 surfaces + dlabel (as in 02a/b)
   * For each edge (i,j) with h2, compute:

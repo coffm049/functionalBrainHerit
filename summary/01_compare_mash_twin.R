@@ -1,7 +1,7 @@
 library(tidyverse)
 
 ROOT <- "/users/4/coffm049/papers/functionalBrainHerit"
-NPC  <- 30
+NPC  <- 20
 OUT  <- file.path(ROOT, "results", "summary")
 dir.create(OUT, showWarnings = FALSE)
 
@@ -27,8 +27,8 @@ read_mash_stream <- function(pattern, label) {
   })
   if (nrow(dfs) == 0) return(empty_mash)
   if (!"PCs" %in% names(dfs) || all(is.na(dfs$PCs))) {
-    message("stream ", label, ": no/NA PCs column; assuming npc 30")
-    dfs <- dfs %>% mutate(PCs = 30)
+    message("stream ", label, ": no/NA PCs column; assuming npc 20")
+    dfs <- dfs %>% mutate(PCs = 20)
   }
   avail <- unique(dfs$PCs)
   use_npc <- if (NPC %in% avail) NPC else max(avail, na.rm = TRUE)

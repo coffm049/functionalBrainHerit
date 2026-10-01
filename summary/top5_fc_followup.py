@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Top-5 Gordon FC follow-up, part 1: distributions + White-subset inputs.
 
-Top 5 by AdjHE-RE SNP h2 (30 PCs) from mash_twin_wide.csv. All 9 edges at the
+Top 5 by AdjHE-RE SNP h2 (20 PCs) from mash_twin_wide.csv. All 9 edges at the
 h2=1.0 boundary are tied (identical var); these 5 break the tie by Twin h2.
 All five are within-MTL edges over a tight parcel cluster (7/14/15, 174/176,
 297, 139/262) — consistent with a parcel-level artifact rather than biology.
