@@ -43,20 +43,52 @@ def parquet_iids(path):
 
 
 def read_ids(path):
-    """Read a headerless FID/IID file, tolerating tab or whitespace delimiters.
+    """Read a headerless FID/IID file.
 
-    A silent misparse here would rebuild the pool from garbage, so validate
-    rather than trust the shape pandas happened to infer.
+    summary/prep_iids.sh:98 accepts exactly a tab or a space in these files
+    and verifies the column counts that way, so match it: take whichever
+    delimiter yields two fields on every non-blank line. Anything else fails
+    loudly with its field-count histogram instead of handing back a
+    shaped-but-wrong frame -- a silent misparse here would republish the
+    pool from garbage.
     """
     if not os.path.isfile(path):
         raise FileNotFoundError(f"Missing id file {path}")
-    df = pd.read_csv(
-        path, header=None, sep=r"\s+", names=["FID", "IID"],
-        dtype=str, engine="python",
+
+    # Default universal-newline reading also splits lone-CR files correctly.
+    with open(path, "r", errors="replace") as fh:
+        lines = [ln.rstrip() for ln in fh]
+    lines = [ln for ln in lines if ln]
+    if not lines:
+        raise ValueError(f"{path}: file is empty")
+
+    for split in (lambda s: s.split("\t"), str.split, lambda s: s.split(",")):
+        parts = [split(ln) for ln in lines]
+        widths = {len(p) for p in parts}
+        if min(widths) >= 2:
+            # FID and IID are always columns 1 and 2, the same fields
+            # prep_iids.sh:140 selects (iid col 2); trailing extras are
+            # ignored rather than treated as a parse failure.
+            if widths != {2}:
+                print(f"  note: {path}: {sorted(widths)} fields/line; "
+                      f"using columns 1-2 (FID, IID)")
+            return pd.DataFrame(
+                {"FID": [p[0] for p in parts], "IID": [p[1] for p in parts]},
+                dtype=str,
+            )
+
+    hist = {}
+    for ln in lines:
+        w = len(ln.split())
+        hist[w] = hist.get(w, 0) + 1
+    bad = next((ln for ln in lines if len(ln.split()) != 2), lines[0])
+    raise ValueError(
+        f"{path}: expected exactly 2 'FID IID' fields per line.\n"
+        f"  {len(lines)} non-blank lines; whitespace field-count histogram "
+        f"{dict(sorted(hist.items()))}\n"
+        f"  first line          : {lines[0]!r}\n"
+        f"  first line that is not 2 fields: {bad!r}"
     )
-    if len(df.columns) != 2 or df.isna().any().any() or (df.IID == "").any():
-        raise ValueError(f"{path}: did not parse as two 'FID IID' columns")
-    return df
 
 
 def main():
