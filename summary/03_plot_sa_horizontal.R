@@ -162,7 +162,7 @@ if (nrow(df_w) == 0) {
         mutate(Twin_h2 = map_dbl(herit, extract_h2)) %>%
         select(Pheno, Twin_h2)
       adj_df <- read_csv(adj_file, show_col_types = FALSE) %>%
-        filter(PCs == 30) %>%
+        filter(PCs == max(PCs, na.rm = TRUE)) %>%
         select(Pheno = pheno, h2_w = h2)
       df_w <- full_join(twin_df, adj_df, by = "Pheno") %>%
         pivot_longer(cols = c(Twin_h2, h2_w), names_to = "Type", values_to = "h2") %>%

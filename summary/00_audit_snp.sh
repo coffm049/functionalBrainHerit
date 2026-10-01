@@ -21,12 +21,14 @@
 # Rows per file = chunk phenotypes x len(npc): MASH emits one row per
 # (phenotype x npc value), tagged by the 'PCs' column
 # (MASH/src/Estimate/estimators/all_estimators.py:455, itertools.product).
-# The npc field is read from the template each submit.sh selects:
-#   gordon/proba gcta/he npc=[20]  -> x1    proba fe  npc=[20]   -> x1
-#   gordon fe             npc=[0,20] -> x2   proba re  npc=[0,20] -> x2
-#   gordon re             npc=[10,20] -> x2  (npc 0 dropped to fight
-#                                             ill_conditioned RE estimates)
-# 01_compare_mash_twin.R:33-36 already collapses these by filtering PCs == npc.
+# The npc field is read from the template each submit.sh selects. Every active
+# template is now npc=[10,20] (two rows per phenotype) after the AdjHE-RE fix:
+# random_groups was entering the PC projection in _adjhe_3comp, which made
+# QSQ = Q D D' Q vanish identically (S is built from the same site indicator
+# matrix D), zeroing XtX's middle row and flagging 100% of RE rows
+# ill_conditioned at every npc. See MASH tests/test_adjhe_site_projection.py.
+# 01_compare_mash_twin.R:33-36 already collapses these by filtering
+# PCs == use_npc, which falls back to max(avail) = 20.
 #
 # This script never writes to results/ and never submits jobs.
 
@@ -44,12 +46,12 @@ trap 'rm -rf "$tmp"' EXIT
 STREAMS=(
   "gordon_AdjHE_FE|results/FCs/gordon/pconns.AdjHE.FE.*.csv|208|61776|297|2"
   "gordon_AdjHE_RE|results/FCs/gordon/pconns.AdjHE.RE.*.csv|208|61776|297|2"
-  "gordon_GCTA|results/FCs/gordon/pconns.GCTA.GCTA.*.csv|100|61776|618|1"
-  "gordon_HEreg|results/FCs/gordon/pconns.HEreg.HEreg.*.csv|208|61776|297|1"
-  "proba_AdjHE_FE|results/FCs/probaConns/probaConns.AdjHE.FE.*.csv|10|3160|316|1"
+  "gordon_GCTA|results/FCs/gordon/pconns.GCTA.GCTA.*.csv|100|61776|618|2"
+  "gordon_HEreg|results/FCs/gordon/pconns.HEreg.HEreg.*.csv|208|61776|297|2"
+  "proba_AdjHE_FE|results/FCs/probaConns/probaConns.AdjHE.FE.*.csv|10|3160|316|2"
   "proba_AdjHE_RE|results/FCs/probaConns/probaConns.AdjHE.RE.*.csv|40|3160|79|2"
-  "proba_GCTA|results/FCs/probaConns/probaConns.GCTA.GCTA.*.csv|10|3160|316|1"
-  "proba_HEreg|results/FCs/probaConns/probaConns.HEreg.HEreg.*.csv|10|3160|316|1"
+  "proba_GCTA|results/FCs/probaConns/probaConns.GCTA.GCTA.*.csv|10|3160|316|2"
+  "proba_HEreg|results/FCs/probaConns/probaConns.HEreg.HEreg.*.csv|10|3160|316|2"
 )
 
 ################################################################################

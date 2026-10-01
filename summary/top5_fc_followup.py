@@ -74,19 +74,19 @@ def main():
     white = df[df["race_ethnicity"] == "White"].copy()
     print(f"White subset N={len(white)} (MASH subsets internally via covar_filter)")
 
-    # ---- residualize on RE covariate set + 30 PCs (same as estimation) ----
+    # ---- residualize on RE covariate set + 20 PCs (same as estimation) ----
     pc = pd.read_table(EIGEN, sep=r"\s+", header=None)
-    pc = pc.iloc[:, :32]
-    pc.columns = ["FID", "IID"] + [f"pc{i}" for i in range(1, 31)]
-    df = df.merge(pc[["IID"] + [f"pc{i}" for i in range(1, 31)]], on="IID", how="left")
+    pc = pc.iloc[:, :22]
+    pc.columns = ["FID", "IID"] + [f"pc{i}" for i in range(1, 21)]
+    df = df.merge(pc[["IID"] + [f"pc{i}" for i in range(1, 21)]], on="IID", how="left")
 
     rows = []
     resid = {}
     for e, a, na, b, nb, twin, snp in TOP5:
         m_raw = moments(df[e].values)
         m_raw = {"edge": e, "pa": a, "pb": b, "twin_h2": twin, "snp_h2": snp, **{f"raw_{k}": v for k, v in m_raw.items()}}
-        # complete-case residualization: age + female/site dummies + pc1..30
-        cols = ["age"] + [f"pc{i}" for i in range(1, 31)]
+        # complete-case residualization: age + female/site dummies + pc1..20
+        cols = ["age"] + [f"pc{i}" for i in range(1, 21)]
         sub = df[["IID", e, "abcd_site", "female"] + cols].dropna()
         dummies = pd.get_dummies(sub[["abcd_site", "female"]], prefix=["site", "female"], dtype=float)
         X = np.column_stack([np.ones(len(sub)), sub[cols].astype(float).values, dummies.values])

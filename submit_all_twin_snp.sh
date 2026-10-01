@@ -37,7 +37,8 @@ FC_TEMPLATES=(FCs/gordon/feExample2.json      FCs/gordon/reExample2.json
               FCs/gordon/gctaExample.json     FCs/gordon/heExample.json
               FCs/probaConns/feExample2.json  FCs/probaConns/reExample2.json
               FCs/probaConns/gctaExample.json FCs/probaConns/heExample.json)
-SA_TEMPLATES=(SA/AdjHE_RE.json SA/AdjHE_RE_wo_total.json SA/GCTA.json SA/HE.json)
+SA_TEMPLATES=(SA/AdjHE_RE.json SA/AdjHE_RE_wo_total.json
+              SA/GCTA.json SA/GCTA_wo_total.json SA/HE.json)
 
 if [ "$DRY_RUN" = true ]; then
   echo "  Would run: bash summary/prep_iids.sh ${FC_TEMPLATES[*]} ${SA_TEMPLATES[*]}"
@@ -130,7 +131,14 @@ for M in $METHODS; do
         sbatch SA/SLURM_AdjHE_RE_with_total.sh
         sbatch SA/SLURM_AdjHE_RE_wo_total.sh
       fi ;;
-    GCTA) echo "Submitting SA GCTA..."; [ "$DRY_RUN" = true ] && echo "  Would run: sbatch SA/SLURM_GCTA.sh" || sbatch SA/SLURM_GCTA.sh ;;
+    GCTA) echo "Submitting SA GCTA (+ wo_total variant)..."
+          if [ "$DRY_RUN" = true ]; then
+            echo "  Would run: sbatch SA/SLURM_GCTA.sh"
+            echo "  Would run: sbatch SA/SLURM_GCTA_wo_total.sh"
+          else
+            sbatch SA/SLURM_GCTA.sh
+            sbatch SA/SLURM_GCTA_wo_total.sh
+          fi ;;
     HEreg) echo "Submitting SA HEreg..."; [ "$DRY_RUN" = true ] && echo "  Would run: sbatch SA/SLURM_HEreg.sh" || sbatch SA/SLURM_HEreg.sh ;;
   esac
 done
