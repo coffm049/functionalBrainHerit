@@ -22,13 +22,14 @@
 # (phenotype x npc value), tagged by the 'PCs' column
 # (MASH/src/Estimate/estimators/all_estimators.py:455, itertools.product).
 # The npc field is read from the template each submit.sh selects. Every active
-# template is now npc=[10,20] (two rows per phenotype) after the AdjHE-RE fix:
+# template is npc=[20] (one row per phenotype) after the AdjHE-RE fix:
 # random_groups was entering the PC projection in _adjhe_3comp, which made
 # QSQ = Q D D' Q vanish identically (S is built from the same site indicator
 # matrix D), zeroing XtX's middle row and flagging 100% of RE rows
-# ill_conditioned at every npc. See MASH tests/test_adjhe_site_projection.py.
-# 01_compare_mash_twin.R:33-36 already collapses these by filtering
-# PCs == use_npc, which falls back to max(avail) = 20.
+# ill_conditioned at every npc and sample size. See
+# MASH tests/test_adjhe_site_projection.py.
+# 01_compare_mash_twin.R:33-36 selects PCs == use_npc, which falls back to
+# max(avail) = 20.
 #
 # This script never writes to results/ and never submits jobs.
 
@@ -44,25 +45,33 @@ trap 'rm -rf "$tmp"' EXIT
 
 # key|glob|chunk|total|expected_files|npc_multiplier
 STREAMS=(
-  "gordon_AdjHE_FE|results/FCs/gordon/pconns.AdjHE.FE.*.csv|208|61776|297|2"
-  "gordon_AdjHE_RE|results/FCs/gordon/pconns.AdjHE.RE.*.csv|208|61776|297|2"
-  "gordon_GCTA|results/FCs/gordon/pconns.GCTA.GCTA.*.csv|100|61776|618|2"
-  "gordon_HEreg|results/FCs/gordon/pconns.HEreg.HEreg.*.csv|208|61776|297|2"
-  "proba_AdjHE_FE|results/FCs/probaConns/probaConns.AdjHE.FE.*.csv|10|3160|316|2"
-  "proba_AdjHE_RE|results/FCs/probaConns/probaConns.AdjHE.RE.*.csv|40|3160|79|2"
-  "proba_GCTA|results/FCs/probaConns/probaConns.GCTA.GCTA.*.csv|10|3160|316|2"
-  "proba_HEreg|results/FCs/probaConns/probaConns.HEreg.HEreg.*.csv|10|3160|316|2"
+  "gordon_AdjHE_FE|results/FCs/gordon/pconns.AdjHE.FE.*.csv|208|61776|297|1"
+  "gordon_AdjHE_RE|results/FCs/gordon/pconns.AdjHE.RE.*.csv|208|61776|297|1"
+  "gordon_GCTA|results/FCs/gordon/pconns.GCTA.GCTA.*.csv|100|61776|618|1"
+  "gordon_HEreg|results/FCs/gordon/pconns.HEreg.HEreg.*.csv|208|61776|297|1"
+  "proba_AdjHE_FE|results/FCs/probaConns/probaConns.AdjHE.FE.*.csv|10|3160|316|1"
+  "proba_AdjHE_RE|results/FCs/probaConns/probaConns.AdjHE.RE.*.csv|40|3160|79|1"
+  "proba_GCTA|results/FCs/probaConns/probaConns.GCTA.GCTA.*.csv|10|3160|316|1"
+  "proba_HEreg|results/FCs/probaConns/probaConns.HEreg.HEreg.*.csv|10|3160|316|1"
 )
 
 ################################################################################
 hdr() { printf '\n===== %s =====\n' "$1"; }
 
 # Rows a SA run must have = len(npc) x len(mpheno), read from its template so
-# the check stays correct when a template gains a phenotype.
+# the check stays correct when a template gains a phenotype. Handles both the
+# multi-line ("npc": [ / 20 / ]) and inline ("npc": [20]) spellings; a line
+# that only opens the array has to fall through to the digit rule below.
 sa_expected() {
   awk '
-    /"npc"[[:space:]]*:/    { sec = "npc"; next }
-    /"mpheno"[[:space:]]*:/ { sec = "ph";  next }
+    /"npc"[[:space:]]*:/    { sec = "npc"
+                              s = $0; sub(/.*\[/, "", s); sub(/\].*/, "", s)
+                              if (s ~ /[0-9]/) { npc += split(s, a, /,/); sec = "" }
+                              next }
+    /"mpheno"[[:space:]]*:/ { sec = "ph"
+                              s = $0; sub(/^[^:]*:[[:space:]]*/, "", s); sub(/\].*$/, "", s)
+                              if (s ~ /"/) { ph += gsub(/"/, "", s) / 2; sec = "" }
+                              next }
     /^[[:space:]]*\]/       { sec = "";    next }
     sec == "npc" && /^[[:space:]]*[0-9]/ { npc++ }
     sec == "ph"  && /^[[:space:]]*"/     { ph++ }

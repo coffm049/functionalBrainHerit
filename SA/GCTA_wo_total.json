@@ -5,7 +5,6 @@
   "pheno": "/projects/standard/rando149/coffm049/ABCD/Results/02_Phenotypes/TotalCorticalRepresentation_ByPFN_ABCD.csv",
   "out": "/users/4/coffm049/papers/functionalBrainHerit/results/SA/GCTA_wo_total",
   "npc": [
-    10,
     20
   ],
   "mpheno": [
