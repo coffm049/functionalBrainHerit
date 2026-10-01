@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """
-Rebuild the SNP analysis pool (filtered_ids) from the genomics-derived
-no_rels GRM cohort, which is the authoritative sample definition.
+Rebuild the SNP analysis pool (filtered_ids) as one identical subject set.
 
-The pool used to be narrowed further by intersecting with both phenotype
-parquets and by intersecting with whatever the previous pool already
-contained. Both were shrinking operations: the result could never grow, and
-the parquet intersection capped the pool at probaConns' 5,552 subjects even
-though no_rels defines 7,234.
+The pool is the intersection of the two genomics GRMs (no_rels and full,
+because every SNP config reads one of those two and passes this pool as
+"ids") with both phenotype parquets (gordon pconns and probaConns). That
+intersection is the whole point of the file: it keeps the same subjects in
+every atlas and every estimator, so a difference between two methods or two
+atlases is a difference in method or atlas and not in sample.
 
-The pool now comes from no_rels.grm.id alone. Each estimate intersects it
-with its own phenotype and covariates while loading, so gordon can reach the
-full 7,234 ceiling while probaConns stays limited by its own 5,552
-phenotypes. Nothing is lost by not pre-intersecting: a subject with no
-phenotype is dropped at load time anyway.
+Intersecting from the GRM outward rather than narrowing whatever the
+previous pool happened to be means the result can grow as well as shrink --
+if probaConns is recompiled with more subjects, so is the pool.
+
+Per-phenotype loading still drops subjects missing covariates, so a subject
+in the shared pool may appear in fewer than all four estimators of an
+atlas. That residual difference is unavoidable and is reported by the audit.
 
 Output format matches what MASH expects: headerless, tab-separated, FID IID.
 """
@@ -32,8 +34,9 @@ PROBA = f"{P}/ABCD/Workflow/02_Phenotypes/FCsTopo/probaConns.parquet"
 GRM_NO_RELS = f"{P}/ABCD/Results/01_Gene_QC/filters/filter1/GRMs/no_rels/no_rels.grm.id"
 GRM_FULL = f"{P}/ABCD/Results/01_Gene_QC/filters/filter1/GRMs/full/full.grm.id"
 
-# Refuse to publish a pool smaller than this: no_rels defines 7,234 subjects,
-# so anything this small means the id file was misparsed or mispointed.
+# Refuse to publish a pool smaller than this: the intersection has run near
+# 3,2xx subjects, so anything this small means a parquet column or an id file
+# was misparsed rather than genuinely sparse.
 MIN_POOL = 1000
 
 
@@ -110,18 +113,26 @@ def main():
     grm_no_rels = set(grm_no_rels_df.IID)
     grm_full = set(grm_full_df.IID)
 
-    # Source of truth: the no_rels cohort, in GRM order.
+    # Source of truth: the no_rels cohort, in GRM order, narrowed to subjects
+    # usable by every SNP config (present in both GRMs) and phenotyped in both
+    # atlases. Base is the GRM rather than the previous pool so the set is
+    # recomputed correctly instead of only ever shrinking.
     grm = grm_no_rels_df
-    pool = grm[grm.IID.isin(grm_full)].copy()
+    usable = grm_full & gordon_ids & proba_ids
+    pool = grm[grm.IID.isin(usable)].copy()
     if pool.empty:
         raise ValueError(
-            "Empty pool - no_rels.grm.id and full.grm.id share no subjects"
+            "Empty pool - no_rels.grm.id shares no subjects with full GRM, "
+            f"pconns.parquet, and probaConns.parquet "
+            f"(full={len(grm_full)}, gordon={len(gordon_ids)}, "
+            f"proba={len(proba_ids)})"
         )
     pool_ids = set(pool.IID)
     if len(pool) < MIN_POOL:
         raise ValueError(
-            f"Pool of {len(pool)} subjects is below MIN_POOL={MIN_POOL} for a "
-            f"no_rels.grm.id of {len(grm_no_rels)} parsed - refusing to write"
+            f"Pool of {len(pool)} subjects is below MIN_POOL={MIN_POOL} - "
+            f"no_rels parsed {len(grm_no_rels)}, full {len(grm_full)}, "
+            f"gordon {len(gordon_ids)}, proba {len(proba_ids)} - refusing to write"
         )
 
     # Only worth backing up if the rebuild would actually drop somebody.
@@ -134,12 +145,16 @@ def main():
     print(f"Current pool       : {len(cur_ids)} subjects")
     print(f"no_rels GRM        : {len(grm_no_rels)} IIDs")
     print(f"full GRM           : {len(grm_full)} IIDs (no_rels not in full: {len(grm_no_rels - grm_full)})")
-    print(f"POOL (GRM only)    : {len(pool)} subjects -> wrote {IDS}")
+    print(f"gordon pconns      : {len(gordon_ids)} IIDs")
+    print(f"probaConns         : {len(proba_ids)} IIDs")
+    print(f"POOL (4-way shared): {len(pool)} subjects -> wrote {IDS}")
     print(f"  added            : {len(pool_ids - cur_ids)}")
     print(f"  dropped          : {len(cur_ids - pool_ids)}")
-    print("Parquet overlap (reported only - MASH intersects per phenotype):")
-    print(f"  gordon pconns    : {len(pool_ids & gordon_ids)}")
-    print(f"  probaConns       : {len(pool_ids & proba_ids)}")
+    print("Ceilings (how much each constraint alone costs):")
+    print(f"  no_rels only             : {len(grm[grm.IID.isin(grm_full)])}")
+    print(f"  no_rels x gordon         : {len(grm[grm.IID.isin(grm_full & gordon_ids)])}")
+    print(f"  no_rels x proba          : {len(grm[grm.IID.isin(grm_full & proba_ids)])}")
+    print("  after covariate load-time drops: see 00_audit_snp.sh")
 
 
 if __name__ == "__main__":
