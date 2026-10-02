@@ -37,7 +37,8 @@ FC_TEMPLATES=(FCs/gordon/feExample2.json      FCs/gordon/reExample2.json
               FCs/gordon/gctaExample.json     FCs/gordon/heExample.json
               FCs/probaConns/feExample2.json  FCs/probaConns/reExample2.json
               FCs/probaConns/gctaExample.json FCs/probaConns/heExample.json)
-SA_TEMPLATES=(SA/AdjHE_FE_wo_total.json SA/AdjHE_RE.json SA/AdjHE_RE_wo_total.json
+SA_TEMPLATES=(SA/AdjHE_FE.json SA/AdjHE_FE_wo_total.json
+              SA/AdjHE_RE.json SA/AdjHE_RE_wo_total.json
               SA/GCTA.json SA/GCTA_wo_total.json SA/HE.json)
 
 if [ "$DRY_RUN" = true ]; then
@@ -120,17 +121,19 @@ echo "--- Submitting SA estimates ---"
 for M in $METHODS; do
   case $M in
     AdjHE)
-      # three variants: results/SA/AdjHE_RE.csv (w_total) is read by
+      # four variants, two axes: FE vs RE x with/without totalNetworkSurface.
+      # results/SA/AdjHE_RE.csv (RE w_total) is read by
       # 03_plot_sa_horizontal.R, 04_compare_r2.R, 04b_h2_SA_correlation.py
       # and 02d_brain_sa_total.py; AdjHE_RE_wo_total.csv by 01 and 04.
-      # AdjHE_FE_wo_total.csv is the SA AdjHE-FE counterpart of
-      # FCs/*/feExample2.json, so AdjHE-FE can be reported for all 3 atlases.
+      # The FE pair are the AdjHE-FE counterparts of FCs/*/feExample2.json.
       echo "Submitting SA AdjHE-FE + AdjHE-RE (with + without totalNetworkSurface)..."
       if [ "$DRY_RUN" = true ]; then
+        echo "  Would run: sbatch SA/SLURM_AdjHE_FE_with_total.sh"
         echo "  Would run: sbatch SA/SLURM_AdjHE_FE_wo_total.sh"
         echo "  Would run: sbatch SA/SLURM_AdjHE_RE_with_total.sh"
         echo "  Would run: sbatch SA/SLURM_AdjHE_RE_wo_total.sh"
       else
+        sbatch SA/SLURM_AdjHE_FE_with_total.sh
         sbatch SA/SLURM_AdjHE_FE_wo_total.sh
         sbatch SA/SLURM_AdjHE_RE_with_total.sh
         sbatch SA/SLURM_AdjHE_RE_wo_total.sh
