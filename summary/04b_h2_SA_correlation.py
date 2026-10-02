@@ -157,42 +157,50 @@ for _,row in sa_sub.iterrows():
         sa_map_wo[net] = {"Twin": float(row["Twin_h2"]) if pd.notna(row["Twin_h2"]) else np.nan,
                           "AdjHE-FE": float(row["h2_SA_AdjHE_FE"]) if "h2_SA_AdjHE_FE" in row and pd.notna(row["h2_SA_AdjHE_FE"]) else np.nan,
                           "AdjHE-RE": float(row["h2_SA_AdjHE_RE"]) if "h2_SA_AdjHE_RE" in row and pd.notna(row["h2_SA_AdjHE_RE"]) else np.nan}
-        # w_total if columns exist. Only AdjHE-RE has a w_total run (the SA FE
-        # template is wo_total), so w_total stays RE-only.
+        # w_total if columns exist in WIDE. These are not emitted by
+        # 01_compare_mash_twin.R, so sa_map_w normally stays empty here and is
+        # filled from the direct CSVs in the fallback block below.
         twin_w_col = next((c for c in ["Twin_h2_w_total","Twin_h2_wtotal"] if c in row and pd.notna(row[c])), None)
         adj_w_col = next((c for c in ["h2_SA_AdjHE_RE_w_total","h2_SA_AdjHE_RE_wtotal","h2_SA_w_total_AdjHE_RE"] if c in row and pd.notna(row[c])), None)
         if twin_w_col or adj_w_col:
             sa_map_w[net] = {"Twin": float(row[twin_w_col]) if twin_w_col and pd.notna(row[twin_w_col]) else np.nan,
                              "AdjHE-RE": float(row[adj_w_col]) if adj_w_col and pd.notna(row[adj_w_col]) else np.nan}
     except: pass
-# Fallback for w_total via direct files if not in WIDE
-if not sa_map_w:
-    try:
-        twin_w_path = ROOT / "results/SA/twinEsts/herit_w_total.Rds"
-        if not twin_w_path.exists():
-            twin_w_path = Path("results/SA/twinEsts/herit_w_total.Rds")
-        adj_w_path = ROOT / "results/SA/AdjHE_RE.csv"
-        if not adj_w_path.exists():
-            adj_w_path = Path("results/SA/AdjHE_RE.csv")
-        if twin_w_path.exists() and adj_w_path.exists():
-            import rpy2.robjects as ro
-            # Use R to read RDS via rpy2 if needed, but try python via pyreadr or direct
-            # Fallback: try to read via pandas if it's actually csv
-            pass
-    except: pass
-    # If still empty, try direct read of SA w_total files via R: use simple python fallback by reading the wo_total and assuming w_total similar?
-    # For now, if w_total not in WIDE, try to read from SA direct files via python's rds reading not available — leave empty and handle later
-    pass
-# If w_total still empty, try to load via direct SA files using Rscript-like approach: read the RDS via pandas not possible, so keep wo_total only
-# For local Windows, also try portable paths
-if not sa_map_w:
-    # Try portable direct files
-    twin_w_portable = Path("results/SA/twinEsts/herit_w_total.Rds")
-    adj_w_portable = Path("results/SA/AdjHE_RE.csv")
-    # If those exist, try to parse via R not available, so just keep wo_total
-    pass
-# Use wo_total as fallback for w_total if needed, but keep separate maps
-# For correlation, we will compute both wo_total and w_total if available
+# Fallback for w_total via direct files if not in WIDE.
+# results/SA/AdjHE_FE.csv and results/SA/AdjHE_RE.csv are plain CSVs, so Python
+# can read them without rpy2. Only the Twin w_total estimate needs R
+# (results/SA/twinEsts/herit_w_total.Rds), so Twin carries over from wo_total and
+# the SNP columns are what actually change between the two sa_types.
+if not any(np.isfinite(v.get(k, np.nan))
+           for v in sa_map_w.values() for k in ("AdjHE-FE", "AdjHE-RE")):
+    for tag, rel in (("AdjHE-FE", "results/SA/AdjHE_FE.csv"),
+                     ("AdjHE-RE", "results/SA/AdjHE_RE.csv")):
+        p = ROOT / rel
+        if not p.exists():
+            p = Path(rel)
+        if not p.exists():
+            continue
+        try:
+            d = pd.read_csv(p)
+        except Exception:
+            continue
+        if "pheno" not in d.columns or "h2" not in d.columns:
+            continue
+        for _, row in d.iterrows():
+            ph = str(row["pheno"])
+            try:
+                num = int(ph.split("network_surfarea")[-1]) if "network_surfarea" in ph else int(ph)
+            except ValueError:
+                continue
+            net = SA_NETWORKS.get(num)
+            if net is None or not np.isfinite(row["h2"]):
+                continue
+            sa_map_w.setdefault(net, {})[tag] = float(row["h2"])
+    # Give every w_total network a Twin slot so the pairwise loop can align on
+    # network name; the value is the wo_total estimate (see note above).
+    for net, v in sa_map_wo.items():
+        if net in sa_map_w:
+            sa_map_w[net].setdefault("Twin", v.get("Twin", np.nan))
 sa_maps = {"wo_total": sa_map_wo, "w_total": sa_map_w if sa_map_w else sa_map_wo}
 
 # Build FC per-parcel summaries and correlate — for each SA type (wo_total, w_total) if available
