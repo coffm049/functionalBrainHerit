@@ -81,9 +81,9 @@ filter_n0 <- function(df) {
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:left; font-size:1.15em; line-height:1.6;"}
 
-- **low FC heritability mostly within networks:** median SNP h2 0.001 (Gordon, AdjHE-FE); Twin median is 0.177 within vs 0.119 across networks
+- **low FC heritability mostly within networks:** median SNP h² `r sprintf("%.4f", median(wide[[gordon_col]][wide$Set == "gordon" & !is.na(wide[[gordon_col]])]))` (Gordon, `r gordon_label`); Twin median is 0.177 within vs 0.119 across networks
 - **Surface area h2 higher:** SA Twin mean h² is 0.177, reaching ~0.401 in MTL and VIS
-- **Twin–SNP gap:** Gordon mean h2 is 0.129 (Twin) vs 0.008 (SNP, AdjHE-FE) — standard missing heritability gap
+- **Twin–SNP gap:** Gordon mean h² is `r sprintf("%.3f", mean(wide$Twin_h2[wide$Set == "gordon" & !is.na(wide$Twin_h2)]))` (Twin) vs `r sprintf("%.3f", mean(wide[[gordon_col]][wide$Set == "gordon" & !is.na(wide[[gordon_col]])]))` (SNP, `r gordon_label`) — standard missing heritability gap. Both values are computed from `wide` rather than hardcoded: the retained SNP median moved by ~17× when the Gordon AdjHE-FE stream was re-run with `abcd_site` as a fixed effect, and a hardcoded figure did not notice.
 - **h2 changes with distance:** Gordon Twin h2 decreases with distance across networks ($\rho$ = −0.104) but increases within networks (R = 0.103).
 - **Zero-heritability common:** 14.1% of across- and 7.9% of within-network connections sit at zero (h2 ≤ 1e-9, Gordon Twin).
 
@@ -117,7 +117,7 @@ filter_n0 <- function(df) {
 
 ## Gordon — "Manhattans" {.scrollable style="text-align:center;"}
 
-*Sys-Sys ordered by SNP (`AdjHE-FE`) median `h²` (20 largest by size, alternating `Twin` blue `AdjHE-FE` orange, grey tail `100×`). Every method shown — `Twin`, `AdjHE-FE`, `AdjHE-RE` — shares that one SNP `x`-axis for direct comparison. GCTA is omitted here: it returns `h2 == 0` for >50% of FC edges (zero-censored negatives, no flag column), so it is not comparable to the AdjHE panels.*
+*Sys-Sys ordered by SNP (`AdjHE-FE`) median `h²` (20 largest by size, alternating `Twin` blue `AdjHE-FE` orange, grey tail `100×`). `AdjHE-FE` and `AdjHE-RE` are both reported and both are drawn against that one SNP `x`-axis. **Read the per-panel `n`, not just the shared axis:** the two AdjHE variants retain very different fractions of phenotypes, because MASH's flag rate differs between them (~48% retained for FE vs ~77% for RE), so the panels are *not* the same row set at the same scale — the FE/RE gap is partly selection, not purely method. GCTA is omitted here: it returns `h2 == 0` for >50% of FC edges (zero-censored negatives, no flag column), so it is not comparable to the AdjHE panels.*
 
 ::: {style="overflow-y:auto; max-height:1200px; text-align:center;"}
 
@@ -202,7 +202,7 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 
 ## ProbaConns — Manhattans {.scrollable style="text-align:center;"}
 
-*Sys-Sys ordered by SNP (`r proba_label`) median `h²`; `Twin`, `AdjHE-FE` and `AdjHE-RE` all use that same SNP `x`-axis. GCTA omitted for the same reason as in Gordon.*
+*Sys-Sys ordered by SNP (`r proba_label`) median `h²`; `Twin`, `AdjHE-FE` and `AdjHE-RE` all use that same SNP `x`-axis. As in Gordon, both AdjHE variants are reported and each panel carries its own retained `n`: FE keeps ~37% of phenotypes here and RE ~75%, so again the two panels are not the same row set. GCTA omitted for the same reason as in Gordon.*
 
 ::: {style="overflow-y:auto; max-height:1200px; text-align:center;"}
 
@@ -249,7 +249,7 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 
 ## SA — "Manhattans" {.scrollable style="text-align:center;"}
 
-*Sys-Sys ordered by SNP (`r sa_label`) median `h²`; `Twin`, `AdjHE-FE` and `AdjHE-RE` all use that same SNP `x`-axis, matching the Gordon and ProbaConns panels above. GCTA omitted for the same reason as in Gordon.*
+*Sys-Sys ordered by SNP (`r sa_label`) median `h²`; `Twin`, `AdjHE-FE` and `AdjHE-RE` all use that same SNP `x`-axis, matching the Gordon and ProbaConns panels above. Both AdjHE variants are reported; here they retain the same 13 rows, so unlike the FC atlases the FE/RE contrast is not confounded by differential retention — but the median ratio is still ~4×, the largest of the three sets. GCTA omitted for the same reason as in Gordon.*
 
 ::: {style="overflow-y:auto; max-height:1200px; text-align:center;"}
 

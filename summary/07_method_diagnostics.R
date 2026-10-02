@@ -4,9 +4,16 @@
 #
 # This reads the RAW MASH CSVs rather than mash_twin_wide.csv on purpose. The
 # wide table is produced by 01_compare_mash_twin.R, and its GCTA/HEreg columns
-# have never appeared, so anything built on it silently inherits that gap. Going
-# straight to the source files means a stream that 01_compare drops still shows up
-# here, and the per-stream schema table below is what explains why.
+# never appeared because that script aborted partway through and left the
+# previous table in place. Going straight to the source files means a stream that
+# 01_compare drops still shows up here, and the per-stream schema table below is
+# what explains why.
+#
+# Run from the repo root:  Rscript summary/07_method_diagnostics.R
+#
+# The row filter is sourced from summary/mash_flags.R, shared with
+# 01_compare_mash_twin.R, so the counts below are the counts the pipeline keeps
+# rather than a second, drifting copy of the rules.
 #
 # Run from the repo root:  Rscript summary/07_method_diagnostics.R
 #
@@ -14,6 +21,8 @@
 #   method_diagnostics_streams.csv    per stream: files, rows, columns, flag/npc/N
 #   method_diagnostics_summary.csv     per set x method: h2 distribution
 #   method_diagnostics_pairwise.csv    per set: Pearson R between every method pair
+#   method_diagnostics_divergence.csv  per set: FE vs RE agreement and flag rate
+#   method_diagnostics_flag_vs_twin.csv flag rate vs Twin h2 (selection check)
 
 library(tidyverse)
 
@@ -21,6 +30,8 @@ ROOT <- "/users/4/coffm049/papers/functionalBrainHerit"
 NPC  <- 20
 OUT  <- file.path(ROOT, "results", "summary")
 dir.create(OUT, showWarnings = FALSE)
+
+source(file.path(ROOT, "summary", "mash_flags.R"))
 
 streams <- tribble(
   ~set,         ~method,         ~pattern,
@@ -73,11 +84,9 @@ read_stream <- function(pattern) {
 
   npc_avail <- if ("PCs" %in% names(dfs)) sort(unique(dfs$PCs[!is.na(dfs$PCs)])) else numeric()
 
-  has_flag <- "flag" %in% names(dfs) && any(!is.na(dfs$flag) & nzchar(dfs$flag))
-  if (has_flag) {
-    bad <- paste(c("neg_sigma_g", "h2_neg_clamped", "nonpositive_h2"), collapse = "|")
-    n_flagged <- sum(!is.na(dfs$flag) & grepl(bad, dfs$flag))
-    keep <- is.na(dfs$flag) | !nzchar(dfs$flag) | !grepl(bad, dfs$flag)
+  if ("flag" %in% names(dfs)) {
+    keep <- mash_row_kept(dfs$flag)
+    n_flagged <- sum(!keep)
   } else {
     n_flagged <- 0L
     keep <- is.na(dfs$h2) | dfs$h2 > 0
@@ -98,6 +107,23 @@ read_stream <- function(pattern) {
        npc_avail = npc_avail,
        n_flagged = n_flagged,
        n_nonpos = n_nonpos)
+}
+
+# Re-read a stream keeping the flag column, so we can ask whether the flag fires
+# preferentially on phenotypes with low Twin h2. read_stream() has already thrown
+# the flagged rows away, so this cannot be recovered from the data it returns.
+read_flagged_twin <- function(files, tw) {
+  d <- suppressWarnings(map_dfr(files, function(f)
+    read_csv(f, show_col_types = FALSE, col_types = cols(.default = col_character()))))
+  if (!all(c("pheno", "h2") %in% names(d))) return(NULL)
+  d <- d %>% rename(Pheno = pheno) %>%
+    mutate(h2 = suppressWarnings(as.numeric(h2))) %>%
+    filter(!is.na(h2), !is.na(Pheno))
+  if (!nrow(d)) return(NULL)
+  flagged <- if ("flag" %in% names(d)) !mash_row_kept(d$flag) else rep(FALSE, nrow(d))
+  j <- inner_join(tibble(Pheno = d$Pheno, flagged = flagged), tw, by = "Pheno")
+  j %>% filter(!is.na(Twin_h2)) %>%
+    mutate(bin = cut(Twin_h2, breaks = seq(0, 1, by = 0.1), include.lowest = TRUE))
 }
 
 cat("=== 1. STREAM INVENTORY AND SCHEMA ===\n\n")
@@ -197,3 +223,96 @@ if (!is.null(pw)) {
   write_csv(pw, file.path(OUT, "method_diagnostics_pairwise.csv"))
   print(pw %>% mutate(pearson_r = round(pearson_r, 3)), n = Inf)
 }
+
+# The AdjHE-FE and AdjHE-RE panels are shown side by side, but they retain very
+# different fractions of phenotypes (flag rates differ by ~2x), so they are not
+# estimating the same thing over the same rows. Two things need separating before
+# the pair is read as a method contrast:
+#   1. how much of the disagreement is a pure scale factor (RE ~ k x FE), versus
+#      a genuine re-ranking of which connections look heritable;
+#   2. whether the flag filter is selecting on the outcome.
+# (2) matters most: if flagged rows are systematically the low-Twin-h2 ones, then
+# FE and RE are not "AdjHE with different site handling" but different subsets
+# selected on h2 itself, and no amount of side-by-side plotting fixes that.
+cat("\n=== 5. AdjHE-FE vs AdjHE-RE: SCALE vs RE-RANKING ===\n\n")
+
+inv2 <- inv %>% select(set, method, n_files, npc_avail, n_flagged, n_h2_nonpos)
+print(inv2, n = Inf)
+
+div <- list()
+for (s in sort(unique(long$set))) {
+  sub <- long %>% filter(set == s, !is.na(h2)) %>%
+    select(method, Pheno, h2) %>% distinct(method, Pheno, .keep_all = TRUE)
+  fe <- sub %>% filter(method == "AdjHE-FE") %>% transmute(Pheno, fe = h2)
+  re <- sub %>% filter(method == "AdjHE-RE") %>% transmute(Pheno, re = h2)
+  if (nrow(fe) < 3 || nrow(re) < 3) next
+  j <- inner_join(fe, re, by = "Pheno")
+  if (nrow(j) < 3) next
+  cc <- complete.cases(j$fe, j$re)
+  j <- j[cc, ]
+  if (nrow(j) < 3) next
+  # OLS of RE on FE: slope ~1 means "same ranking, different units".
+  fit <- tryCatch(lm(re ~ fe, data = j), error = function(e) NULL)
+  div[[length(div) + 1]] <- tibble(
+    set = s, n_complete = nrow(j),
+    pearson_r  = cor(j$fe, j$re),
+    spearman_r = cor(j$fe, j$re, method = "spearman"),
+    ols_slope_re_on_fe = if (is.null(fit)) NA_real_ else unname(coef(fit)[2]),
+    median_ratio_re_fe = median(j$re / j$fe[j$fe > 0]),
+    # Share of the FE variance a pure rescale would explain: r^2. Near 1 means
+    # the panels differ only in scale; near 0 means they rank connections
+    # differently and a shared x-axis invites a false read.
+    r2_after_rescale = cor(j$fe, j$re)^2)
+}
+div <- bind_rows(div)
+if (!is.null(div)) {
+  write_csv(div, file.path(OUT, "method_diagnostics_divergence.csv"))
+  print(div %>% mutate(across(where(is.numeric), ~round(.x, 4))), n = Inf)
+}
+
+# Flag rate as a function of Twin h2. If the AdjHE flag filter is not independent
+# of the phenotype, the retained subset is outcome-selected and the FE/RE
+# difference above cannot be read as a method contrast.
+cat("\n=== 6. IS THE FLAG FILTER SELECTING ON h2? ===\n\n")
+if (!is.null(twin) && nrow(twin)) {
+  flagsel <- list()
+  for (s in sort(unique(long$set))) {
+    for (m in c("AdjHE-FE", "AdjHE-RE")) {
+      pat <- streams %>% filter(set == s, method == m) %>% pull(pattern)
+      if (!length(pat)) next
+      files <- Sys.glob(file.path(ROOT, pat))
+      if (!length(files)) next
+      r <- read_flagged_twin(files, twin %>% filter(set == s) %>% select(Pheno, Twin_h2))
+      if (!is.null(r)) {
+        r$set <- s; r$method <- m
+        flagsel[[length(flagsel) + 1]] <- r
+      }
+    }
+  }
+  fs <- bind_rows(flagsel)
+  if (!is.null(fs) && nrow(fs)) {
+    agg <- fs %>% group_by(set, method, bin) %>%
+      summarise(n = n(), frac_flagged = round(mean(flagged), 4),
+                median_twin_h2 = round(median(Twin_h2), 4), .groups = "drop")
+    write_csv(agg, file.path(OUT, "method_diagnostics_flag_vs_twin.csv"))
+    print(agg, n = Inf)
+    # A flag that fires more often on low-Twin-h2 phenotypes means retention is
+    # outcome-dependent; report the slope so it is not left to the eye.
+    cat("\nflag rate vs Twin h2 (logistic slope; negative = flags low-h2 rows):\n")
+    slopes <- fs %>% group_by(set, method) %>%
+      summarise(n = n(),
+                slope = {
+                  dd <- data.frame(flagged = flagged, Twin_h2 = Twin_h2)
+                  if (nrow(dd) >= 20 && length(unique(dd$Twin_h2)) > 2)
+                    tryCatch(unname(coef(glm(flagged ~ Twin_h2, family = binomial,
+                                             data = dd))[2]),
+                             error = function(e) NA_real_) else NA_real_
+                },
+                .groups = "drop")
+    print(slopes, n = Inf)
+  }
+} else {
+  cat("no Twin reference; skipping flag-selection check\n")
+}
+
+cat("\nDone. Outputs in", OUT, "\n")

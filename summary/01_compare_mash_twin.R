@@ -5,6 +5,8 @@ NPC  <- 20
 OUT  <- file.path(ROOT, "results", "summary")
 dir.create(OUT, showWarnings = FALSE)
 
+source(file.path(ROOT, "summary", "mash_flags.R"))
+
 empty_mash <- tibble(Set = character(), Pheno = character(), h2 = numeric(),
                      var_h2 = numeric(), stream = character())
 empty_row  <- tibble(Pheno = character(), h2 = numeric(), var_h2 = numeric())
@@ -12,37 +14,54 @@ empty_row  <- tibble(Pheno = character(), h2 = numeric(), var_h2 = numeric())
 read_mash_stream <- function(pattern, label) {
   files <- Sys.glob(file.path(ROOT, pattern))
   if (length(files) == 0) { message("No MASH files: ", label); return(empty_mash) }
+  dropped_flagged <- 0
   dropped_nonpositive <- 0
   dfs <- map_dfr(files, function(f) {
-    d <- suppressWarnings(read_csv(f, show_col_types = FALSE))
+    # Read every column as text and coerce explicitly. read_csv's type guessing
+    # turns an h2 column that is mostly "0" but occasionally "nan"/"" into
+    # character, which then fails every numeric comparison below without raising
+    # an error.
+    d <- suppressWarnings(read_csv(f, show_col_types = FALSE,
+                                   col_types = cols(.default = col_character())))
     if ("pheno" %in% names(d)) d <- rename(d, Pheno = pheno)
     if (!"Pheno" %in% names(d) || !"h2" %in% names(d)) return(empty_row)
-    # Filter out flagged estimates (keep only "ok" or NaN flags)
-    has_flag <- "flag" %in% names(d) && any(!is.na(d$flag) & nzchar(d$flag))
+    d <- d %>% mutate(h2 = suppressWarnings(as.numeric(h2)))
+
+    # AdjHE emits a flag column; GCTA and HEreg do not, so a negative sigma_g
+    # clamped by the estimator is indistinguishable there from a genuine 0 and
+    # would survive a flag-based filter. Where there is no flag to justify the
+    # row, drop h2 <= 0 instead, so every method is summarised over the same
+    # "positive genetic estimate" subset. Same spirit as the h2 > Twin_h2 censor
+    # applied further down.
     if ("flag" %in% names(d)) {
-      bad_flags <- c("ill_conditioned", "singular", "nan_solve", "h2_gt_1_invalid", "nonpos_det", "neg_sigma_g")
-      d <- d %>% filter(!str_detect(coalesce(flag, ""), paste(bad_flags, collapse = "|")))
-    }
-    # GCTA and HEreg emit no flag column, so a negative sigma_g clamped by the
-    # estimator is indistinguishable from a genuine 0 and survives the filter
-    # above. At the current pool N that is >50% of gordon FC edges, which would
-    # drag the GCTA distribution to a median of exactly 0 while AdjHE - whose
-    # equivalent rows ARE flagged and dropped - looks healthy. Drop h2 <= 0 when
-    # there is no flag to justify the row, so every method is summarized over the
-    # same "positive genetic estimate" subset. Same spirit as the h2 > Twin_h2
-    # censor applied further down.
-    if (!has_flag) {
-      dropped_nonpositive <<- dropped_nonpositive + sum(!is.na(d$h2) & d$h2 <= 0)
+      keep <- mash_row_kept(d$flag)
+      dropped_flagged <<- dropped_flagged + sum(!keep)
+      d <- d %>% filter(keep)
+    } else {
+      nonpos <- !is.na(d$h2) & d$h2 <= 0
+      dropped_nonpositive <<- dropped_nonpositive + sum(nonpos)
       d <- d %>% filter(is.na(h2) | h2 > 0)
     }
-    d <- d %>% mutate(var_h2 = as.numeric(`var(h2)`)) %>%
-      select(Pheno, h2, var_h2, any_of("PCs"))
-    d
+
+    # var(h2) is absent from some streams. This used to be an unguarded
+    # backtick reference, so one stream missing the column aborted the whole
+    # script and left the previous mash_twin_wide.csv in place -- a stale table
+    # with a fresh-looking mtime is exactly what we could not diagnose.
+    if ("var(h2)" %in% names(d))
+      d <- d %>% mutate(var_h2 = suppressWarnings(as.numeric(`var(h2)`)))
+    else
+      d <- d %>% mutate(var_h2 = NA_real_)
+    if ("PCs" %in% names(d))
+      d <- d %>% mutate(PCs = suppressWarnings(as.numeric(PCs)))
+
+    d %>% select(Pheno, h2, var_h2, any_of("PCs"))
   })
+  if (dropped_flagged > 0)
+    message(sprintf("stream %s: dropped %d rows with a bad flag", label, dropped_flagged))
   if (dropped_nonpositive > 0) {
     message(sprintf("stream %s: no flag column; dropped %d rows with h2 <= 0", label, dropped_nonpositive))
   }
-  if (nrow(dfs) == 0) return(empty_mash)
+  if (nrow(dfs) == 0) { message("stream ", label, ": EMPTY after filtering"); return(empty_mash) }
   if (!"PCs" %in% names(dfs) || all(is.na(dfs$PCs))) {
     message("stream ", label, ": no/NA PCs column; assuming npc 20")
     dfs <- dfs %>% mutate(PCs = 20)
@@ -80,11 +99,32 @@ streams <- list(
                          label = "proba_HEreg")
 )
 
-mash <- map_dfr(streams, function(s) read_mash_stream(s[["pattern"]], s[["label"]]),
-                .id = "stream_key") %>%
+mash <- map_dfr(streams, function(s) {
+  # One bad stream must not abort the run. Before this guard a single unguarded
+  # column reference killed the script mid-way, leaving the previous wide table
+  # in place with no non-zero exit to notice.
+  tryCatch(read_mash_stream(s[["pattern"]], s[["label"]]),
+           error = function(e) {
+             warning(sprintf("stream %s FAILED: %s", s[["label"]], conditionMessage(e)))
+             empty_mash
+           })
+}, .id = "stream_key") %>%
   mutate(Set = case_when(grepl("^SA", stream) ~ "SA",
                          grepl("gordon", stream) ~ "gordon",
                          grepl("proba", stream) ~ "probaConns"))
+
+# Provenance, written before the wide table: how many phenotypes each stream
+# actually contributed. A later reader can then tell a current table from a
+# leftover instead of having to guess from an mtime.
+stream_counts <- map_dfr(names(streams), function(k)
+  tibble(stream = k,
+         n_files = length(Sys.glob(file.path(ROOT, streams[[k]][["pattern"]]))),
+         n_rows = sum(mash$stream_key == k),
+         n_pheno = n_distinct(mash$Pheno[mash$stream_key == k])))
+write_csv(stream_counts, file.path(OUT, "stream_row_counts.csv"))
+if (any(stream_counts$n_pheno == 0))
+  warning("streams contributing no phenotypes: ",
+          paste(stream_counts$stream[stream_counts$n_pheno == 0], collapse = ", "))
 
 extract_twin <- function(x) {
   if (is.null(x) || inherits(x, "twinlm_error"))

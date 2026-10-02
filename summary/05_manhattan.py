@@ -6,9 +6,11 @@ mash_twin_wide.csv (20 PCs):
 
   gordon / probaConns / SA : Twin, AdjHE-FE, AdjHE-RE, GCTA
 
-All methods for an atlas share one x-axis: the primary SNP method fixes the
-Sys-Sys order (AdjHE-FE for all three atlases) and everything else, Twin
-included, is drawn against it.
+All methods for an atlas share one x-axis. There is no primary SNP method --
+AdjHE-FE and AdjHE-RE are both reported -- so one method is chosen only to fix
+the Sys-Sys order (AdjHE-FE, for all three atlases) and everything else, Twin
+included, is drawn against it. Panels state their own retained n because the two
+AdjHE variants keep very different fractions of phenotypes.
 
   x = edge index grouped by Sys-Sys network pair (e.g. DMN-VIS), ordered by
       largest median h2 within that Sys-Sys group (descending).
@@ -381,16 +383,24 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
         Line2D([0], [0], marker="o", color="w", markerfacecolor="grey", markersize=7, label="Remaining (100× compressed)"),
     ]
     ax.legend(handles=handles, loc="upper right", fontsize=7, frameon=False)
+    # Retained-row count per panel. AdjHE-FE and AdjHE-RE keep very different
+    # fractions of phenotypes (~48% vs ~77% for gordon), so without an explicit n
+    # the two panels look directly comparable when they are not: same y-scale,
+    # shared x-axis, different row sets. Upper-left is free (legend is upper-right).
+    n_rows, n_conn = int(len(df)), int(df["connection"].nunique())
+    ax.text(0.012, 0.975, f"n = {n_rows:,} rows\n{n_conn} Sys-Sys",
+            transform=ax.transAxes, va="top", ha="left", fontsize=7.5, linespacing=1.3,
+            bbox=dict(boxstyle="round,pad=0.28", facecolor="white", edgecolor="none", alpha=0.75))
     fig.tight_layout(pad=0.4)
     plt.savefig(out_path, dpi=300, bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
     # Save stats for quarto (instead of title numbers)
     try:
         stats_out = str(out_path).replace(".png", "_stats.csv")
-        pd.DataFrame([{"atlas": atlas, "method": method, "n": int(len(df)), "groups": int(len(grouped)), "large20": int(len(largest_20)), "divider": float(divider) if divider is not None else np.nan, "xmax_compressed": float(xmax)}]).to_csv(stats_out, index=False)
+        pd.DataFrame([{"atlas": atlas, "method": method, "n": n_rows, "n_connections": n_conn, "groups": int(len(grouped)), "large20": int(len(largest_20)), "divider": float(divider) if divider is not None else np.nan, "xmax_compressed": float(xmax)}]).to_csv(stats_out, index=False)
     except Exception:
         pass
-    print(f"  wrote {out_path}  n={len(df)} groups={len(grouped)} large20={len(largest_20)} divider={divider} xmax_compressed={xmax:.1f}")
+    print(f"  wrote {out_path}  n={n_rows} conns={n_conn} groups={len(grouped)} large20={len(largest_20)} divider={divider} xmax_compressed={xmax:.1f}")
 
 
 wide = pd.read_csv(WIDE)
@@ -398,7 +408,8 @@ set_N = {"gordon": 352, "probaConns": 80, "SA": 17}
 
 # Which h2 columns to plot, per atlas, in panel order. Every atlas has an
 # AdjHE-FE stream (SA via SA/AdjHE_FE_wo_total.json), so all three specs are
-# the same length and AdjHE-FE is the report's primary SNP method everywhere.
+# the same length. AdjHE-FE and AdjHE-RE are BOTH reported -- neither is
+# designated primary -- so this list is a panel roster, not a ranking.
 # probaConns columns are named h2_proba_* because 01_compare_mash_twin.R keys
 # them by stream label "proba_<method>" rather than by Set "probaConns".
 METHOD_SPECS = {
@@ -422,8 +433,9 @@ METHOD_SPECS = {
     ],
 }
 
-# One x-axis per atlas: this method fixes the Sys-Sys order and every other
-# method (Twin included) is drawn against it. AdjHE-FE for all three atlases.
+# One x-axis per atlas: this method only fixes the Sys-Sys order and every other
+# method (Twin included) is drawn against it. Not a primary-method choice --
+# AdjHE-FE and AdjHE-RE are both reported -- just the ordering reference.
 ORDER_METHOD = {"gordon": "AdjHE-FE", "probaConns": "AdjHE-FE", "SA": "AdjHE-FE"}
 
 # Column order of the overview grid — union of every method any atlas uses.
@@ -470,8 +482,8 @@ for atlas in ["gordon", "probaConns", "SA"]:
     if not dfs:
         continue
 
-    # Derive the shared Sys-Sys order from the primary SNP method; fall back to
-    # the first available method if that column is missing from this run.
+    # Derive the shared Sys-Sys order from the ordering-reference method; fall
+    # back to the first available method if that column is missing from this run.
     order_src = ORDER_METHOD[atlas] if ORDER_METHOD[atlas] in dfs else None
     if order_src is None:
         for method, _ in specs:
@@ -486,7 +498,7 @@ for atlas in ["gordon", "probaConns", "SA"]:
 
 # ---- Manhattan Overview: rows = atlas, cols = method ----
 # Regenerated alongside the individual panels so every method appears, not
-# only the primary SNP. (The previous version drew just one method per atlas:
+# only the ordering reference. (The previous version drew just one method per atlas:
 # the drawing block was indented outside the method loop, so `ax` was left
 # pointing at the last method and `method` held that same value.)
 try:
@@ -587,6 +599,16 @@ try:
                 ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
                 ax.set_yticks([0, 0.5, 1])
                 ax.tick_params(axis="y", labelsize=7)
+                # Same per-cell n as the individual panels: retention differs by
+                # method, so a cell with half the rows must not read as a like-for-like
+                # neighbour of the cell beside it.
+                n_cell = int(len(sub))
+                n_conn_cell = int(sub["connection"].nunique())
+                ax.text(0.015, 0.975, f"n = {n_cell:,}\n{n_conn_cell} Sys-Sys",
+                        transform=ax.transAxes, va="top", ha="left", fontsize=6.5,
+                        linespacing=1.3,
+                        bbox=dict(boxstyle="round,pad=0.22", facecolor="white",
+                                  edgecolor="none", alpha=0.75))
 
         fig.suptitle("Manhattan Overview - ordered by h2 magnitude (y 0-1, <1.5% grey 100x compressed, full x-axis)",
                      fontsize=12, fontweight="bold")
