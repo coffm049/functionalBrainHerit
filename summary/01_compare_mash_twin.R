@@ -12,19 +12,36 @@ empty_row  <- tibble(Pheno = character(), h2 = numeric(), var_h2 = numeric())
 read_mash_stream <- function(pattern, label) {
   files <- Sys.glob(file.path(ROOT, pattern))
   if (length(files) == 0) { message("No MASH files: ", label); return(empty_mash) }
+  dropped_nonpositive <- 0
   dfs <- map_dfr(files, function(f) {
     d <- suppressWarnings(read_csv(f, show_col_types = FALSE))
     if ("pheno" %in% names(d)) d <- rename(d, Pheno = pheno)
     if (!"Pheno" %in% names(d) || !"h2" %in% names(d)) return(empty_row)
     # Filter out flagged estimates (keep only "ok" or NaN flags)
+    has_flag <- "flag" %in% names(d) && any(!is.na(d$flag) & nzchar(d$flag))
     if ("flag" %in% names(d)) {
       bad_flags <- c("ill_conditioned", "singular", "nan_solve", "h2_gt_1_invalid", "nonpos_det", "neg_sigma_g")
-      d <- d %>% filter(!str_detect(flag, paste(bad_flags, collapse = "|")))
+      d <- d %>% filter(!str_detect(coalesce(flag, ""), paste(bad_flags, collapse = "|")))
+    }
+    # GCTA and HEreg emit no flag column, so a negative sigma_g clamped by the
+    # estimator is indistinguishable from a genuine 0 and survives the filter
+    # above. At the current pool N that is >50% of gordon FC edges, which would
+    # drag the GCTA distribution to a median of exactly 0 while AdjHE - whose
+    # equivalent rows ARE flagged and dropped - looks healthy. Drop h2 <= 0 when
+    # there is no flag to justify the row, so every method is summarized over the
+    # same "positive genetic estimate" subset. Same spirit as the h2 > Twin_h2
+    # censor applied further down.
+    if (!has_flag) {
+      dropped_nonpositive <<- dropped_nonpositive + sum(!is.na(d$h2) & d$h2 <= 0)
+      d <- d %>% filter(is.na(h2) | h2 > 0)
     }
     d <- d %>% mutate(var_h2 = as.numeric(`var(h2)`)) %>%
       select(Pheno, h2, var_h2, any_of("PCs"))
     d
   })
+  if (dropped_nonpositive > 0) {
+    message(sprintf("stream %s: no flag column; dropped %d rows with h2 <= 0", label, dropped_nonpositive))
+  }
   if (nrow(dfs) == 0) return(empty_mash)
   if (!"PCs" %in% names(dfs) || all(is.na(dfs$PCs))) {
     message("stream ", label, ": no/NA PCs column; assuming npc 20")

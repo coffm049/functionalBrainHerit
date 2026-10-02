@@ -41,8 +41,11 @@ sa_label     <- "AdjHE-RE"
 # Image path suffixes
 gordon_img_sfx <- if (gordon_col == "h2_gordon_AdjHE_FE") "AdjHE" else "AdjHERE"
 proba_img_sfx  <- if (proba_col == "h2_proba_AdjHE_FE") "AdjHE" else "AdjHERE"
-# Manhattan panels use literal method names (Twin / AdjHEFE / AdjHERE / GCTA),
-# one figure per atlas x method, all sharing the SNP-ordered x-axis.
+# Manhattan panels use literal method names (Twin / AdjHEFE / AdjHERE),
+# one figure per atlas x method, all sharing the SNP-ordered x-axis. GCTA
+# figures are still written by 05_manhattan.py but are not shown: GCTA
+# zero-censors >50% of FC edges and has no flag column, so it is not
+# comparable to the AdjHE panels (see 01_compare_mash_twin.R).
 
 fivenum_tbl <- function(x) {
   x <- x[is.finite(x)]
@@ -112,19 +115,17 @@ filter_n0 <- function(df) {
 
 ## Gordon — "Manhattans" {.scrollable style="text-align:center;"}
 
-*Sys-Sys ordered by SNP (`AdjHE-FE`) median `h²` (20 largest by size, alternating `Twin` blue `AdjHE-FE` orange, grey tail `100×`). Every method — `Twin`, `AdjHE-FE`, `AdjHE-RE`, `GCTA` — shares that one SNP `x`-axis for direct comparison.*
+*Sys-Sys ordered by SNP (`AdjHE-FE`) median `h²` (20 largest by size, alternating `Twin` blue `AdjHE-FE` orange, grey tail `100×`). Every method shown — `Twin`, `AdjHE-FE`, `AdjHE-RE` — shares that one SNP `x`-axis for direct comparison. GCTA is omitted here: it returns `h2 == 0` for >50% of FC edges (zero-censored negatives, no flag column), so it is not comparable to the AdjHE panels.*
 
-::: {style="overflow-y:auto; max-height:1400px; text-align:center;"}
+::: {style="overflow-y:auto; max-height:1200px; text-align:center;"}
 
-::: {layout="[[1],[1],[1],[1]]" style="text-align:center;"}
+::: {layout="[[1],[1],[1]]" style="text-align:center;"}
 
 ![Gordon Twin "Manhattan" — Sys-Sys pairs, SNP determines order, Twin same x-axis](../results/summary/plots/manhattan_gordon_Twin.png){width="100%" style="object-fit:contain;"}
 
 ![Gordon AdjHE-FE Manhattan (SNP order — determines the x-axis)](../results/summary/plots/manhattan_gordon_AdjHEFE.png){width="100%" style="object-fit:contain;"}
 
 ![Gordon AdjHE-RE Manhattan (same SNP x-axis)](../results/summary/plots/manhattan_gordon_AdjHERE.png){width="100%" style="object-fit:contain;"}
-
-![Gordon GCTA Manhattan (same SNP x-axis)](../results/summary/plots/manhattan_gordon_GCTA.png){width="100%" style="object-fit:contain;"}
 
 :::
 
@@ -199,19 +200,17 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 
 ## ProbaConns — Manhattans {.scrollable style="text-align:center;"}
 
-*Sys-Sys ordered by SNP (`r proba_label`) median `h²`; `Twin`, `AdjHE-FE`, `AdjHE-RE` and `GCTA` all use that same SNP `x`-axis.*
+*Sys-Sys ordered by SNP (`r proba_label`) median `h²`; `Twin`, `AdjHE-FE` and `AdjHE-RE` all use that same SNP `x`-axis. GCTA omitted for the same reason as in Gordon.*
 
-::: {style="overflow-y:auto; max-height:1400px; text-align:center;"}
+::: {style="overflow-y:auto; max-height:1200px; text-align:center;"}
 
-::: {layout="[[1],[1],[1],[1]]" style="text-align:center;"}
+::: {layout="[[1],[1],[1]]" style="text-align:center;"}
 
 ![ProbaConns Twin Manhattan (SNP order)](../results/summary/plots/manhattan_probaConns_Twin.png){width="100%" style="object-fit:contain;"}
 
 ![ProbaConns AdjHE-FE Manhattan (determines order)](../results/summary/plots/manhattan_probaConns_AdjHEFE.png){width="100%" style="object-fit:contain;"}
 
 ![ProbaConns AdjHE-RE Manhattan (same SNP x-axis)](../results/summary/plots/manhattan_probaConns_AdjHERE.png){width="100%" style="object-fit:contain;"}
-
-![ProbaConns GCTA Manhattan (same SNP x-axis)](../results/summary/plots/manhattan_probaConns_GCTA.png){width="100%" style="object-fit:contain;"}
 
 :::
 
