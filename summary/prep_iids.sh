@@ -221,12 +221,15 @@ done
 hr
 #--- parquet inputs: awk/sed cannot touch these, use pyarrow ------------------
 #
-# MEMORY: run this script inside a large allocation. pconns.parquet is
+# MEMORY: if any given template reads a parquet phenotype, run this script
+# inside a large allocation. pconns.parquet is
 # ~10,123 x 61,776 float64 (~5 GB) and the pyarrow check below loads all of
 # it, then re-serializes every non-IID column twice (to_csv, once for
 # sig_before and once for sig_after) to prove only the ID column changed.
 # Realistic peak is ~15-20 GB, so a default or 32 GB allocation can OOM here.
 # probaConns.parquet is 5,552 x 3,160 (~0.14 GB) and never hits this.
+# Templates whose phenotype is a CSV (all SA ones) skip both parquets entirely,
+# so those runs need no special allocation.
 #
 # An OOM kill is silent from Python's point of view: the interpreter dies
 # before printing, so $res is empty and the case below reports
@@ -236,9 +239,24 @@ hr
 # under:  srun -N 1 --mem=64gb -t 2:00:00 -p interactive --pty bash
 # 64g is safe: account already has GCTAbigN.SLURM and archive/GCTA.SLURM
 # asking for it.
+# Only verify the parquet inputs that a passed template actually reads. The SA
+# templates point at a CSV phenotype, so an SA-only run must not load the ~5 GB
+# pconns.parquet: python gets OOM-killed on a login node and reports no output,
+# which then aborts the whole run for an input nothing depends on.
+want_parquet=""
+for tpl in "$@"; do
+  [ -f "$tpl" ] || continue
+  tp=$(awk -F'"' '/"pheno"/{print $4; exit}' "$tpl")
+  case "$tp" in *.parquet) want_parquet="$want_parquet $tp" ;; esac
+done
+
 for p in "$BASE/ABCD/Workflow/02_Phenotypes/FCsTopo/pconns.parquet" \
          "$BASE/ABCD/Workflow/02_Phenotypes/FCsTopo/probaConns.parquet"; do
   name="pheno_$(basename "$p" .parquet)"
+  case " $want_parquet " in
+    *" $p "*) ;;
+    *) say "SKIP   $name  not read by any given template"; continue ;;
+  esac
   if [ ! -f "$p" ]; then
     say "SKIP   $name  missing: $p"
     printf '%s\t%s\t%s\t%s\n' "$name" "MISSING" "$p" "-" >> "$PATHS"
