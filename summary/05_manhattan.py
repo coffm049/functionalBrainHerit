@@ -4,12 +4,11 @@
 For each atlas (Gordon 352, ProbaConns 80, SA 17) and each method present in
 mash_twin_wide.csv (20 PCs):
 
-  gordon / probaConns : Twin, AdjHE-FE, AdjHE-RE, GCTA
-  SA                  : Twin, AdjHE-RE, GCTA   (no FE template exists)
+  gordon / probaConns / SA : Twin, AdjHE-FE, AdjHE-RE, GCTA
 
 All methods for an atlas share one x-axis: the primary SNP method fixes the
-Sys-Sys order (AdjHE-FE for the FC atlases, AdjHE-RE for SA) and everything
-else, Twin included, is drawn against it.
+Sys-Sys order (AdjHE-FE for all three atlases) and everything else, Twin
+included, is drawn against it.
 
   x = edge index grouped by Sys-Sys network pair (e.g. DMN-VIS), ordered by
       largest median h2 within that Sys-Sys group (descending).
@@ -397,11 +396,11 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
 wide = pd.read_csv(WIDE)
 set_N = {"gordon": 352, "probaConns": 80, "SA": 17}
 
-# Which h2 columns to plot, per atlas, in panel order. SA has no AdjHE-FE
-# template (see SA_TEMPLATES in submit_all_twin_snp.sh), so its spec is short
-# by one method. probaConns columns are named h2_proba_* because
-# 01_compare_mash_twin.R keys them by stream label "proba_<method>" rather
-# than by Set "probaConns".
+# Which h2 columns to plot, per atlas, in panel order. Every atlas has an
+# AdjHE-FE stream (SA via SA/AdjHE_FE_wo_total.json), so all three specs are
+# the same length and AdjHE-FE is the report's primary SNP method everywhere.
+# probaConns columns are named h2_proba_* because 01_compare_mash_twin.R keys
+# them by stream label "proba_<method>" rather than by Set "probaConns".
 METHOD_SPECS = {
     "gordon": [
         ("Twin", "Twin_h2"),
@@ -417,14 +416,15 @@ METHOD_SPECS = {
     ],
     "SA": [
         ("Twin", "Twin_h2"),
+        ("AdjHE-FE", "h2_SA_AdjHE_FE"),
         ("AdjHE-RE", "h2_SA_AdjHE_RE"),
         ("GCTA", "h2_SA_GCTA"),
     ],
 }
 
 # One x-axis per atlas: this method fixes the Sys-Sys order and every other
-# method (Twin included) is drawn against it.
-ORDER_METHOD = {"gordon": "AdjHE-FE", "probaConns": "AdjHE-FE", "SA": "AdjHE-RE"}
+# method (Twin included) is drawn against it. AdjHE-FE for all three atlases.
+ORDER_METHOD = {"gordon": "AdjHE-FE", "probaConns": "AdjHE-FE", "SA": "AdjHE-FE"}
 
 # Column order of the overview grid — union of every method any atlas uses.
 OVERVIEW_COLS = ["Twin", "AdjHE-FE", "AdjHE-RE", "GCTA"]
@@ -527,9 +527,10 @@ try:
                         # method exists for this atlas but produced no rows
                         ax.set_visible(False)
                     else:
-                        # method has no template here (SA / AdjHE-FE). Keep the
-                        # cell as a labelled placeholder so AdjHE-RE and GCTA
-                        # stay aligned with the FC rows instead of packing left.
+                        # Method is in OVERVIEW_COLS but not in this atlas'
+                        # spec. Keep the cell as a labelled placeholder so the
+                        # remaining methods stay aligned with the other atlases
+                        # instead of packing left.
                         ax.set_title(title, fontsize=9, fontweight="bold", color="0.55")
                         ax.set_xticks([])
                         ax.set_yticks([])

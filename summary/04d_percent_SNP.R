@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Percent of twin heritability explained by SNP (MASH/AdjHE-FE for FC, AdjHE-RE for SA) per phenotype set
+# Percent of twin heritability explained by SNP (AdjHE-FE for all sets) per phenotype set
 # For each phenotype: pct = 100 * h2_MASH / h2_Twin
 # Summarize per Set (gordon, probaConns, SA) with mean, SD, SE, median, etc.
 # Input: results/summary/mash_twin_wide.csv (Twin_h2, h2_gordon_AdjHE_FE, h2_proba_AdjHE_FE, h2_SA_AdjHE_RE)
@@ -22,17 +22,18 @@ dir.create(dirname(OUT), recursive = TRUE, showWarnings = FALSE)
 wide <- tryCatch(read_csv(WIDE, show_col_types = FALSE), error = function(e) tibble())
 if (nrow(wide)==0) stop("mash_twin_wide.csv not found or empty: ", WIDE)
 
-# Map Set -> preferred MASH column (prefer FE for FC, RE for SA; fall back to RE if FE not available)
+# Map Set -> preferred MASH column (AdjHE-FE for all three sets; SA via
+# SA/AdjHE_FE_wo_total.json), falling back to AdjHE-RE when no FE run exists.
 # Note: column names use underscore (AdjHE_FE/AdjHE_RE) for files, display as AdjHE-FE/AdjHE-RE (hyphen)
 preferred_mash_col <- c(
   "gordon" = "h2_gordon_AdjHE_FE",
   "probaConns" = "h2_proba_AdjHE_FE",
-  "SA" = "h2_SA_AdjHE_RE"
+  "SA" = "h2_SA_AdjHE_FE"
 )
 fallback_mash_col <- c(
   "gordon" = "h2_gordon_AdjHE_RE",
   "probaConns" = "h2_proba_AdjHE_RE",
-  "SA" = NA  # SA only has RE
+  "SA" = "h2_SA_AdjHE_RE"
 )
 
 mash_col_for_set <- preferred_mash_col

@@ -54,6 +54,8 @@ read_mash_stream <- function(pattern, label) {
 }
 
 streams <- list(
+  SA_AdjHE_FE        = c(pattern = "results/SA/AdjHE_FE_wo_total.csv",
+                         label = "SA_AdjHE_FE"),
   SA_AdjHE_RE        = c(pattern = "results/SA/AdjHE_RE_wo_total.csv",
                          label = "SA_AdjHE_RE"),
   SA_GCTA            = c(pattern = "results/SA/GCTA.csv",

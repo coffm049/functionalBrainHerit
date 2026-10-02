@@ -155,8 +155,10 @@ for _,row in sa_sub.iterrows():
         if net is None:
             continue
         sa_map_wo[net] = {"Twin": float(row["Twin_h2"]) if pd.notna(row["Twin_h2"]) else np.nan,
+                          "AdjHE-FE": float(row["h2_SA_AdjHE_FE"]) if "h2_SA_AdjHE_FE" in row and pd.notna(row["h2_SA_AdjHE_FE"]) else np.nan,
                           "AdjHE-RE": float(row["h2_SA_AdjHE_RE"]) if "h2_SA_AdjHE_RE" in row and pd.notna(row["h2_SA_AdjHE_RE"]) else np.nan}
-        # w_total if columns exist
+        # w_total if columns exist. Only AdjHE-RE has a w_total run (the SA FE
+        # template is wo_total), so w_total stays RE-only.
         twin_w_col = next((c for c in ["Twin_h2_w_total","Twin_h2_wtotal"] if c in row and pd.notna(row[c])), None)
         adj_w_col = next((c for c in ["h2_SA_AdjHE_RE_w_total","h2_SA_AdjHE_RE_wtotal","h2_SA_w_total_AdjHE_RE"] if c in row and pd.notna(row[c])), None)
         if twin_w_col or adj_w_col:
@@ -237,17 +239,13 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
         # Also ensure canonical SA name for merging
         print(f"[{atlas}][{sa_type}] networks {sorted(set(networks))} -> keep {sorted(networks_keep)}")
 
-        # Prefer FE for FC, RE for SA; fall back to the other if preferred not present
-        if atlas != "SA":
-            col_pref = f"h2_{atlas}_AdjHE_FE"
-            col_alt = f"h2_{atlas}_AdjHE_RE"
-            method_label = "AdjHE-FE"
-        else:
-            col_pref = f"h2_{atlas}_AdjHE_RE"
-            col_alt = None
-            method_label = "AdjHE-RE"
+        # Prefer AdjHE-FE for every atlas (SA via SA/AdjHE_FE_wo_total.json);
+        # fall back to AdjHE-RE when the FE stream has not been run.
+        col_pref = f"h2_{atlas}_AdjHE_FE"
+        col_alt = f"h2_{atlas}_AdjHE_RE"
+        method_label = "AdjHE-FE"
         col = col_pref
-        if col not in wide.columns and col_alt and col_alt in wide.columns:
+        if col not in wide.columns and col_alt in wide.columns:
             col = col_alt
             method_label = "AdjHE-RE"
         elif col not in wide.columns:
@@ -291,11 +289,12 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
                     sa_h2_entry=sa_key
                 else:
                     sa_h2_entry=sa_key
-                # sa_h2_entry is dict with Twin/AdjHE-FE (FC) or Twin/AdjHE-RE (SA)
+                # sa_h2_entry is dict with Twin/AdjHE-FE/AdjHE-RE (wo_total);
+                # the w_total map is Twin/AdjHE-RE only.
                 if isinstance(sa_h2_entry, dict):
                     sa_h2 = sa_h2_entry.get(method, np.nan)
                     if not np.isfinite(sa_h2):
-                        # SA has no FE run: fall back to SA AdjHE-RE for the SNP column
+                        # No FE column for this entry (e.g. w_total): use AdjHE-RE
                         sa_h2 = sa_h2_entry.get("AdjHE-RE", np.nan)
                 else:
                     sa_h2 = np.nan

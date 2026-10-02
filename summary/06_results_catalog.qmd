@@ -29,14 +29,16 @@ ROOT <- "/users/4/coffm049/papers/functionalBrainHerit"
 WIDE <- file.path(ROOT, "results/summary/mash_twin_wide.csv")
 wide <- read_csv(WIDE, show_col_types = FALSE)
 
-# Detect which SNP columns are available (prefer FE for FC, RE for SA; fall back to RE if FE missing)
+# Detect which SNP columns are available. AdjHE-FE is the reported SNP method
+# for all three phenotype sets (SA via SA/AdjHE_FE_wo_total.json); fall back to
+# AdjHE-RE when an FE stream has not been run yet.
 gordon_col <- if ("h2_gordon_AdjHE_FE" %in% names(wide)) "h2_gordon_AdjHE_FE" else "h2_gordon_AdjHE_RE"
-proba_col  <- if ("h2_proba_AdjHE_FE" %in% names(wide)) "h2_proba_AdjHE_FE" else "h2_proba_AdjHE_RE"
-sa_col     <- "h2_SA_AdjHE_RE"  # SA only has RE
+proba_col  <- if ("h2_proba_AdjHE_FE"  %in% names(wide)) "h2_proba_AdjHE_FE"  else "h2_proba_AdjHE_RE"
+sa_col     <- if ("h2_SA_AdjHE_FE"     %in% names(wide)) "h2_SA_AdjHE_FE"     else "h2_SA_AdjHE_RE"
 
 gordon_label <- if (gordon_col == "h2_gordon_AdjHE_FE") "AdjHE-FE" else "AdjHE-RE"
-proba_label  <- if (proba_col == "h2_proba_AdjHE_FE") "AdjHE-FE" else "AdjHE-RE"
-sa_label     <- "AdjHE-RE"
+proba_label  <- if (proba_col  == "h2_proba_AdjHE_FE")  "AdjHE-FE" else "AdjHE-RE"
+sa_label     <- if (sa_col     == "h2_SA_AdjHE_FE")     "AdjHE-FE" else "AdjHE-RE"
 
 # Image path suffixes
 gordon_img_sfx <- if (gordon_col == "h2_gordon_AdjHE_FE") "AdjHE" else "AdjHERE"
@@ -245,6 +247,24 @@ wo <- wo %>% filter(n != 0) %>% mutate(across(where(is.numeric), ~round(.x, 3)))
 kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), caption="ProbaConns — Within vs outside network h2 (10th, 50th/median, 90th percentiles, per Twin vs `r proba_label`)")
 ```
 
+## SA — "Manhattans" {.scrollable style="text-align:center;"}
+
+*Sys-Sys ordered by SNP (`r sa_label`) median `h²`; `Twin`, `AdjHE-FE` and `AdjHE-RE` all use that same SNP `x`-axis, matching the Gordon and ProbaConns panels above. GCTA omitted for the same reason as in Gordon.*
+
+::: {style="overflow-y:auto; max-height:1200px; text-align:center;"}
+
+::: {layout="[[1],[1],[1]]" style="text-align:center;"}
+
+![SA Twin Manhattan (SNP order)](../results/summary/plots/manhattan_SA_Twin.png){width="100%" style="object-fit:contain;"}
+
+![SA AdjHE-FE Manhattan (determines order)](../results/summary/plots/manhattan_SA_AdjHEFE.png){width="100%" style="object-fit:contain;"}
+
+![SA AdjHE-RE Manhattan (same SNP x-axis)](../results/summary/plots/manhattan_SA_AdjHERE.png){width="100%" style="object-fit:contain;"}
+
+:::
+
+:::
+
 ---
 
 ## SA w_total — Surface Area Heritability (w_total) {.scrollable style="text-align:center;"}
@@ -273,10 +293,10 @@ corr_wide <- corr_sa_fc %>%
   mutate(pearson_r = round(pearson_r, 3)) %>%
   pivot_wider(names_from = method, values_from = pearson_r) %>%
   arrange(match(atlas, c("gordon","probaConns")), match(metric, c("fc_mean","fc_p90","fc_within","fc_outside")), sa_type)
-# Order columns Twin then SNP (AdjHE-FE for FC, AdjHE-RE for SA) when present
+# Order columns Twin then the reported SNP method (AdjHE-FE for all atlases)
 mcols <- intersect(c("Twin","AdjHE-FE","AdjHE-RE"), names(corr_wide))
 corr_wide <- corr_wide %>% select(any_of(c("atlas","metric","sa_type")), all_of(mcols))
-kable(corr_wide, caption="SA-FC h2 by system: Pearson R of FC parcel-mean / p90 / within / outside h2 vs SA h2 (14 nets; rows = atlas × metric × SA type; SNP = AdjHE-FE for FC, AdjHE-RE for SA)")
+kable(corr_wide, caption="SA-FC h2 by system: Pearson R of FC parcel-mean / p90 / within / outside h2 vs SA h2 (14 nets; rows = atlas × metric × SA type; SNP = AdjHE-FE for all atlases, falling back to AdjHE-RE where no FE run exists)")
 ```
 
 ```{r sa-fc-scatter}
@@ -406,7 +426,7 @@ kable(filter_n0(dist_sum), caption="FC h2 vs distance — within (same network) 
 
 ---
 
-## Percent SNP Heritability of Twin Estimates — `100 × SNP / Twin` per Phenotype Set (SNP = AdjHE-FE for FC, AdjHE-RE for SA)
+## Percent SNP Heritability of Twin Estimates — `100 × SNP / Twin` per Phenotype Set (SNP = AdjHE-FE for all sets)
 
 ```{r percent-snp}
 pct_path <- file.path(ROOT, "results/summary/percent_SNP_explained.csv")
@@ -416,7 +436,7 @@ pct <- filter_n0(pct)
 # Keep Set order gordon, probaConns, SA; select only needed cols for display (keep Pearson focus but percent table is separate)
 pct <- pct %>% arrange(match(Set, c("gordon","probaConns","SA")))
 # Only show mean/median + SE for publication (keep full for now but ensure n_valid !=0)
-kable(pct, caption="Percent SNP heritability of Twin estimates — 100 × SNP / Twin per phenotype (per Set: mean ± SE, median, SD, q1/q3, min/max, n_valid; SNP = AdjHE-FE for FC, AdjHE-RE for SA; SA 14 nets excl. 4/6/17, FCs filtered Twin_h2>0.001, MASH 0–1.2)")
+kable(pct, caption="Percent SNP heritability of Twin estimates — 100 × SNP / Twin per phenotype (per Set: mean ± SE, median, SD, q1/q3, min/max, n_valid; SNP = AdjHE-FE for all sets; SA 14 nets excl. 4/6/17, FCs filtered Twin_h2>0.001, MASH 0–1.2)")
 cat("\n\n*Interpretation: `mean_pct` = mean of per-phenotype `pct`; `se_pct = sd / sqrt(n_valid)`; `median_pct` robust to outliers (Twin near 0 inflates mean). `ratio_of_means_pct = 100 × mean(MASH)/mean(Twin)` is also shown.*\n")
 ```
 
