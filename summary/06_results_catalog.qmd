@@ -77,6 +77,148 @@ filter_n0 <- function(df) {
 .reveal .cell-output-display caption { font-size: 1.1em; white-space: normal; }
 </style>
 
+## Estimation and quality control of the SNP heritability estimates
+
+All SNP heritabilities were estimated with the MASH estimator (MASH
+`ffb888d`). Two AdjHE variants are reported for every phenotype set and they are
+**not** the same computation: they differ in whether collection site enters as a
+random effect, and consequently they use different solvers and — importantly for
+how the results should be read — different failure detection.
+
+### Solver selected by site handling
+
+`AdjHE(...)` dispatches on `random_groups` (`AdjHE.py:12`):
+
+- **AdjHE-FE** (`random_groups: null`; `abcd_site` in `covar_discrete`) takes the
+  **two-component** path, `_adjhe_2comp`, which returns `sigma_g` and `sigma_e`
+  with no site component.
+- **AdjHE-RE** (`random_groups: "abcd_site"`) takes the **three-component** path,
+  `_adjhe_3comp`, which additionally estimates a site variance `sigma_s`.
+
+Both paths standardise the phenotype, restrict the GRM to rows with non-missing
+phenotype, and project out the first `npc = 20` principal components using
+`Q = I - V(V'V)^{-1}V'` with `V` from a QR factorisation of the PC columns. The
+projection is applied to the traces only, not materialised. Projected quantities
+are `tr(AQ) = tr(A) - tr(V'AV)`, `tr(AQA) = tr(A^2) - 2tr((AV)'(AV)) +
+tr(V'AVAV)`, and the effective sample size is reduced to `n_adj = n - npc`.
+
+### Two-component path (AdjHE-FE)
+
+Variance components are obtained in closed form from the projected traces:
+
+$$\hat\sigma_g = \frac{(y'A_Qy)\,n_{adj} - \mathrm{tr}(A_Q)\,y'Q_{y}y}{\Delta}, \qquad
+\hat\sigma_e = \frac{\mathrm{tr}(A_QA_Q)\,y'Q_{y}y - \mathrm{tr}(A_Q)\,(y'A_Qy)}{\Delta}$$
+
+with
+
+$$\Delta = \mathrm{tr}(A_QA_Q)\, n_{adj} - \big[\mathrm{tr}(A_Q)\big]^2 .$$
+
+**Degeneracy criterion.** A non-positive or non-finite `Delta` is flagged
+`nonpos_det` and all variance components are returned as `NaN`. This is a
+*determinant sign test on a 2x2 system*, and it is the only degeneracy screen on
+this path — **no condition number is computed for AdjHE-FE at any `npc` or sample
+size.** A finite `Delta > 0` guarantees a non-singular 2x2 solve, but says
+nothing about whether the estimate is well determined.
+
+### Three-component path (AdjHE-RE) and the near-singularity condition
+
+The site component is `S = blockdiag(1_{n_1}, ..., 1_{n_G}) = DD'`, where `D` is
+the site indicator matrix. With `QSQ` computed explicitly and `yy' = y y'`, the
+3x3 cross-product (normal-equations) matrix and moment vector are
+
+$$X_tX = \begin{pmatrix}
+\mathrm{tr}(A^2) & \mathrm{tr}(QSQA) & \mathrm{tr}(A)\\
+\mathrm{tr}(QSQA) & \mathrm{tr}(QSQQSQ) & \mathrm{tr}(QSQ)\\
+\mathrm{tr}(A) & \mathrm{tr}(QSQ) & n
+\end{pmatrix}, \qquad
+X_ty = \begin{pmatrix} \mathrm{tr}(A\,yy')\\[2pt] \mathrm{tr}(QSQ\,yy')\\[2pt] \mathrm{tr}(yy')\end{pmatrix}.$$
+
+**Near-singularity condition.** The 2-norm condition number of this matrix is
+evaluated before solving,
+
+$$\kappa = \mathrm{cond}_2(X_tX) = \sigma_{\max}(X_tX) / \sigma_{\min}(X_tX),$$
+
+and the estimate is rejected when
+
+$$\kappa > 10^{10} \quad\text{or}\quad \kappa \notin \mathbb{R},$$
+
+flagged `ill_conditioned`, with all three variance components returned as `NaN`.
+Two adjacent guards follow: `numpy.linalg.LinAlgError` raised by the solve is
+flagged `singular`, and a `NaN` anywhere in the solved components is flagged
+`nan_solve`. The `10^{10}` threshold is hardcoded in `AdjHE.py:154` and is not
+configurable from the pipeline: no argument file in this repository carries a
+conditioning or tolerance parameter.
+
+**Why the threshold exists.** The conditioning check was not precautionary. An
+earlier revision projected the site indicators out along with the PCs. Because
+`S` is built from that same site indicator matrix, `QD = 0`, so
+
+$$QSQ = QD\,D'Q = (QD)(QD)' = \mathbf{0}$$
+
+identically: the middle row and column of `X_tX` were exactly zero, `kappa` was
+infinite for **every** phenotype, `npc` and sample size, and 100% of RE rows were
+flagged `ill_conditioned`. The fix (`ffb888d`) restricts the projection to the PC
+columns only — a component estimated as a random effect has no business being
+projected away as a fixed effect — and `MASH/tests/test_adjhe_site_projection.py`
+regression-tests that RE no longer returns `ill_conditioned` at any `npc` or `N`.
+The `10^{10}` cut-off therefore encodes "collinear enough that the solve is
+meaningless", not a data-driven threshold.
+
+### Post-solve screening, common to both paths
+
+`h2 = sigma_g / (sigma_g + sigma_e)`, then:
+
+- `sigma_g < 0` → flag `neg_sigma_g`;
+- `h2 < 0` → clamp to 0 and flag `h2_neg_clamped` (near-zero heritability or poor fit);
+- `h2 > 1` → **return `NaN`** and flag `h2_gt_1_invalid`. This is deliberately *not*
+  clamped to 1, because a variance ratio above 1 signals a collapsed solve (typically
+  `sigma_e ~ 0`) and clamping would masquerade as perfect heritability.
+
+Flags compound (`"neg_sigma_g;h2_neg_clamped"`), so the pipeline's filter matches
+on substrings; the vocabulary is centralised in `summary/mash_flags.R`.
+
+The variance of `h2` is computed as `2n / (n tr(A^2) - tr(A)^2)` from the
+**unprojected** traces. If that denominator is non-positive the variance is
+replaced by its absolute value and logged, but **not** flagged — a degenerate
+`var(h2)` therefore survives into the output with `flag = "ok"`. We exclude no
+rows on `var(h2)` alone.
+
+### GCTA and HEreg are not screened at all
+
+**No equivalent condition is applied to GCTA or HEreg, because none exists in
+the code.** Only `AdjHE.py` emits a `flag` column; `GCTA_wrapper.py` and
+`two_step_M_est.py` compute no condition number, catch no `LinAlgError`, and
+their output schema has no `flag` field. A GCTA row that failed, or was
+ill-conditioned, or returned a negative variance clamped at zero is
+**indistinguishable from a genuine estimate of zero**. There is likewise no
+`ill_conditioned` equivalent to search for, and the absence of such a flag in a
+GCTA stream is not evidence of good conditioning.
+
+To keep the summarised distributions on comparable footing, the pipeline
+therefore substitutes a **sign filter**: for streams with no `flag` column
+(GCTA, HEreg) any row with `h2 <= 0` is dropped. This is a sign test, not a
+conditioning screen — it removes clamped negatives but cannot detect a
+well-conditioned solve that is nonetheless unreliable. This is why GCTA returns
+`h2 = 0` for a large fraction of FC edges and is excluded from the panels below.
+
+### Consequence for interpreting the FE/RE contrast
+
+The two reported AdjHE variants are **not symmetric in failure detection**:
+
+| | degeneracy screen | can emit |
+|---|---|---|
+| AdjHE-FE | determinant sign test `Delta <= 0` | `nonpos_det`, `neg_sigma_g`, `h2_neg_clamped`, `h2_gt_1_invalid` |
+| AdjHE-RE | `cond2(X_tX) > 1e10` | `ill_conditioned`, `singular`, `nan_solve`, `neg_sigma_g`, `h2_neg_clamped`, `h2_gt_1_invalid` |
+
+A retained AdjHE-FE row has had **no conditioning check applied to it at all**,
+whereas a retained AdjHE-RE row has been explicitly conditioned-screened. The
+retained fractions therefore differ by construction (~48% FE vs ~77% RE for
+Gordon; ~37% vs ~75% for ProbaConns; 13 of 18 for both SA variants), and the
+panels are drawn on a shared x-axis with their own `n` printed. Differences in
+median `h2` between the FE and RE panels should be read as differences in both
+the estimator *and* the subset of phenotypes that survived screening, not as a
+method contrast alone.
+
 # Summary {.scrollable style="text-align:center;"}
 
 ::: {style="overflow-y:auto; max-height:820px; text-align:left; font-size:1.15em; line-height:1.6;"}
