@@ -23,7 +23,10 @@ PARTITION=
 case "$KIND" in
   FE) TEMPLATE=feExample2.json ;;
   RE) TEMPLATE=reExample2.json ;;
-  GCTA) CHUNK=100; TIME=24:00:00; TEMPLATE=gctaExample.json ;;
+  # GCTA observed ~12-24 min/chunk on the current pool at 36-47 GB RSS, so the
+  # old 24h/64g request just over-reserved the partition. 3h/48g leaves ample
+  # headroom over the slowest observed chunk (24 min) and the peak RSS (47 GB).
+  GCTA) CHUNK=100; TIME=3:00:00; MEM=48g; TEMPLATE=gctaExample.json ;;
   HEreg) TEMPLATE=heExample.json ;;
   *) echo "KIND must be FE, RE, GCTA or HEreg"; exit 1 ;;
 esac

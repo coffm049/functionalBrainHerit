@@ -23,7 +23,9 @@ PARTITION=
 case "$KIND" in
   FE) CHUNK=10; TEMPLATE=feExample2.json ;;
   RE) CHUNK=40; TEMPLATE=reExample2.json ;;
-  GCTA) TEMPLATE=gctaExample.json ;;
+  # 3160 phenotypes at 3,160/10 = 316 chunks. GCTA inherits TIME=3:00:00; drop
+  # mem to 48g to match gordon (same GRM, smaller phenos -> <= gordon's RSS).
+  GCTA) MEM=48g; TEMPLATE=gctaExample.json ;;
   HEreg) TEMPLATE=heExample.json ;;
   *) echo "KIND must be FE, RE, GCTA or HEreg"; exit 1 ;;
 esac
