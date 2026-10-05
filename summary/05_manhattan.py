@@ -295,6 +295,23 @@ def _get_ordering(df, atlas, method):
     small_order = stats.loc[~stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
     return large_order, small_order, largest_20
 
+def _get_shared_order(dfs: dict):
+    """Union Sys-Sys ordering across the methods plotted for one atlas."""
+    parts = []
+    for df in dfs.values():
+        parts.append(df[["connection", "h2"]].dropna())
+    if not parts:
+        return None
+    allx = pd.concat(parts, ignore_index=True)
+    if allx.empty:
+        return None
+    stats = allx.groupby("connection")["h2"].agg(median="median", size="size")
+    largest_20 = stats.sort_values("size", ascending=False).head(20).index.tolist()
+    large_order = stats.loc[stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
+    small_order = stats.loc[~stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
+    return large_order, small_order, largest_20
+
+
 def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
     # median h2 and size per Sys-Sys group — if shared_order provided (from SNP), use it for both Twin and SNP per user
     if shared_order is not None:
@@ -433,11 +450,6 @@ METHOD_SPECS = {
     ],
 }
 
-# One x-axis per atlas: this method only fixes the Sys-Sys order and every other
-# method (Twin included) is drawn against it. Not a primary-method choice --
-# AdjHE-FE and AdjHE-RE are both reported -- just the ordering reference.
-ORDER_METHOD = {"gordon": "AdjHE-FE", "probaConns": "AdjHE-FE", "SA": "AdjHE-FE"}
-
 # Column order of the overview grid — union of every method any atlas uses.
 OVERVIEW_COLS = ["Twin", "AdjHE-FE", "AdjHE-RE", "GCTA"]
 
@@ -482,15 +494,7 @@ for atlas in ["gordon", "probaConns", "SA"]:
     if not dfs:
         continue
 
-    # Derive the shared Sys-Sys order from the ordering-reference method; fall
-    # back to the first available method if that column is missing from this run.
-    order_src = ORDER_METHOD[atlas] if ORDER_METHOD[atlas] in dfs else None
-    if order_src is None:
-        for method, _ in specs:
-            if method in dfs:
-                order_src = method
-                break
-    shared_order = _get_ordering(dfs[order_src], atlas, order_src) if order_src else None
+    shared_order = _get_shared_order(dfs) if dfs else None
 
     for method, df in dfs.items():
         out = PLOT_DIR / f"manhattan_{atlas}_{method.replace('-', '')}.png"

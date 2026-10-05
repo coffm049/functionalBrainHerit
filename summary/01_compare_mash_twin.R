@@ -77,7 +77,7 @@ streams <- list(
                          label = "SA_AdjHE_FE"),
   SA_AdjHE_RE        = c(pattern = "results/SA/AdjHE_RE_wo_total.csv",
                          label = "SA_AdjHE_RE"),
-  SA_GCTA            = c(pattern = "results/SA/GCTA.csv",
+  SA_GCTA            = c(pattern = "results/SA/GCTA_wo_total.csv",
                          label = "SA_GCTA"),
   SA_HEreg           = c(pattern = "results/SA/HE.csv",
                          label = "SA_HEreg"),

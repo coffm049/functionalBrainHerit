@@ -29,9 +29,12 @@ ROOT <- "/users/4/coffm049/papers/functionalBrainHerit"
 WIDE <- file.path(ROOT, "results/summary/mash_twin_wide.csv")
 wide <- read_csv(WIDE, show_col_types = FALSE)
 
-# Detect which SNP columns are available. AdjHE-FE is the reported SNP method
-# for all three phenotype sets (SA via SA/AdjHE_FE_wo_total.json); fall back to
-# AdjHE-RE when an FE stream has not been run yet.
+# Detect which SNP columns are available. AdjHE-FE and AdjHE-RE are both
+# reported for all three phenotype sets (SA via the *_wo_total runs); the
+# `*_label` values name which one drives the surface/percent figures below.
+# The shared Manhattan x-axis is pooled across methods and is not primary-method
+# defined -- AdjHE-FE is not a primary method, and in gordon its retention is
+# Twin-h2-biased (see 07_method_diagnostics.R section 6).
 gordon_col <- if ("h2_gordon_AdjHE_FE" %in% names(wide)) "h2_gordon_AdjHE_FE" else "h2_gordon_AdjHE_RE"
 proba_col  <- if ("h2_proba_AdjHE_FE"  %in% names(wide)) "h2_proba_AdjHE_FE"  else "h2_proba_AdjHE_RE"
 sa_col     <- if ("h2_SA_AdjHE_FE"     %in% names(wide)) "h2_SA_AdjHE_FE"     else "h2_SA_AdjHE_RE"
@@ -259,15 +262,15 @@ method contrast alone.
 
 ## Gordon — "Manhattans" {.scrollable style="text-align:center;"}
 
-*Sys-Sys ordered by SNP (`AdjHE-FE`) median `h²` (20 largest by size, alternating `Twin` blue `AdjHE-FE` orange, grey tail `100×`). `AdjHE-FE` and `AdjHE-RE` are both reported and both are drawn against that one SNP `x`-axis. **Read the per-panel `n`, not just the shared axis:** the two AdjHE variants retain very different fractions of phenotypes, because MASH's flag rate differs between them (~48% retained for FE vs ~77% for RE), so the panels are *not* the same row set at the same scale — the FE/RE gap is partly selection, not purely method. GCTA is omitted here: it returns `h2 == 0` for >50% of FC edges (zero-censored negatives, no flag column), so it is not comparable to the AdjHE panels.*
+*Sys-Sys ordered by a pooled median `h²` axis across every plotted method (`Twin`, `AdjHE-FE`, `AdjHE-RE`, GCTA omitted; 20 largest by size, alternating `Twin` blue `AdjHE-FE` orange, grey tail `100×`). Both AdjHE variants are reported and each panel carries its own retained `n`. **Read the per-panel `n`, not just the shared axis:** the two AdjHE variants retain very different fractions of phenotypes, because MASH's flag rate differs between them (~48% retained for FE vs ~77% for RE), so the panels are *not* the same row set at the same scale — the FE/RE gap is partly selection, not purely method.*
 
 ::: {style="overflow-y:auto; max-height:1200px; text-align:center;"}
 
 ::: {layout="[[1],[1],[1]]" style="text-align:center;"}
 
-![Gordon Twin "Manhattan" — Sys-Sys pairs, SNP determines order, Twin same x-axis](../results/summary/plots/manhattan_gordon_Twin.png){width="100%" style="object-fit:contain;"}
+![Gordon Twin "Manhattan" — Sys-Sys pairs, same pooled x-axis](../results/summary/plots/manhattan_gordon_Twin.png){width="100%" style="object-fit:contain;"}
 
-![Gordon AdjHE-FE Manhattan (SNP order — determines the x-axis)](../results/summary/plots/manhattan_gordon_AdjHEFE.png){width="100%" style="object-fit:contain;"}
+![Gordon AdjHE-FE Manhattan (shared pooled x-axis)](../results/summary/plots/manhattan_gordon_AdjHEFE.png){width="100%" style="object-fit:contain;"}
 
 ![Gordon AdjHE-RE Manhattan (same SNP x-axis)](../results/summary/plots/manhattan_gordon_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
@@ -344,7 +347,7 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 
 ## ProbaConns — Manhattans {.scrollable style="text-align:center;"}
 
-*Sys-Sys ordered by SNP (`r proba_label`) median `h²`; `Twin`, `AdjHE-FE` and `AdjHE-RE` all use that same SNP `x`-axis. As in Gordon, both AdjHE variants are reported and each panel carries its own retained `n`: FE keeps ~37% of phenotypes here and RE ~75%, so again the two panels are not the same row set. GCTA omitted for the same reason as in Gordon.*
+*Sys-Sys ordered by a pooled median `h²` axis across every plotted method; `Twin`, `AdjHE-FE` and `AdjHE-RE` all use that same `x`-axis. As in Gordon, both AdjHE variants are reported and each panel carries its own retained `n`: FE keeps ~37% of phenotypes here and RE ~75%, so again the two panels are not the same row set. GCTA omitted for the same reason as in Gordon.*
 
 ::: {style="overflow-y:auto; max-height:1200px; text-align:center;"}
 
@@ -352,7 +355,7 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 
 ![ProbaConns Twin Manhattan (SNP order)](../results/summary/plots/manhattan_probaConns_Twin.png){width="100%" style="object-fit:contain;"}
 
-![ProbaConns AdjHE-FE Manhattan (determines order)](../results/summary/plots/manhattan_probaConns_AdjHEFE.png){width="100%" style="object-fit:contain;"}
+![ProbaConns AdjHE-FE Manhattan (shared pooled x-axis)](../results/summary/plots/manhattan_probaConns_AdjHEFE.png){width="100%" style="object-fit:contain;"}
 
 ![ProbaConns AdjHE-RE Manhattan (same SNP x-axis)](../results/summary/plots/manhattan_probaConns_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
@@ -391,7 +394,7 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 
 ## SA — "Manhattans" {.scrollable style="text-align:center;"}
 
-*Sys-Sys ordered by SNP (`r sa_label`) median `h²`; `Twin`, `AdjHE-FE` and `AdjHE-RE` all use that same SNP `x`-axis, matching the Gordon and ProbaConns panels above. Both AdjHE variants are reported; here they retain the same 13 rows, so unlike the FC atlases the FE/RE contrast is not confounded by differential retention — but the median ratio is still ~4×, the largest of the three sets. GCTA omitted for the same reason as in Gordon.*
+*Sys-Sys ordered by a pooled median `h²` axis across every plotted method; `Twin`, `AdjHE-FE` and `AdjHE-RE` all use that same `x`-axis, matching the Gordon and ProbaConns panels above. Both AdjHE variants are reported; here they retain the same 13 rows, so unlike the FC atlases the FE/RE contrast is not confounded by differential retention — but the median ratio is still ~4×, the largest of the three sets. GCTA omitted for the same reason as in Gordon.*
 
 ::: {style="overflow-y:auto; max-height:1200px; text-align:center;"}
 
@@ -399,7 +402,7 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 
 ![SA Twin Manhattan (SNP order)](../results/summary/plots/manhattan_SA_Twin.png){width="100%" style="object-fit:contain;"}
 
-![SA AdjHE-FE Manhattan (determines order)](../results/summary/plots/manhattan_SA_AdjHEFE.png){width="100%" style="object-fit:contain;"}
+![SA AdjHE-FE Manhattan (shared pooled x-axis)](../results/summary/plots/manhattan_SA_AdjHEFE.png){width="100%" style="object-fit:contain;"}
 
 ![SA AdjHE-RE Manhattan (same SNP x-axis)](../results/summary/plots/manhattan_SA_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
