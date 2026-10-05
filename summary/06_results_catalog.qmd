@@ -30,8 +30,9 @@ WIDE <- file.path(ROOT, "results/summary/mash_twin_wide.csv")
 wide <- read_csv(WIDE, show_col_types = FALSE)
 
 # Detect which SNP columns are available. AdjHE-FE and AdjHE-RE are both
-# reported for all three phenotype sets (SA via the *_wo_total runs); the
-# `*_label` values name which one drives the surface/percent figures below.
+# reported for all three phenotype sets; SA comes from the w_total runs, and its
+# wo_total runs feed only the appendix at the end of this document.
+# The `*_label` values name which one drives the surface/percent figures below.
 # The shared Manhattan x-axis is pooled across methods and is not primary-method
 # defined -- AdjHE-FE is not a primary method, and in gordon its retention is
 # Twin-h2-biased (see 07_method_diagnostics.R section 6).
@@ -48,9 +49,12 @@ gordon_img_sfx <- if (gordon_col == "h2_gordon_AdjHE_FE") "AdjHE" else "AdjHERE"
 proba_img_sfx  <- if (proba_col == "h2_proba_AdjHE_FE") "AdjHE" else "AdjHERE"
 # Manhattan panels use literal method names (Twin / AdjHEFE / AdjHERE),
 # one figure per atlas x method, all sharing the SNP-ordered x-axis. GCTA
-# figures are still written by 05_manhattan.py but are not shown: GCTA
-# zero-censors >50% of FC edges and has no flag column, so it is not
-# comparable to the AdjHE panels (see 01_compare_mash_twin.R).
+# figures are still written by 05_manhattan.py but are not shown in these
+# three sections: across the FC sets GCTA zero-censors >50% of edges and has no
+# flag column, so it is not comparable to the AdjHE panels (see
+# 01_compare_mash_twin.R). That rationale is FC-specific -- SA retains usable
+# GCTA coverage, so it is reported in the overview grid and in the diagnostics
+# rather than promoted into the per-atlas trio.
 
 fivenum_tbl <- function(x) {
   x <- x[is.finite(x)]
@@ -61,6 +65,45 @@ fivenum_tbl <- function(x) {
     n = length(x), sd = sd(x)
   )
 }
+
+# Per-panel stats, read back from the manhattan_<atlas>_<method>_stats.csv files
+# that 05_manhattan.py writes. The section prose interpolates these with inline R
+# so a re-run that retains a different number of rows cannot leave a stale
+# "the same N rows" or "~Nx median ratio" claim in the report. Every accessor
+# degrades to "n/a" when a stats file is absent or predates median_h2.
+mh_stats <- function(atlas) {
+  ss <- sub("[.]png$", "_stats.csv",
+            Sys.glob(file.path(ROOT, "results/summary/plots", paste0("manhattan_", atlas, "_*.png"))))
+  ss <- ss[file.exists(ss)]
+  if (!length(ss)) return(tibble())
+  bind_rows(lapply(ss, function(p) as_tibble(read_csv(p, show_col_types = FALSE))))
+}
+mh_row <- function(atlas, method) {
+  s <- mh_stats(atlas)
+  if (!nrow(s)) return(NULL)
+  r <- s[s$method == method, , drop = FALSE]
+  if (!nrow(r)) return(NULL)
+  r[1, , drop = FALSE]
+}
+mh_n <- function(atlas, method) {
+  r <- mh_row(atlas, method)
+  if (is.null(r) || !"n" %in% names(r)) return(NA_real_)
+  as.numeric(r$n)
+}
+mh_median <- function(atlas, method) {
+  r <- mh_row(atlas, method)
+  if (is.null(r) || !"median_h2" %in% names(r)) return(NA_real_)
+  as.numeric(r$median_h2)
+}
+# Median-h2 ratio of method `a` to method `b` for one atlas.
+mh_ratio <- function(atlas, a, b) {
+  x <- mh_median(atlas, a); y <- mh_median(atlas, b)
+  if (!is.finite(x) || !is.finite(y) || y <= 0) return(NA_real_)
+  x / y
+}
+fmt_n <- function(x) if (is.finite(x)) format(as.integer(x), big.mark = ",") else "n/a"
+fmt_ratio <- function(x) if (is.finite(x)) sprintf("%.1f×", x) else "n/a"
+
 # Helper to filter n=0 rows for publication (per user: filter all tables to remove n=0)
 filter_n0 <- function(df) {
   if ("n" %in% names(df)) df <- df %>% filter(n != 0)
@@ -215,12 +258,14 @@ The two reported AdjHE variants are **not symmetric in failure detection**:
 
 A retained AdjHE-FE row has had **no conditioning check applied to it at all**,
 whereas a retained AdjHE-RE row has been explicitly conditioned-screened. The
-retained fractions therefore differ by construction (~48% FE vs ~77% RE for
-Gordon; ~37% vs ~75% for ProbaConns; 13 of 18 for both SA variants), and the
-panels are drawn on a shared x-axis with their own `n` printed. Differences in
-median `h2` between the FE and RE panels should be read as differences in both
-the estimator *and* the subset of phenotypes that survived screening, not as a
-method contrast alone.
+retained fractions therefore differ by construction — the plotted rows are Gordon
+FE `r fmt_n(mh_n("gordon","AdjHE-FE"))` vs RE `r fmt_n(mh_n("gordon","AdjHE-RE"))`,
+ProbaConns FE `r fmt_n(mh_n("probaConns","AdjHE-FE"))` vs RE
+`r fmt_n(mh_n("probaConns","AdjHE-RE"))`, SA FE `r fmt_n(mh_n("SA","AdjHE-FE"))` vs
+RE `r fmt_n(mh_n("SA","AdjHE-RE"))` Sys-Sys pairs — and the panels are drawn on a
+shared x-axis with their own `n` printed. Differences in median `h2` between the FE
+and RE panels should be read as differences in both the estimator *and* the subset
+of phenotypes that survived screening, not as a method contrast alone.
 
 # Summary {.scrollable style="text-align:center;"}
 
@@ -262,7 +307,7 @@ method contrast alone.
 
 ## Gordon — "Manhattans" {.scrollable style="text-align:center;"}
 
-*Sys-Sys ordered by a pooled median `h²` axis across every plotted method (`Twin`, `AdjHE-FE`, `AdjHE-RE`, GCTA omitted; 20 largest by size, alternating `Twin` blue `AdjHE-FE` orange, grey tail `100×`). Both AdjHE variants are reported and each panel carries its own retained `n`. **Read the per-panel `n`, not just the shared axis:** the two AdjHE variants retain very different fractions of phenotypes, because MASH's flag rate differs between them (~48% retained for FE vs ~77% for RE), so the panels are *not* the same row set at the same scale — the FE/RE gap is partly selection, not purely method.*
+*Sys-Sys ordered by a pooled median `h²` axis across every plotted method (`Twin`, `AdjHE-FE`, `AdjHE-RE`, GCTA omitted; 20 largest by size, alternating `Twin` blue `AdjHE-FE` orange, grey tail `100×`). Both AdjHE variants are reported and each panel carries its own retained `n`. **Read the per-panel `n`, not just the shared axis:** the two AdjHE variants retain very different fractions of phenotypes, because MASH's flag rate differs between them (FE `r fmt_n(mh_n("gordon","AdjHE-FE"))` vs RE `r fmt_n(mh_n("gordon","AdjHE-RE"))` Sys-Sys pairs), so the panels are *not* the same row set at the same scale — the FE/RE gap is partly selection, not purely method. FE retention is also Twin-h²-biased here (see 07_method_diagnostics.R section 6), which is why no single SNP method is designated primary.*
 
 ::: {style="overflow-y:auto; max-height:1200px; text-align:center;"}
 
@@ -347,7 +392,7 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 
 ## ProbaConns — Manhattans {.scrollable style="text-align:center;"}
 
-*Sys-Sys ordered by a pooled median `h²` axis across every plotted method; `Twin`, `AdjHE-FE` and `AdjHE-RE` all use that same `x`-axis. As in Gordon, both AdjHE variants are reported and each panel carries its own retained `n`: FE keeps ~37% of phenotypes here and RE ~75%, so again the two panels are not the same row set. GCTA omitted for the same reason as in Gordon.*
+*Sys-Sys ordered by a pooled median `h²` axis across every plotted method; `Twin`, `AdjHE-FE` and `AdjHE-RE` all use that same `x`-axis. As in Gordon, both AdjHE variants are reported and each panel carries its own retained `n`: FE keeps `r fmt_n(mh_n("probaConns","AdjHE-FE"))` Sys-Sys pairs here and RE `r fmt_n(mh_n("probaConns","AdjHE-RE"))`, so again the two panels are not the same row set (median `h²` ratio RE/FE `r fmt_ratio(mh_ratio("probaConns","AdjHE-RE","AdjHE-FE"))`). GCTA omitted for the same reason as in Gordon.*
 
 ::: {style="overflow-y:auto; max-height:1200px; text-align:center;"}
 
@@ -394,7 +439,7 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 
 ## SA — "Manhattans" {.scrollable style="text-align:center;"}
 
-*Sys-Sys ordered by a pooled median `h²` axis across every plotted method; `Twin`, `AdjHE-FE` and `AdjHE-RE` all use that same `x`-axis, matching the Gordon and ProbaConns panels above. Both AdjHE variants are reported; here they retain the same 13 rows, so unlike the FC atlases the FE/RE contrast is not confounded by differential retention — but the median ratio is still ~4×, the largest of the three sets. GCTA omitted for the same reason as in Gordon.*
+*Sys-Sys ordered by a pooled median `h²` axis across every plotted method; `Twin`, `AdjHE-FE` and `AdjHE-RE` all use that same `x`-axis, matching the Gordon and ProbaConns panels above. Both AdjHE variants are reported and each panel carries its own retained `n`, read back from the panel stats: Twin `r fmt_n(mh_n("SA","Twin"))`, FE `r fmt_n(mh_n("SA","AdjHE-FE"))`, RE `r fmt_n(mh_n("SA","AdjHE-RE"))`, of 14 plottable networks (4/6/17 are null and excluded). Retention is therefore near-matched here — unlike the FC atlases, the FE/RE contrast is not strongly confounded by selection — while the median `h²` ratio RE/FE is `r fmt_ratio(mh_ratio("SA","AdjHE-RE","AdjHE-FE"))`. GCTA is kept out of this trio so it stays comparable with the FC panels, but unlike in the FC sets it retains usable coverage here (`r fmt_n(mh_n("SA","GCTA"))` networks), so it appears in the overview grid and in the diagnostics.*
 
 ::: {style="overflow-y:auto; max-height:1200px; text-align:center;"}
 

@@ -411,10 +411,14 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
     fig.tight_layout(pad=0.4)
     plt.savefig(out_path, dpi=300, bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
-    # Save stats for quarto (instead of title numbers)
+    # Save stats for quarto (instead of title numbers). median_h2/mean_h2 are read
+    # back by 06_results_catalog.qmd so the per-panel prose can interpolate the
+    # FE/RE median ratio instead of hardcoding a number that drifts whenever a
+    # re-run retains a different set of rows.
     try:
         stats_out = str(out_path).replace(".png", "_stats.csv")
-        pd.DataFrame([{"atlas": atlas, "method": method, "n": n_rows, "n_connections": n_conn, "groups": int(len(grouped)), "large20": int(len(largest_20)), "divider": float(divider) if divider is not None else np.nan, "xmax_compressed": float(xmax)}]).to_csv(stats_out, index=False)
+        _h2 = pd.to_numeric(df["h2"], errors="coerce").dropna()
+        pd.DataFrame([{"atlas": atlas, "method": method, "n": n_rows, "n_connections": n_conn, "groups": int(len(grouped)), "large20": int(len(largest_20)), "divider": float(divider) if divider is not None else np.nan, "xmax_compressed": float(xmax), "median_h2": float(_h2.median()) if len(_h2) else np.nan, "mean_h2": float(_h2.mean()) if len(_h2) else np.nan}]).to_csv(stats_out, index=False)
     except Exception:
         pass
     print(f"  wrote {out_path}  n={n_rows} conns={n_conn} groups={len(grouped)} large20={len(largest_20)} divider={divider} xmax_compressed={xmax:.1f}")
