@@ -73,11 +73,11 @@ read_mash_stream <- function(pattern, label) {
 }
 
 streams <- list(
-  SA_AdjHE_FE        = c(pattern = "results/SA/AdjHE_FE_wo_total.csv",
+  SA_AdjHE_FE        = c(pattern = "results/SA/AdjHE_FE.csv",
                          label = "SA_AdjHE_FE"),
-  SA_AdjHE_RE        = c(pattern = "results/SA/AdjHE_RE_wo_total.csv",
+  SA_AdjHE_RE        = c(pattern = "results/SA/AdjHE_RE.csv",
                          label = "SA_AdjHE_RE"),
-  SA_GCTA            = c(pattern = "results/SA/GCTA_wo_total.csv",
+  SA_GCTA            = c(pattern = "results/SA/GCTA.csv",
                          label = "SA_GCTA"),
   SA_HEreg           = c(pattern = "results/SA/HE.csv",
                          label = "SA_HEreg"),
@@ -163,7 +163,7 @@ read_twin_set <- function(patterns, set) {
 }
 
 twin <- bind_rows(
-  read_twin_set("results/SA/twinEsts/herit_wo_total.Rds", "SA"),
+  read_twin_set("results/SA/twinEsts/herit_w_total.Rds", "SA"),
   read_twin_set(c("results/FCs/gordon/herit_*.Rds",
                   "results/FCs/gordon/twinEstResults/herit_*.Rds"), "gordon"),
   read_twin_set(c("results/FCs/probaConns/herit_*.Rds",
@@ -186,6 +186,34 @@ final <- final %>% mutate(across(starts_with("h2_"),
                                  ~ if_else(!is.na(Twin_h2) & .x > Twin_h2, NA_real_, .x)))
 
 write_csv(final, file.path(OUT, "mash_twin_wide.csv"))
+
+# The main wide table now carries SA = w_total. SA also has a wo_total run that
+# several figures (03, 04b, the qmd appendix) still need to contrast against it,
+# but those consumers are Python/pandas and cannot read the Twin .Rds directly.
+# Emit the SA variants as plain CSVs: the wo_total twin, and a wo_total copy of
+# the SA MASH columns. FE/RE/GCTA have wo_total runs; there is no SA-wide HEreg
+# wo_total run to mirror.
+twin_variant <- bind_rows(
+  read_twin_set("results/SA/twinEsts/herit_wo_total.Rds", "SA") %>%
+    mutate(variant = "wo_total", Pheno = Phenotype) %>%
+    select(Set, Pheno, variant, Twin_h2),
+  twin %>% filter(Set == "SA") %>%
+    mutate(variant = "w_total", Pheno = Phenotype) %>%
+    select(Set, Pheno, variant, Twin_h2))
+write_csv(twin_variant, file.path(OUT, "sa_twin_by_variant.csv"))
+
+sa_wo_files <- c(AdjHE_FE = "results/SA/AdjHE_FE_wo_total.csv",
+                 AdjHE_RE = "results/SA/AdjHE_RE_wo_total.csv",
+                 GCTA     = "results/SA/GCTA_wo_total.csv")
+sa_wo <- map_dfr(names(sa_wo_files),
+                 function(k) tryCatch(read_mash_stream(sa_wo_files[[k]], k), error = function(e) empty_mash),
+                 .id = "tag")
+if (nrow(sa_wo) > 0)
+  sa_wo %>% select(Pheno, method = stream, h2) %>%
+    distinct(Pheno, method, .keep_all = TRUE) %>%
+    pivot_wider(names_from = method, values_from = h2,
+                names_prefix = "h2_SA_", values_fn = first) %>%
+    write_csv(file.path(OUT, "sa_wo_total_mash.csv"))
 
 long <- final %>% pivot_longer(cols = starts_with("h2_") | all_of("Twin_h2"),
                                names_to = "Source", values_to = "h2") %>%

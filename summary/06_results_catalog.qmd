@@ -600,7 +600,11 @@ cat("\n\n*Interpretation: `mean_pct` = mean of per-phenotype `pct`; `se_pct = sd
 ## SA wo_total — Five-Number Summaries & Correlations
 
 ```{r sa-stats-appendix}
-sa_long <- wide %>% filter(Set=="SA") %>%
+sa_twin_wo <- read_csv(file.path(ROOT,"results/summary/sa_twin_by_variant.csv"), show_col_types=FALSE) %>%
+  filter(Set == "SA", variant == "wo_total") %>% select(Pheno, Twin_h2)
+sa_wo_mash <- read_csv(file.path(ROOT,"results/summary/sa_wo_total_mash.csv"), show_col_types=FALSE)
+sa_long <- sa_twin_wo %>%
+  left_join(sa_wo_mash %>% select(Pheno, h2_SA_AdjHE_RE), by = "Pheno") %>%
   select(Pheno, Twin_h2, h2_SA_AdjHE_RE) %>%
   pivot_longer(c(Twin_h2, h2_SA_AdjHE_RE), names_to="Method", values_to="h2") %>%
   mutate(Method = recode(Method, Twin_h2="Twin", h2_SA_AdjHE_RE="AdjHE-RE"))
@@ -610,8 +614,21 @@ kable(filter_n0(fivenum_sa), caption="SA (wo_total, 14 networks) — h2 five-num
 ```
 
 ```{r sa-corr-appendix}
-kable(filter_n0(read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="SA")), caption="SA — Twin vs MASH correlations (wo_total)")
+# SA's wo_total twin vs MASH correlations, computed from the wo_total files
+# 01_compare exports for that variant (sa_twin_by_variant + sa_wo_total_mash).
+sa_twin_wo <- read_csv(file.path(ROOT,"results/summary/sa_twin_by_variant.csv"), show_col_types=FALSE) %>%
+  filter(Set == "SA", variant == "wo_total") %>% select(Pheno, Twin_h2)
+sa_wo_mash <- read_csv(file.path(ROOT,"results/summary/sa_wo_total_mash.csv"), show_col_types=FALSE)
+wo_corr <- lapply(setdiff(names(sa_wo_mash), "Pheno"), function(m) {
+  j <- sa_twin_wo %>% left_join(sa_wo_mash %>% select(Pheno, !!sym(m)), by = "Pheno")
+  tibble(MashMethod = sub("^h2_SA_", "", m),
+         n = sum(!is.na(j[[m]]) & !is.na(j$Twin_h2)),
+         Pearson_r = cor(j[[m]], j$Twin_h2, use = "pairwise.complete.obs"))
+}) %>% bind_rows() %>% mutate(Set = "SA", Pearson_r = round(Pearson_r, 4))
+kable(filter_n0(wo_corr), caption="SA (wo_total, 14 networks) — Twin vs MASH correlations")
 ```
+
+Note: `correlations_by_set.csv` now reports the current **w_total** SA spec for the `SA` rows (see next section); the wo_total twin-vs-MASH values for comparison are in the table above.
 
 ## SA w_total vs wo_total — Correlation & Comparison {.scrollable style="text-align:center;"}
 

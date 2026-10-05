@@ -225,8 +225,7 @@ if not sa:
         print(f"Trying direct read of {twin_path} — if this fails, run compare_mash_twin.R with w_total first")
     except Exception:
         pass
-    # For now, reuse WIDE wo_total as placeholder but label as w_total for viz structure
-    # (The actual w_total values will appear after compare_mash_twin.R is updated)
+    # WIDE's SA columns now carry w_total, so this reads the real w_total values.
     df = pd.read_csv(WIDE)
     sub = df[df["Set"] == "SA"]
     for method, col in [("twin", "Twin_h2"), ("AdjHE", "h2_SA_AdjHE_RE")]:
@@ -237,7 +236,7 @@ if not sa:
             if region is not None:
                 mapping[region] = float(h2)
         sa[method] = mapping
-        print(f"[SA_w_total_{method} fallback from WIDE wo_total] networks={len(mapping)} (update WIDE for true w_total)")
+        print(f"[SA_w_total_{method} from WIDE] networks={len(mapping)}")
 
 for method, mapping in sa.items():
     tex_l, tex_r = sa_values_to_textures(mapping, DLABEL)

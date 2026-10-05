@@ -88,25 +88,41 @@ plot_sa <- function(df, out_path, title_suffix) {
   print(cor_df)
 }
 
-# ---- wo_total (from mash_twin_wide.csv: Twin_h2 + h2_SA_AdjHE_RE) ----
-if (nrow(wide) > 0 && "Twin_h2" %in% names(wide) && "h2_SA_AdjHE_RE" %in% names(wide)) {
-  df_wo <- wide %>%
-    filter(Set == "SA") %>%
-    select(Pheno, Twin_h2, h2_SA_AdjHE_RE) %>%
-    pivot_longer(cols = c(Twin_h2, h2_SA_AdjHE_RE),
-                 names_to = "Type", values_to = "h2") %>%
-    mutate(
-      Type = recode(Type, Twin_h2 = "Twin", h2_SA_AdjHE_RE = "AdjHE_RE"),
-      pheno_num = parse_number(Pheno),
-      pheno_label = recode(as.character(pheno_num), !!!networks, .default = NA_character_),
-      # 4/6/17 are null per Gordon (no parcels) — intentionally NA and dropped to avoid shift
-      h2 = if_else(is.na(h2) | h2 < 0, 0, h2)
-    ) %>%
-    drop_na(pheno_label)
-  plot_sa(df_wo, OUT, " (wo_total, 14 networks)")
-} else {
-  message("WIDE missing wo_total columns — skipping wo_total barplot")
+# SA panels must read explicit per-variant sources, not WIDE: after the 01_compare
+# switch, WIDE's SA columns are all w_total, so a "wo_total" panel built from WIDE
+# would silently display w_total data.
+extract_twin_h2 <- function(twin_rds_path) {
+  rds <- readRDS(twin_rds_path)
+  id_col <- setdiff(names(rds), c("herit", "data"))
+  if (length(id_col) == 1) rds <- rename(rds, Pheno = all_of(id_col))
+  if (!"Pheno" %in% names(rds) && "Phenotype" %in% names(rds)) rds <- rename(rds, Pheno = Phenotype)
+  rds %>% mutate(Twin = map_dbl(herit, function(x) {
+    if (is.null(x) || inherits(x, "twinlm_error")) return(NA_real_)
+    cf <- tryCatch(x$coef, error = function(e) NULL)
+    if (is.null(cf)) return(NA_real_)
+    A <- as.numeric(cf[1,1]); C <- as.numeric(cf[2,1]); E <- as.numeric(cf[3,1])
+    Ttot <- A + C + E
+    if (Ttot > 0) A / Ttot else NA_real_
+  })) %>% select(Pheno, Twin)
 }
+
+build_sa_panel <- function(twin_rds_path, adj_csv) {
+  twin_df <- extract_twin_h2(twin_rds_path)
+  adj_df <- read_csv(adj_csv, show_col_types = FALSE) %>%
+    filter(PCs == max(PCs, na.rm = TRUE)) %>%
+    select(Pheno = pheno, AdjHE_RE = h2)
+  full_join(twin_df, adj_df, by = "Pheno") %>%
+    pivot_longer(cols = c(Twin, AdjHE_RE), names_to = "Type", values_to = "h2") %>%
+    mutate(pheno_num = parse_number(Pheno),
+           pheno_label = recode(as.character(pheno_num), !!!networks, .default = NA_character_),
+           h2 = if_else(is.na(h2) | h2 < 0, 0, h2)) %>%
+    drop_na(pheno_label)
+}
+
+df_wo <- tryCatch(build_sa_panel(file.path(ROOT, "results/SA/twinEsts/herit_wo_total.Rds"),
+                                 file.path(ROOT, "results/SA/AdjHE_RE_wo_total.csv")),
+                  error = function(e) { message("wo_total build failed: ", conditionMessage(e)); tibble() })
+if (nrow(df_wo) > 0) plot_sa(df_wo, OUT, " (wo_total, 14 networks)") else message("No wo_total SA data — skipping ", OUT)
 
 # ---- w_total (Twin_h2_w_total + h2_SA_AdjHE_RE_w_total if in WIDE, else fallback to direct SA files) ----
 df_w <- tibble()
