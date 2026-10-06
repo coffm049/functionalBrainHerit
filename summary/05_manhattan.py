@@ -392,21 +392,7 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
     ax.set_ylabel(r"Heritability ($h^2$)", size=11)
     ax.set_yticks([0, 0.25, 0.5, 0.75, 1])
     ax.set_yticklabels([0, 0.25, 0.5, 0.75, 1], size=9)
-    # Publication-ready: no title (handled in quarto caption), minimal whitespace
-    from matplotlib.lines import Line2D
-    handles = [
-        Line2D([0], [0], marker="o", color="w", markerfacecolor=alt_colors[0], markersize=7, label="Top 20 Sys-Sys (alternating)"),
-        Line2D([0], [0], marker="o", color="w", markerfacecolor="grey", markersize=7, label="Remaining (100× compressed)"),
-    ]
-    ax.legend(handles=handles, loc="upper right", fontsize=7, frameon=False)
-    # Retained-row count per panel. AdjHE-FE and AdjHE-RE keep very different
-    # fractions of phenotypes (~48% vs ~77% for gordon), so without an explicit n
-    # the two panels look directly comparable when they are not: same y-scale,
-    # shared x-axis, different row sets. Upper-left is free (legend is upper-right).
-    n_rows, n_conn = int(len(df)), int(df["connection"].nunique())
-    ax.text(0.012, 0.975, f"n = {n_rows:,} rows\n{n_conn} Sys-Sys",
-            transform=ax.transAxes, va="top", ha="left", fontsize=7.5, linespacing=1.3,
-            bbox=dict(boxstyle="round,pad=0.28", facecolor="white", edgecolor="none", alpha=0.75))
+    # Publication-ready: no title, no legend, no annotations, minimal whitespace
     fig.tight_layout(pad=0.4)
     plt.savefig(out_path, dpi=300, bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
