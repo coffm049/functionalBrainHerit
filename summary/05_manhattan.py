@@ -393,6 +393,7 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
     ax.set_yticks([0, 0.25, 0.5, 0.75, 1])
     ax.set_yticklabels([0, 0.25, 0.5, 0.75, 1], size=9)
     # Publication-ready: no title, no legend, no annotations, minimal whitespace
+    n_rows, n_conn = int(len(df)), int(df["connection"].nunique())
     fig.tight_layout(pad=0.4)
     plt.savefig(out_path, dpi=300, bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
