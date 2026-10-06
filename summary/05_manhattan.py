@@ -326,15 +326,19 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
     df = df.sort_values("connection").reset_index(drop=True).reset_index(drop=False).rename(columns={"index": "idx"})
     df["index"] = df["idx"]
 
-    # compute plot_index with 100× compression for the small (<1.5%) tail
-    # so the x-axis spans the compressed width, not the original uncompressed width
+    # compute plot_index with 100× compression for the small tail
+    # only compress if small groups represent a meaningful fraction (>20%) of connections
     if small_order:
-        try:
-            divider = df.loc[df["connection"].isin(small_order), "index"].min()
-        except Exception:
-            divider = None
-        # fallback if divider still None (e.g. categorical empty)
-        if pd.isna(divider):
+        small_mask = df["connection"].isin(small_order)
+        small_frac = small_mask.sum() / len(df)
+        if small_frac > 0.20:  # only compress if small groups are >20% of connections
+            try:
+                divider = df.loc[small_mask, "index"].min()
+            except Exception:
+                divider = None
+            if pd.isna(divider):
+                divider = None
+        else:
             divider = None
     else:
         divider = None
