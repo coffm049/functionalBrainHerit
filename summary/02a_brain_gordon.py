@@ -3,13 +3,14 @@
 
 Produces for twin and AdjHE-RE (90th-percentile node summary, publication-ready, no titles, minimal whitespace):
 - <out>/gordon_{twin,AdjHERE}_surface.png  (both hemispheres, 0–0.5, colorbar not overlapping)
-- <out>/gordon_networks_surface.png      (categorical network topography, 14 nets, subcortical NA hidden)
-- <out>/gordon_{twin,AdjHERE}_circular.png (h2 > 0.33, nodes grouped by network, publication-ready, 0.33-1.0 rescale)
+  - <out>/gordon_networks_surface.png      (categorical network topography, 14 nets, subcortical NA hidden)
+  - <out>/gordon_{twin,AdjHERE}_circular.png (h2 > 0.33, nodes grouped by network, publication-ready, 0.33-1.0 rescale)
 
-Run on the HPC where the dlabel / surfaces and .venv are available:
-  bash summary/run_brain_viz.sh
-or directly:
-  /users/4/coffm049/papers/functionalBrainHerit/.venv/bin/python summary/brain_gordon.py
+AdjHE-RE is the reported SNP method; see 06_results_catalog.qmd for why.
+
+Run on the HPC, where the dlabel and surfaces are available:
+  conda activate MASH
+  python summary/02a_brain_gordon.py
 """
 import re
 from pathlib import Path

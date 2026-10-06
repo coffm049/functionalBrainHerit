@@ -8,8 +8,11 @@ networks dlabel — no pconn rebuild / node-summary needed.
 Produces:
   - <out>/SA_{twin,AdjHE}_surface.png  (both hemispheres, 0–0.5)
 
-Run on the HPC where the dlabel / surfaces and .venv are available:
-  /users/4/coffm049/papers/functionalBrainHerit/.venv/bin/python summary/brain_sa.py
+Run on the HPC, where the dlabel and surfaces are available:
+  conda activate MASH
+  python summary/02c_brain_sa.py
+
+This is the wo_total SA surface. The w_total counterpart is 02d_brain_sa_total.py.
 
 Notes (from 03a/03b/05-topoViz + HPC check 2026-08-27, updated for 14-network fix):
   - SA Set in mash_twin_wide.csv has 17 phenos network_surfarea1..17

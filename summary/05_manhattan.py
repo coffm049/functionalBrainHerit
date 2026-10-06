@@ -296,17 +296,15 @@ def _get_ordering(df, atlas, method):
     small_order = stats.loc[~stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
     return large_order, small_order, largest_20
 
-def _get_shared_order(dfs: dict):
-    """Union Sys-Sys ordering across the methods plotted for one atlas."""
-    parts = []
-    for df in dfs.values():
-        parts.append(df[["connection", "h2"]].dropna())
-    if not parts:
+def _get_shared_order(dfs: dict, order_method: str = "AdjHE-RE"):
+    """Sys-Sys ordering based on a single reference method (default: AdjHE-RE)."""
+    ref_df = dfs.get(order_method)
+    if ref_df is None:
         return None
-    allx = pd.concat(parts, ignore_index=True)
-    if allx.empty:
+    ref = ref_df[["connection", "h2"]].dropna()
+    if ref.empty:
         return None
-    stats = allx.groupby("connection")["h2"].agg(median="median", size="size")
+    stats = ref.groupby("connection")["h2"].agg(median="median", size="size")
     largest_20 = stats.sort_values("size", ascending=False).head(20).index.tolist()
     large_order = stats.loc[stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
     small_order = stats.loc[~stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
@@ -506,125 +504,7 @@ for atlas in ["gordon", "probaConns", "SA"]:
 # only the ordering reference. (The previous version drew just one method per atlas:
 # the drawing block was indented outside the method loop, so `ax` was left
 # pointing at the last method and `method` held that same value.)
-try:
-    overview_rows = []
-    for atlas in ["gordon", "probaConns", "SA"]:
-        for method, col in specs_for(atlas):
-            df = build_long_for_set(wide, atlas, set_N[atlas], col)
-            if df.empty:
-                continue
-            df["atlas"] = atlas
-            df["method"] = method
-            overview_rows.append(df)
 
-    if overview_rows:
-        overview = pd.concat(overview_rows, ignore_index=True)
-        # Global ordering by mean h2 per connection (descending) - same basis
-        # as the per-panel large_order logic
-        ov_order = overview.groupby("connection")["h2"].mean().sort_values(ascending=False).index.tolist()
-        overview["connection"] = pd.Categorical(overview["connection"], categories=ov_order, ordered=True)
-        overview = overview.sort_values("connection").reset_index(drop=True).reset_index(drop=False).rename(columns={"index": "idx"})
-        overview["index"] = overview["idx"]
-
-        atlases = ["gordon", "probaConns", "SA"]
-        disp = {"gordon": "Gordon", "probaConns": "ProbaConns", "SA": "SA"}
-        alt_colors = ["#1f77b4", "#ff7f0e"]
-        ncol = len(OVERVIEW_COLS)
-        fig, axes = plt.subplots(len(atlases), ncol, figsize=(4.4 * ncol, 9),
-                                 sharey=True, squeeze=False)
-
-        for r, atlas in enumerate(atlases):
-            for c, method in enumerate(OVERVIEW_COLS):
-                ax = axes[r][c]
-                title = f"{disp[atlas]} - {method}"
-                sub = overview[(overview["atlas"] == atlas) & (overview["method"] == method)].copy()
-
-                if sub.empty:
-                    if any(m == method for m, _ in METHOD_SPECS[atlas]):
-                        # method exists for this atlas but produced no rows
-                        ax.set_visible(False)
-                    else:
-                        # Method is in OVERVIEW_COLS but not in this atlas'
-                        # spec. Keep the cell as a labelled placeholder so the
-                        # remaining methods stay aligned with the other atlases
-                        # instead of packing left.
-                        ax.set_title(title, fontsize=9, fontweight="bold", color="0.55")
-                        ax.set_xticks([])
-                        ax.set_yticks([])
-                        for sp in ax.spines.values():
-                            sp.set_visible(False)
-                        ax.text(0.5, 0.5, "n/a", transform=ax.transAxes,
-                                ha="center", va="center", color="0.55", fontsize=11)
-                    continue
-
-                # Per-facet stats for large20 / divider (mirrors manhattan_for_df).
-                # observed=True matters: `connection` is a global categorical, so
-                # the default would report every other atlas' connections at size 0.
-                stats = sub.groupby("connection", observed=True)["h2"].agg(median="median", size="size")
-                largest_20 = stats.sort_values("size", ascending=False).head(20).index.tolist()
-                large_order = stats.loc[stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
-                small_order = [cc for cc in ov_order if cc not in largest_20 and cc in stats.index]
-
-                divider = None
-                if small_order:
-                    try:
-                        d = sub.loc[sub["connection"].isin(small_order), "index"].min()
-                        if not pd.isna(d):
-                            divider = float(d)
-                    except Exception:
-                        divider = None
-
-                if divider is not None:
-                    mask_small = sub["connection"].isin(small_order)
-                    sub["plot_index"] = np.where(
-                        mask_small,
-                        (sub["index"].astype(float) - divider) / 100.0 + divider,
-                        sub["index"].astype(float),
-                    )
-                else:
-                    sub["plot_index"] = sub["index"].astype(float)
-
-                for name, group in sub.groupby("connection", observed=True):
-                    is_large = name in largest_20
-                    if is_large:
-                        col_c = alt_colors[large_order.index(name) % 2] if name in large_order else alt_colors[0]
-                        alpha, sz = 0.85, 6
-                    else:
-                        col_c, alpha, sz = "grey", 0.35, 5
-                    ax.scatter(group["plot_index"], group["h2"], color=col_c, s=sz, alpha=alpha,
-                               zorder=10, linewidths=0.2, edgecolors="black" if is_large else "none")
-
-                xmax = float(sub["plot_index"].max())
-                xmin = float(sub["plot_index"].min())
-                pad = (xmax - xmin) * 0.015 if xmax > xmin else 1
-                ax.set_xlim([xmin - pad, xmax + pad])
-                ax.set_ylim([0, 1])
-                ax.set_title(title, fontsize=9, fontweight="bold")
-                ax.set_ylabel(r"$h^2$", fontsize=8)
-                ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
-                ax.set_yticks([0, 0.5, 1])
-                ax.tick_params(axis="y", labelsize=7)
-                # Same per-cell n as the individual panels: retention differs by
-                # method, so a cell with half the rows must not read as a like-for-like
-                # neighbour of the cell beside it.
-                n_cell = int(len(sub))
-                n_conn_cell = int(sub["connection"].nunique())
-                ax.text(0.015, 0.975, f"n = {n_cell:,}\n{n_conn_cell} Sys-Sys",
-                        transform=ax.transAxes, va="top", ha="left", fontsize=6.5,
-                        linespacing=1.3,
-                        bbox=dict(boxstyle="round,pad=0.22", facecolor="white",
-                                  edgecolor="none", alpha=0.75))
-
-        fig.suptitle("Manhattan Overview - ordered by h2 magnitude (y 0-1, <1.5% grey 100x compressed, full x-axis)",
-                     fontsize=12, fontweight="bold")
-        fig.tight_layout(rect=[0, 0, 1, 0.96])
-        out_ov = PLOT_DIR / "manhattan_overview.png"
-        fig.savefig(out_ov, dpi=300, bbox_inches="tight", pad_inches=0.12)
-        plt.close(fig)
-        print(f"  wrote {out_ov}  n={len(overview)}")
-except Exception as e:
-    import traceback
-    print(f"overview failed: {e}")
-    traceback.print_exc()
+# Overview grid disabled per user request
 
 print("Done.")

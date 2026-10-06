@@ -6,8 +6,11 @@ Produces for twin and AdjHE-RE (90th-percentile node summary, publication-ready,
   - <out>/probaConns_networks_surface.png      (categorical, from label table, Sal↔SMl swapped, 14 nets)
   - <out>/probaConns_{twin,AdjHERE}_circular.png (h2 > 0.33, nodes grouped by network, publication-ready, 0.33-1.0 rescale)
 
-Run on the HPC where the dlabel / surfaces and .venv are available:
-  /users/4/coffm049/papers/functionalBrainHerit/.venv/bin/python summary/brain_probaconns.py
+AdjHE-RE is the reported SNP method; see 06_results_catalog.qmd for why.
+
+Run on the HPC, where the dlabel and surfaces are available:
+  conda activate MASH
+  python summary/02b_brain_probaconns.py
 """
 import re
 from pathlib import Path

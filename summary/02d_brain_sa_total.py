@@ -8,14 +8,15 @@ It maps the SA heritability estimates that *control for totalNetworkSurface*
 Produces:
   - <out>/SA_w_total_{twin,AdjHE}_surface.png  (both hemispheres, 0–0.5)
 
-Source (after SA SLURM jobs finish):
-  - Twin w_total: results/SA/twinEsts/herit_w_total.Rds  (from SA/twinEsts/estimate.R)
-  - AdjHE w_total: results/SA/AdjHE_RE.csv  (from SA/AdjHE_RE.json, qcovar age+totalNetworkSurface)
-  Fallback: if results/summary/mash_twin_wide.csv already contains w_total
-  columns (h2_SA_AdjHE_RE_w_total / Twin_h2_w_total), those are used.
+Source: results/summary/mash_twin_wide.csv. 01_compare_mash_twin.R reads
+herit_w_total.Rds for SA, so the main wide table's SA columns (Twin_h2 and
+h2_SA_AdjHE_RE) already carry the w_total specification. The wo_total run is
+exported separately to sa_twin_by_variant.csv / sa_wo_total_mash.csv and is
+visualised by 02c_brain_sa.py.
 
 Run:
-  /users/4/coffm049/papers/functionalBrainHerit/.venv/bin/python summary/brain_sa_total.py
+  conda activate MASH
+  python summary/02d_brain_sa_total.py
 """
 import re
 from pathlib import Path
@@ -190,57 +191,24 @@ def plot_sa_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
 
 OUTDIR.mkdir(parents=True, exist_ok=True)
 
-# Try WIDE with w_total columns first; fallback to direct SA results
+# SA rows of the wide table already carry w_total: 01_compare_mash_twin.R reads
+# herit_w_total.Rds into them. There is no separate _w_total-suffixed column, so
+# this is the only read path.
+df = pd.read_csv(WIDE)
+sub = df[df["Set"] == "SA"]
 sa = {}
-try:
-    df = pd.read_csv(WIDE)
-    sub = df[df["Set"] == "SA"]
-    # Look for w_total columns (if compare_mash_twin.R has been updated)
-    # Fallback to wo_total columns if w_total not present
-    if "h2_SA_AdjHE_RE_w_total" in sub.columns or "Twin_h2_w_total" in sub.columns:
-        cols = {"twin": "Twin_h2_w_total" if "Twin_h2_w_total" in sub.columns else "Twin_h2",
-                "AdjHE": "h2_SA_AdjHE_RE_w_total" if "h2_SA_AdjHE_RE_w_total" in sub.columns else "h2_SA_AdjHE_RE"}
-        for method, col in [("twin", cols["twin"]), ("AdjHE", cols["AdjHE"])]:
-            s = sub[["Pheno", col]].dropna()
-            mapping = {}
-            for pheno, h2 in zip(s["Pheno"].values, s[col].values.astype(float)):
-                region = sa_region_from_pheno(pheno)
-                if region is not None:
-                    mapping[region] = float(h2)
-            sa[method] = mapping
-            print(f"[SA_w_total_{method} from WIDE] networks={len(mapping)}")
-        raise SystemExit  # skip fallback
-except SystemExit:
-    pass
-except Exception as e:
-    print(f"WIDE w_total not available ({e}), falling back to direct SA files")
-
-if not sa:
-    # Direct fallback: read SA w_total files (with totalNetworkSurface)
-    # Twin w_total
-    try:
-        import rpy2.robjects as ro
-        # Use R to read RDS if available, else try python
-        twin_path = ROOT / "results/SA/twinEsts/herit_w_total.Rds"
-        print(f"Trying direct read of {twin_path} — if this fails, run compare_mash_twin.R with w_total first")
-    except Exception:
-        pass
-    # WIDE's SA columns now carry w_total, so this reads the real w_total values.
-    df = pd.read_csv(WIDE)
-    sub = df[df["Set"] == "SA"]
-    for method, col in [("twin", "Twin_h2"), ("AdjHE", "h2_SA_AdjHE_RE")]:
-        s = sub[["Pheno", col]].dropna()
-        mapping = {}
-        for pheno, h2 in zip(s["Pheno"].values, s[col].values.astype(float)):
-            region = sa_region_from_pheno(pheno)
-            if region is not None:
-                mapping[region] = float(h2)
-        sa[method] = mapping
-        print(f"[SA_w_total_{method} from WIDE] networks={len(mapping)}")
+for method, col in [("twin", "Twin_h2"), ("AdjHE", "h2_SA_AdjHE_RE")]:
+    s = sub[["Pheno", col]].dropna()
+    mapping = {}
+    for pheno, h2 in zip(s["Pheno"].values, s[col].values.astype(float)):
+        region = sa_region_from_pheno(pheno)
+        if region is not None:
+            mapping[region] = float(h2)
+    sa[method] = mapping
+    print(f"[SA_w_total_{method} from WIDE] networks={len(mapping)}")
 
 for method, mapping in sa.items():
     tex_l, tex_r = sa_values_to_textures(mapping, DLABEL)
     plot_sa_surface(tex_l, tex_r, SURF_L, SURF_R, OUTDIR, f"SA_w_total_{method}", VMAX)
 
 print(f"Done. Outputs in {OUTDIR}")
-print("Note: For true w_total vs wo_total comparison, update compare_mash_twin.R to include SA_AdjHE_RE (w_total) pattern and rebuild WIDE.")
