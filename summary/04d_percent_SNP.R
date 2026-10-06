@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Percent of twin heritability explained by SNP (AdjHE-FE for all sets) per phenotype set
+# Percent of twin heritability explained by SNP (AdjHE-RE for all sets) per phenotype set
 # For each phenotype: pct = 100 * h2_MASH / h2_Twin
 # Summarize per Set (gordon, probaConns, SA) with mean, SD, SE, median, etc.
 # Input: results/summary/mash_twin_wide.csv (Twin_h2, h2_gordon_AdjHE_RE, h2_proba_AdjHE_RE, h2_SA_AdjHE_RE)

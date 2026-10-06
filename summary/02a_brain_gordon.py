@@ -379,12 +379,16 @@ def _display_tag(tag: str) -> str:
     m = method.lower()
     if m == "twin":
         method_disp = "Twin"
-    elif m in ("adjhe", "adjhe_re", "adjhe-re", "adjhe_fe", "adjhe-fe"):
+    elif m in ("adjhe", "adjhe_re", "adjhe-re"):
         method_disp = "AdjHE-RE"
+    elif m in ("adjhe_fe", "adjhe-fe"):
+        method_disp = "AdjHE-FE"
     elif m == "networks":
         return f"{atlas_disp} Networks"
     else:
-        method_disp = re.sub(r"AdjHE", "AdjHE-RE", method.replace("_", "-"), flags=re.IGNORECASE)
+        # Never rewrite an unrecognised method name into "AdjHE-RE": that would
+        # label a non-RE stream as RE. Show it verbatim instead.
+        method_disp = method.replace("_", "-")
         method_disp = method_disp[0].upper() + method_disp[1:] if method_disp else method_disp
     return f"{atlas_disp} {method_disp}"
 

@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """Pairwise-system Manhattan — grouped by Sys-Sys, sorted by median h2.
 
-For each atlas (Gordon 352, ProbaConns 80, SA 17) and each method present in
-mash_twin_wide.csv (20 PCs):
+For each atlas (Gordon 352, ProbaConns 80, SA 17), two methods are plotted (20 PCs):
 
-  gordon / probaConns / SA : Twin, AdjHE-FE, AdjHE-RE, GCTA
+  gordon / probaConns / SA : Twin, AdjHE-RE
 
-All methods for an atlas share one x-axis. There is no primary SNP method --
-AdjHE-FE and AdjHE-RE are both reported -- so one method is chosen only to fix
-the Sys-Sys order (AdjHE-FE, for all three atlases) and everything else, Twin
-included, is drawn against it. Panels state their own retained n because the two
-AdjHE variants keep very different fractions of phenotypes.
+AdjHE-RE is the single reported SNP method: it is the only AdjHE variant that
+applies a conditioning screen (cond(X_tX) > 1e10), so a retained RE row has been
+checked for ill-conditioning whereas a retained FE row has had only a determinant
+sign test. AdjHE-FE and GCTA are still computed in mash_twin_wide.csv and still
+compared against AdjHE-RE in 07_method_diagnostics.R; they are not plotted here.
+All methods for an atlas share one x-axis, ordered by median h2 within each
+Sys-Sys group, with Twin drawn against AdjHE-RE. Panels state their own retained n.
 
   x = edge index grouped by Sys-Sys network pair (e.g. DMN-VIS), ordered by
       largest median h2 within that Sys-Sys group (descending).

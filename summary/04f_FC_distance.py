@@ -384,8 +384,12 @@ def _plot_dist(ax, dist_all, h2_all, same_all, xlabel, color_within="#d62728", c
     ax.legend(fontsize=7, loc="upper right", framealpha=0.8)
     return info
 
+# Iterate the methods actually present in the long frame rather than a hardcoded
+# list, so a rename of the reported method cannot silently skip every panel.
+plot_methods=[m for m in ("Twin","AdjHE-RE","AdjHE-FE") if m in set(df["method"])]
+print(f"  plotting methods: {plot_methods}")
 for atlas in ["gordon","probaConns"]:
-    for method in ["Twin","AdjHE-FE"]:
+    for method in plot_methods:
         sub=df[(df["atlas"]==atlas) & (df["method"]==method)]
         if sub.empty:
             continue
