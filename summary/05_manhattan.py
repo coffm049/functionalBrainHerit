@@ -427,35 +427,31 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
 wide = pd.read_csv(WIDE)
 set_N = {"gordon": 352, "probaConns": 80, "SA": 17}
 
-# Which h2 columns to plot, per atlas, in panel order. Every atlas has an
-# AdjHE-FE stream (SA via SA/AdjHE_FE_wo_total.json), so all three specs are
-# the same length. AdjHE-FE and AdjHE-RE are BOTH reported -- neither is
-# designated primary -- so this list is a panel roster, not a ranking.
+# Which h2 columns to plot, per atlas, in panel order. AdjHE-RE is the single
+# reported SNP method: it is the only AdjHE variant that applies a conditioning
+# screen (cond(X_tX) > 1e10), so a retained RE row has actually been checked for
+# ill-conditioning whereas a retained FE row has not. AdjHE-FE and GCTA are still
+# computed in mash_twin_wide.csv and reported in 07_method_diagnostics.R, but
+# they are not plotted here.
 # probaConns columns are named h2_proba_* because 01_compare_mash_twin.R keys
 # them by stream label "proba_<method>" rather than by Set "probaConns".
 METHOD_SPECS = {
     "gordon": [
         ("Twin", "Twin_h2"),
-        ("AdjHE-FE", "h2_gordon_AdjHE_FE"),
         ("AdjHE-RE", "h2_gordon_AdjHE_RE"),
-        ("GCTA", "h2_gordon_GCTA"),
     ],
     "probaConns": [
         ("Twin", "Twin_h2"),
-        ("AdjHE-FE", "h2_proba_AdjHE_FE"),
         ("AdjHE-RE", "h2_proba_AdjHE_RE"),
-        ("GCTA", "h2_proba_GCTA"),
     ],
     "SA": [
         ("Twin", "Twin_h2"),
-        ("AdjHE-FE", "h2_SA_AdjHE_FE"),
         ("AdjHE-RE", "h2_SA_AdjHE_RE"),
-        ("GCTA", "h2_SA_GCTA"),
     ],
 }
 
-# Column order of the overview grid — union of every method any atlas uses.
-OVERVIEW_COLS = ["Twin", "AdjHE-FE", "AdjHE-RE", "GCTA"]
+# Column order of the overview grid -- union of every method any atlas uses.
+OVERVIEW_COLS = ["Twin", "AdjHE-RE"]
 
 
 def _resolve_col(col):

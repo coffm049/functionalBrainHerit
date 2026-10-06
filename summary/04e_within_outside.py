@@ -2,7 +2,7 @@
 """
 Within vs outside network heritability — 10th, 50th, 90th percentiles.
 
-For each FC atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-FE, 20 PCs):
+For each FC atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-RE, 20 PCs):
   * Load networks per parcel (Gordon: gordon_modules.csv 352->14 via labelDict; Proba: abcd 0.75 via CIFTI + Sal<->SMl swap)
   * For each edge (oK -> i,j via triu_indices), classify as:
       - within: networks[i] == networks[j] and not NA
@@ -132,13 +132,14 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
         networks=load_proba_networks(dlabel, N)
     # Keep only cortical 14 for Gordon/Proba (filter NA)
     # But for within/outside classification, we need to handle NA: edges involving NA are excluded from both groups
-    # Prefer FE for FC; fall back to RE if not present
-    col_pref = f"h2_{atlas}_AdjHE_FE"
-    col_alt = f"h2_{atlas}_AdjHE_RE"
-    method_label = "AdjHE-FE"
+    # AdjHE-RE is the reported SNP method (it is the only AdjHE variant with a
+    # conditioning screen). Fall back to FE only if RE has not been run.
+    col_pref = f"h2_{atlas}_AdjHE_RE"
+    col_alt = f"h2_{atlas}_AdjHE_FE"
+    method_label = "AdjHE-RE"
     if col_pref not in wide.columns and col_alt in wide.columns:
         col_pref = col_alt
-        method_label = "AdjHE-RE"
+        method_label = "AdjHE-FE"
     elif col_pref not in wide.columns:
         alt = col_pref.replace("probaConns","proba")
         if alt in wide.columns:

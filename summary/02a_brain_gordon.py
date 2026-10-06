@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Gordon (352 parcels) brain-space visualization — simple, hardcoded.
 
-Produces for twin and AdjHE-FE (90th-percentile node summary, publication-ready, no titles, minimal whitespace):
-  - <out>/gordon_{twin,AdjHE-FE}_surface.png  (both hemispheres, 0–0.5, colorbar not overlapping)
-  - <out>/gordon_networks_surface.png      (categorical network topography, 14 nets, subcortical NA hidden)
-  - <out>/gordon_{twin,AdjHE-FE}_circular.png (h2 > 0.33, nodes grouped by network, publication-ready, 0.33-1.0 rescale)
+Produces for twin and AdjHE-RE (90th-percentile node summary, publication-ready, no titles, minimal whitespace):
+- <out>/gordon_{twin,AdjHERE}_surface.png  (both hemispheres, 0–0.5, colorbar not overlapping)
+- <out>/gordon_networks_surface.png      (categorical network topography, 14 nets, subcortical NA hidden)
+- <out>/gordon_{twin,AdjHERE}_circular.png (h2 > 0.33, nodes grouped by network, publication-ready, 0.33-1.0 rescale)
 
 Run on the HPC where the dlabel / surfaces and .venv are available:
   bash summary/run_brain_viz.sh
@@ -380,11 +380,11 @@ def _display_tag(tag: str) -> str:
     if m == "twin":
         method_disp = "Twin"
     elif m in ("adjhe", "adjhe_re", "adjhe-re", "adjhe_fe", "adjhe-fe"):
-        method_disp = "AdjHE-FE"
+        method_disp = "AdjHE-RE"
     elif m == "networks":
         return f"{atlas_disp} Networks"
     else:
-        method_disp = re.sub(r"AdjHE", "AdjHE-FE", method.replace("_", "-"), flags=re.IGNORECASE)
+        method_disp = re.sub(r"AdjHE", "AdjHE-RE", method.replace("_", "-"), flags=re.IGNORECASE)
         method_disp = method_disp[0].upper() + method_disp[1:] if method_disp else method_disp
     return f"{atlas_disp} {method_disp}"
 
@@ -498,7 +498,7 @@ sub = df[df["Set"] == "gordon"]
 
 matrices = {}
 node_vals = {}
-for method, col in [("twin", "Twin_h2"), ("AdjHE", "h2_gordon_AdjHE_FE")]:
+for method, col in [("twin", "Twin_h2"), ("AdjHERE", "h2_gordon_AdjHE_RE")]:
     s = sub[["Pheno", col]].dropna()
     M = rebuild_pconn(s["Pheno"].values, s[col].values.astype(float), N)
     matrices[method] = M
@@ -515,7 +515,7 @@ net_names = [n for n in net_names_all if n in CORTICAL_14 or n.lower() in {c.low
 net_id = np.array([net_names.index(s) if s in net_names else -1 for s in networks], dtype=int)
 print(f"[networks] {len(net_names_all)} groups (incl. subcortical): {net_names_all} -> display {len(net_names)} cortical: {net_names}")
 
-dL, dR = dlabel_values(node_vals["AdjHE"], DLABEL, N)
+dL, dR = dlabel_values(node_vals["AdjHERE"], DLABEL, N)
 print(f"[dlabel] left assigned={int(np.count_nonzero(~np.isnan(dL)))} right assigned={int(np.count_nonzero(~np.isnan(dR)))} (N={N})")
 
 for method, node_h2 in node_vals.items():

@@ -29,32 +29,27 @@ ROOT <- "/users/4/coffm049/papers/functionalBrainHerit"
 WIDE <- file.path(ROOT, "results/summary/mash_twin_wide.csv")
 wide <- read_csv(WIDE, show_col_types = FALSE)
 
-# Detect which SNP columns are available. AdjHE-FE and AdjHE-RE are both
-# reported for all three phenotype sets; SA comes from the w_total runs, and its
-# wo_total runs feed only the appendix at the end of this document.
-# The `*_label` values name which one drives the surface/percent figures below.
-# The shared Manhattan x-axis is pooled across methods and is not primary-method
-# defined -- AdjHE-FE is not a primary method, and in gordon its retention is
-# Twin-h2-biased (see 07_method_diagnostics.R section 6).
-gordon_col <- if ("h2_gordon_AdjHE_FE" %in% names(wide)) "h2_gordon_AdjHE_FE" else "h2_gordon_AdjHE_RE"
-proba_col  <- if ("h2_proba_AdjHE_FE"  %in% names(wide)) "h2_proba_AdjHE_FE"  else "h2_proba_AdjHE_RE"
-sa_col     <- if ("h2_SA_AdjHE_FE"     %in% names(wide)) "h2_SA_AdjHE_FE"     else "h2_SA_AdjHE_RE"
+# The reported SNP method is AdjHE-RE for every phenotype set. It is the only
+# AdjHE variant that applies a conditioning screen (cond(X_tX) > 1e10), so a
+# retained RE estimate has actually been checked for ill-conditioning; a retained
+# FE estimate has had only a determinant sign test. AdjHE-FE and GCTA are still
+# computed in mash_twin_wide.csv and compared in 07_method_diagnostics.R, but
+# every figure, table and correlation below reports AdjHE-RE.
+# SA comes from the w_total runs; its wo_total runs feed only the appendix.
+gordon_col <- if ("h2_gordon_AdjHE_RE" %in% names(wide)) "h2_gordon_AdjHE_RE" else "h2_gordon_AdjHE_FE"
+proba_col  <- if ("h2_proba_AdjHE_RE"  %in% names(wide)) "h2_proba_AdjHE_RE"  else "h2_proba_AdjHE_FE"
+sa_col     <- if ("h2_SA_AdjHE_RE"     %in% names(wide)) "h2_SA_AdjHE_RE"     else "h2_SA_AdjHE_FE"
 
-gordon_label <- if (gordon_col == "h2_gordon_AdjHE_FE") "AdjHE-FE" else "AdjHE-RE"
-proba_label  <- if (proba_col  == "h2_proba_AdjHE_FE")  "AdjHE-FE" else "AdjHE-RE"
-sa_label     <- if (sa_col     == "h2_SA_AdjHE_FE")     "AdjHE-FE" else "AdjHE-RE"
+gordon_label <- if (gordon_col == "h2_gordon_AdjHE_RE") "AdjHE-RE" else "AdjHE-FE"
+proba_label  <- if (proba_col  == "h2_proba_AdjHE_RE")  "AdjHE-RE" else "AdjHE-FE"
+sa_label     <- if (sa_col     == "h2_SA_AdjHE_RE")     "AdjHE-RE" else "AdjHE-FE"
 
 # Image path suffixes
-gordon_img_sfx <- if (gordon_col == "h2_gordon_AdjHE_FE") "AdjHE" else "AdjHERE"
-proba_img_sfx  <- if (proba_col == "h2_proba_AdjHE_FE") "AdjHE" else "AdjHERE"
-# Manhattan panels use literal method names (Twin / AdjHEFE / AdjHERE),
-# one figure per atlas x method, all sharing the SNP-ordered x-axis. GCTA
-# figures are still written by 05_manhattan.py but are not shown in these
-# three sections: across the FC sets GCTA zero-censors >50% of edges and has no
-# flag column, so it is not comparable to the AdjHE panels (see
-# 01_compare_mash_twin.R). That rationale is FC-specific -- SA retains usable
-# GCTA coverage, so it is reported in the overview grid and in the diagnostics
-# rather than promoted into the per-atlas trio.
+gordon_img_sfx <- if (gordon_col == "h2_gordon_AdjHE_RE") "AdjHERE" else "AdjHE"
+proba_img_sfx  <- if (proba_col == "h2_proba_AdjHE_RE") "AdjHERE" else "AdjHE"
+# Manhattan panels use literal method names (Twin / AdjHERE), one figure per
+# atlas x method, sharing the pooled SNP-ordered x-axis. 05_manhattan.py plots
+# only Twin and AdjHE-RE.
 
 fivenum_tbl <- function(x) {
   x <- x[is.finite(x)]
@@ -247,9 +242,9 @@ conditioning screen — it removes clamped negatives but cannot detect a
 well-conditioned solve that is nonetheless unreliable. This is why GCTA returns
 `h2 = 0` for a large fraction of FC edges and is excluded from the panels below.
 
-### Consequence for interpreting the FE/RE contrast
+### Why AdjHE-RE is the reported SNP method
 
-The two reported AdjHE variants are **not symmetric in failure detection**:
+AdjHE ships two solver paths, and they are **not symmetric in failure detection**:
 
 | | degeneracy screen | can emit |
 |---|---|---|
@@ -257,15 +252,20 @@ The two reported AdjHE variants are **not symmetric in failure detection**:
 | AdjHE-RE | `cond2(X_tX) > 1e10` | `ill_conditioned`, `singular`, `nan_solve`, `neg_sigma_g`, `h2_neg_clamped`, `h2_gt_1_invalid` |
 
 A retained AdjHE-FE row has had **no conditioning check applied to it at all**,
-whereas a retained AdjHE-RE row has been explicitly conditioned-screened. The
-retained fractions therefore differ by construction — the plotted rows are Gordon
-FE `r fmt_n(mh_n("gordon","AdjHE-FE"))` vs RE `r fmt_n(mh_n("gordon","AdjHE-RE"))`,
-ProbaConns FE `r fmt_n(mh_n("probaConns","AdjHE-FE"))` vs RE
-`r fmt_n(mh_n("probaConns","AdjHE-RE"))`, SA FE `r fmt_n(mh_n("SA","AdjHE-FE"))` vs
-RE `r fmt_n(mh_n("SA","AdjHE-RE"))` Sys-Sys pairs — and the panels are drawn on a
-shared x-axis with their own `n` printed. Differences in median `h2` between the FE
-and RE panels should be read as differences in both the estimator *and* the subset
-of phenotypes that survived screening, not as a method contrast alone.
+whereas a retained AdjHE-RE row has been explicitly conditioned-screened. Every
+SNP heritability estimate, correlation, surface, chord diagram, bar graph and
+Manhattan panel below therefore reports **AdjHE-RE**: it is the variant whose
+retained estimates have actually been screened for ill-conditioning. The plotted
+rows are Gordon `r fmt_n(mh_n("gordon","AdjHE-RE"))`, ProbaConns
+`r fmt_n(mh_n("probaConns","AdjHE-RE"))`, SA `r fmt_n(mh_n("SA","AdjHE-RE"))`
+Sys-Sys pairs, each printed on its panel.
+
+AdjHE-FE is still computed and is not discarded: 07_method_diagnostics.R compares
+it against AdjHE-RE directly, quantifying how much of the FE/RE difference is
+estimator choice versus differential retention (FE retains far fewer phenotypes,
+and in Gordon its retention is biased toward high Twin `h²`). GCTA is likewise
+computed but not reported as a headline SNP method, because it has no flag column
+at all and returns `h2 = 0` for a large fraction of FC edges.
 
 # Summary {.scrollable style="text-align:center;"}
 
@@ -295,11 +295,11 @@ of phenotypes that survived screening, not as a method contrast alone.
 
 ![Gordon Twin Surface. 90th percentile heritability for each ROI.](../results/summary/brain/gordon/gordon_twin_surface.png){width="100%" style="object-fit:contain;"}
 
-![Gordon AdjHE-FE Surface. 90th percentile heritability for each ROI.](../results/summary/brain/gordon/gordon_AdjHE_surface.png){width="100%" style="object-fit:contain;"}
+![Gordon AdjHE-RE Surface. 90th percentile heritability for each ROI.](../results/summary/brain/gordon/gordon_AdjHERE_surface.png){width="100%" style="object-fit:contain;"}
 
 ![Gordon Twin chords](../results/summary/brain/gordon/gordon_twin_circular.png){width="100%" style="object-fit:contain;"}
 
-![Gordon AdjHE-FE chords](../results/summary/brain/gordon/gordon_AdjHE_circular.png){width="100%" style="object-fit:contain;"}
+![Gordon AdjHE-RE chords](../results/summary/brain/gordon/gordon_AdjHERE_circular.png){width="100%" style="object-fit:contain;"}
 
 :::
 
@@ -307,17 +307,15 @@ of phenotypes that survived screening, not as a method contrast alone.
 
 ## Gordon — "Manhattans" {.scrollable style="text-align:center;"}
 
-*Sys-Sys ordered by a pooled median `h²` axis across every plotted method (`Twin`, `AdjHE-FE`, `AdjHE-RE`, GCTA omitted; 20 largest by size, alternating `Twin` blue `AdjHE-FE` orange, grey tail `100×`). Both AdjHE variants are reported and each panel carries its own retained `n`. **Read the per-panel `n`, not just the shared axis:** the two AdjHE variants retain very different fractions of phenotypes, because MASH's flag rate differs between them (FE `r fmt_n(mh_n("gordon","AdjHE-FE"))` vs RE `r fmt_n(mh_n("gordon","AdjHE-RE"))` Sys-Sys pairs), so the panels are *not* the same row set at the same scale — the FE/RE gap is partly selection, not purely method. FE retention is also Twin-h²-biased here (see 07_method_diagnostics.R section 6), which is why no single SNP method is designated primary.*
+*Sys-Sys ordered by a pooled median `h²` axis across the two plotted panels (`Twin`, `AdjHE-RE`; 20 largest by size, alternating colours, grey tail `100×`). AdjHE-RE is the reported SNP method because it is the only AdjHE variant that applies a conditioning screen, so a retained estimate has actually been checked for ill-conditioning. Retained Sys-Sys pairs: Twin `r fmt_n(mh_n("gordon","Twin"))`, AdjHE-RE `r fmt_n(mh_n("gordon","AdjHE-RE"))` — **read the per-panel `n`, not just the shared axis**, since the two panels are not the same row set at the same scale. AdjHE-FE is not plotted here; it is compared against AdjHE-RE in 07_method_diagnostics.R.*
 
 ::: {style="overflow-y:auto; max-height:1200px; text-align:center;"}
 
-::: {layout="[[1],[1],[1]]" style="text-align:center;"}
+::: {layout="[[1],[1]]" style="text-align:center;"}
 
 ![Gordon Twin "Manhattan" — Sys-Sys pairs, same pooled x-axis](../results/summary/plots/manhattan_gordon_Twin.png){width="100%" style="object-fit:contain;"}
 
-![Gordon AdjHE-FE Manhattan (shared pooled x-axis)](../results/summary/plots/manhattan_gordon_AdjHEFE.png){width="100%" style="object-fit:contain;"}
-
-![Gordon AdjHE-RE Manhattan (same SNP x-axis)](../results/summary/plots/manhattan_gordon_AdjHERE.png){width="100%" style="object-fit:contain;"}
+![Gordon AdjHE-RE Manhattan (shared pooled x-axis)](../results/summary/plots/manhattan_gordon_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
 :::
 
@@ -392,17 +390,15 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 
 ## ProbaConns — Manhattans {.scrollable style="text-align:center;"}
 
-*Sys-Sys ordered by a pooled median `h²` axis across every plotted method; `Twin`, `AdjHE-FE` and `AdjHE-RE` all use that same `x`-axis. As in Gordon, both AdjHE variants are reported and each panel carries its own retained `n`: FE keeps `r fmt_n(mh_n("probaConns","AdjHE-FE"))` Sys-Sys pairs here and RE `r fmt_n(mh_n("probaConns","AdjHE-RE"))`, so again the two panels are not the same row set (median `h²` ratio RE/FE `r fmt_ratio(mh_ratio("probaConns","AdjHE-RE","AdjHE-FE"))`). GCTA omitted for the same reason as in Gordon.*
+*Sys-Sys ordered by a pooled median `h²` axis across the two plotted panels; `Twin` and `AdjHE-RE` use that same `x`-axis. As in Gordon, AdjHE-RE is the reported SNP method, and each panel carries its own retained `n`: Twin `r fmt_n(mh_n("probaConns","Twin"))` and AdjHE-RE `r fmt_n(mh_n("probaConns","AdjHE-RE"))` Sys-Sys pairs, so the two panels are not the same row set. AdjHE-FE is compared against AdjHE-RE in 07_method_diagnostics.R rather than plotted.*
 
 ::: {style="overflow-y:auto; max-height:1200px; text-align:center;"}
 
-::: {layout="[[1],[1],[1]]" style="text-align:center;"}
+::: {layout="[[1],[1]]" style="text-align:center;"}
 
 ![ProbaConns Twin Manhattan (SNP order)](../results/summary/plots/manhattan_probaConns_Twin.png){width="100%" style="object-fit:contain;"}
 
-![ProbaConns AdjHE-FE Manhattan (shared pooled x-axis)](../results/summary/plots/manhattan_probaConns_AdjHEFE.png){width="100%" style="object-fit:contain;"}
-
-![ProbaConns AdjHE-RE Manhattan (same SNP x-axis)](../results/summary/plots/manhattan_probaConns_AdjHERE.png){width="100%" style="object-fit:contain;"}
+![ProbaConns AdjHE-RE Manhattan (shared pooled x-axis)](../results/summary/plots/manhattan_probaConns_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
 :::
 
@@ -439,17 +435,15 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 
 ## SA — "Manhattans" {.scrollable style="text-align:center;"}
 
-*Sys-Sys ordered by a pooled median `h²` axis across every plotted method; `Twin`, `AdjHE-FE` and `AdjHE-RE` all use that same `x`-axis, matching the Gordon and ProbaConns panels above. Both AdjHE variants are reported and each panel carries its own retained `n`, read back from the panel stats: Twin `r fmt_n(mh_n("SA","Twin"))`, FE `r fmt_n(mh_n("SA","AdjHE-FE"))`, RE `r fmt_n(mh_n("SA","AdjHE-RE"))`, of 14 plottable networks (4/6/17 are null and excluded). Retention is therefore near-matched here — unlike the FC atlases, the FE/RE contrast is not strongly confounded by selection — while the median `h²` ratio RE/FE is `r fmt_ratio(mh_ratio("SA","AdjHE-RE","AdjHE-FE"))`. GCTA is kept out of this trio so it stays comparable with the FC panels, but unlike in the FC sets it retains usable coverage here (`r fmt_n(mh_n("SA","GCTA"))` networks), so it appears in the overview grid and in the diagnostics.*
+*Sys-Sys ordered by a pooled median `h²` axis across the two plotted panels; `Twin` and `AdjHE-RE` use that same `x`-axis, matching the Gordon and ProbaConns panels above. AdjHE-RE is the reported SNP method here as everywhere else, and each panel carries its own retained `n`, read back from the panel stats: Twin `r fmt_n(mh_n("SA","Twin"))` and AdjHE-RE `r fmt_n(mh_n("SA","AdjHE-RE"))`, of 14 plottable networks (4/6/17 are null and excluded). AdjHE-FE is compared against AdjHE-RE in 07_method_diagnostics.R rather than plotted.*
 
 ::: {style="overflow-y:auto; max-height:1200px; text-align:center;"}
 
-::: {layout="[[1],[1],[1]]" style="text-align:center;"}
+::: {layout="[[1],[1]]" style="text-align:center;"}
 
 ![SA Twin Manhattan (SNP order)](../results/summary/plots/manhattan_SA_Twin.png){width="100%" style="object-fit:contain;"}
 
-![SA AdjHE-FE Manhattan (shared pooled x-axis)](../results/summary/plots/manhattan_SA_AdjHEFE.png){width="100%" style="object-fit:contain;"}
-
-![SA AdjHE-RE Manhattan (same SNP x-axis)](../results/summary/plots/manhattan_SA_AdjHERE.png){width="100%" style="object-fit:contain;"}
+![SA AdjHE-RE Manhattan (shared pooled x-axis)](../results/summary/plots/manhattan_SA_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
 :::
 
@@ -476,15 +470,15 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 #| fig-height: 5
 corr_path <- file.path(ROOT, "results/summary/sa_fc_h2_correlation.csv")
 corr_sa_fc <- read_csv(corr_path, show_col_types = FALSE)
-# Wide format: one column per method (Twin, AdjHE-FE, AdjHE-RE), drop n_networks
+# Wide format: one column per method (Twin, AdjHE-RE), drop n_networks
 corr_sa_fc <- corr_sa_fc %>% filter(n_networks != 0)
 corr_wide <- corr_sa_fc %>%
   select(any_of(c("atlas","method","metric","sa_type","pearson_r"))) %>%
   mutate(pearson_r = round(pearson_r, 3)) %>%
   pivot_wider(names_from = method, values_from = pearson_r) %>%
   arrange(match(atlas, c("gordon","probaConns")), match(metric, c("fc_mean","fc_p90","fc_within","fc_outside")), sa_type)
-# Order columns Twin then the reported SNP method (AdjHE-FE for all atlases)
-mcols <- intersect(c("Twin","AdjHE-FE","AdjHE-RE"), names(corr_wide))
+# Order columns Twin then the reported SNP method (AdjHE-RE for all atlases)
+mcols <- intersect(c("Twin","AdjHE-RE"), names(corr_wide))
 corr_wide <- corr_wide %>% select(any_of(c("atlas","metric","sa_type")), all_of(mcols))
 kable(corr_wide, caption="SA-FC h2 by system: Pearson R of FC parcel-mean / p90 / within / outside h2 vs SA h2 (14 nets; rows = atlas × metric × SA type; SNP = AdjHE-FE for all atlases, falling back to AdjHE-RE where no FE run exists)")
 ```
@@ -523,11 +517,11 @@ for (p in c(file.path(ROOT,"results/summary/plots/SA_horizontal_barplot_stats.cs
 
 ![Gordon Twin FC h2 heatmap (352×352, red low → yellow high, 0–1, parcels ordered by network as in circular)](../results/summary/plots/heatmap_gordon_Twin.png){width="100%" style="object-fit:contain;"}
 
-![Gordon AdjHE-FE heatmap (0–1)](../results/summary/plots/heatmap_gordon_AdjHEFE.png){width="100%" style="object-fit:contain;"}
+![Gordon AdjHE-RE heatmap (0–1)](../results/summary/plots/heatmap_gordon_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
 ![ProbaConns Twin heatmap (80×80, 0–1)](../results/summary/plots/heatmap_probaConns_Twin.png){width="100%" style="object-fit:contain;"}
 
-![ProbaConns AdjHE-FE heatmap (0–1)](../results/summary/plots/heatmap_probaConns_AdjHEFE.png){width="100%" style="object-fit:contain;"}
+![ProbaConns AdjHE-RE heatmap (0–1)](../results/summary/plots/heatmap_probaConns_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
 :::
 
@@ -535,9 +529,9 @@ for (p in c(file.path(ROOT,"results/summary/plots/SA_horizontal_barplot_stats.cs
 
 ```{r heatmap-stats}
 for (p in c(file.path(ROOT,"results/summary/plots/heatmap_gordon_Twin_stats.csv"),
-            file.path(ROOT,"results/summary/plots/heatmap_gordon_AdjHEFE_stats.csv"),
+            file.path(ROOT,"results/summary/plots/heatmap_gordon_AdjHERE_stats.csv"),
             file.path(ROOT,"results/summary/plots/heatmap_probaConns_Twin_stats.csv"),
-            file.path(ROOT,"results/summary/plots/heatmap_probaConns_AdjHEFE_stats.csv"))) {
+            file.path(ROOT,"results/summary/plots/heatmap_probaConns_AdjHERE_stats.csv"))) {
   kable(filter_n0(read_csv(p, show_col_types=FALSE) %>% mutate(across(where(is.numeric), ~round(.x,3)))), caption=paste0("Heatmap stats: ", basename(p)))
 }
 ```
@@ -550,11 +544,11 @@ for (p in c(file.path(ROOT,"results/summary/plots/heatmap_gordon_Twin_stats.csv"
 
 ![Gordon Twin h2 vs Euclidean distance](../results/summary/plots/fc_distance_gordon_Twin.png){width="100%" style="object-fit:contain;"}
 
-![Gordon AdjHE-FE h2 vs Euclidean distance](../results/summary/plots/fc_distance_gordon_AdjHEFE.png){width="100%" style="object-fit:contain;"}
+![Gordon AdjHE-RE h2 vs Euclidean distance](../results/summary/plots/fc_distance_gordon_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
 ![ProbaConns Twin h2 vs Euclidean distance](../results/summary/plots/fc_distance_probaConns_Twin.png){width="100%" style="object-fit:contain;"}
 
-![ProbaConns AdjHE-FE h2 vs Euclidean distance](../results/summary/plots/fc_distance_probaConns_AdjHEFE.png){width="100%" style="object-fit:contain;"}
+![ProbaConns AdjHE-RE h2 vs Euclidean distance](../results/summary/plots/fc_distance_probaConns_AdjHERE.png){width="100%" style="object-fit:contain;"}
 
 :::
 
@@ -565,9 +559,9 @@ for (p in c(file.path(ROOT,"results/summary/plots/heatmap_gordon_Twin_stats.csv"
 ```{r geodesic-section, echo=FALSE, results='asis'}
 geodesic_files <- c(
   "Gordon Twin"  = file.path(ROOT, "results/summary/plots/fc_distance_geodesic_gordon_Twin.png"),
-  "Gordon AdjHE-FE" = file.path(ROOT, "results/summary/plots/fc_distance_geodesic_gordon_AdjHEFE.png"),
+  "Gordon AdjHE-RE" = file.path(ROOT, "results/summary/plots/fc_distance_geodesic_gordon_AdjHERE.png"),
   "ProbaConns Twin" = file.path(ROOT, "results/summary/plots/fc_distance_geodesic_probaConns_Twin.png"),
-  "ProbaConns AdjHE-FE" = file.path(ROOT, "results/summary/plots/fc_distance_geodesic_probaConns_AdjHEFE.png")
+  "ProbaConns AdjHE-RE" = file.path(ROOT, "results/summary/plots/fc_distance_geodesic_probaConns_AdjHERE.png")
 )
 existing <- geodesic_files[file.exists(geodesic_files)]
 if (length(existing) == 4) {
@@ -616,7 +610,7 @@ kable(filter_n0(dist_sum), caption="FC h2 vs distance — within (same network) 
 
 ---
 
-## Percent SNP Heritability of Twin Estimates — `100 × SNP / Twin` per Phenotype Set (SNP = AdjHE-FE for all sets)
+## Percent SNP Heritability of Twin Estimates — `100 × SNP / Twin` per Phenotype Set (SNP = AdjHE-RE for all sets)
 
 ```{r percent-snp}
 pct_path <- file.path(ROOT, "results/summary/percent_SNP_explained.csv")
@@ -626,7 +620,7 @@ pct <- filter_n0(pct)
 # Keep Set order gordon, probaConns, SA; select only needed cols for display (keep Pearson focus but percent table is separate)
 pct <- pct %>% arrange(match(Set, c("gordon","probaConns","SA")))
 # Only show mean/median + SE for publication (keep full for now but ensure n_valid !=0)
-kable(pct, caption="Percent SNP heritability of Twin estimates — 100 × SNP / Twin per phenotype (per Set: mean ± SE, median, SD, q1/q3, min/max, n_valid; SNP = AdjHE-FE for all sets; SA 14 nets excl. 4/6/17, FCs filtered Twin_h2>0.001, MASH 0–1.2)")
+kable(pct, caption="Percent SNP heritability of Twin estimates — 100 × SNP / Twin per phenotype (per Set: mean ± SE, median, SD, q1/q3, min/max, n_valid; SNP = AdjHE-RE for all sets; SA 14 nets excl. 4/6/17, FCs filtered Twin_h2>0.001, MASH 0–1.2)")
 cat("\n\n*Interpretation: `mean_pct` = mean of per-phenotype `pct`; `se_pct = sd / sqrt(n_valid)`; `median_pct` robust to outliers (Twin near 0 inflates mean). `ratio_of_means_pct = 100 × mean(MASH)/mean(Twin)` is also shown.*\n")
 ```
 

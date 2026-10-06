@@ -2,7 +2,7 @@
 # Percent of twin heritability explained by SNP (AdjHE-FE for all sets) per phenotype set
 # For each phenotype: pct = 100 * h2_MASH / h2_Twin
 # Summarize per Set (gordon, probaConns, SA) with mean, SD, SE, median, etc.
-# Input: results/summary/mash_twin_wide.csv (Twin_h2, h2_gordon_AdjHE_FE, h2_proba_AdjHE_FE, h2_SA_AdjHE_RE)
+# Input: results/summary/mash_twin_wide.csv (Twin_h2, h2_gordon_AdjHE_RE, h2_proba_AdjHE_RE, h2_SA_AdjHE_RE)
 # Output: results/summary/percent_SNP_explained.csv + per-set details
 # Also used in quarto 06_results_catalog.qmd
 
@@ -22,18 +22,19 @@ dir.create(dirname(OUT), recursive = TRUE, showWarnings = FALSE)
 wide <- tryCatch(read_csv(WIDE, show_col_types = FALSE), error = function(e) tibble())
 if (nrow(wide)==0) stop("mash_twin_wide.csv not found or empty: ", WIDE)
 
-# Map Set -> preferred MASH column (AdjHE-FE for all three sets; SA via
-# SA/AdjHE_FE_wo_total.json), falling back to AdjHE-RE when no FE run exists.
+# Map Set -> reported MASH column. AdjHE-RE is the reported SNP method for all
+# three sets (it is the only AdjHE variant with a conditioning screen); fall
+# back to AdjHE-FE only when an RE run is missing.
 # Note: column names use underscore (AdjHE_FE/AdjHE_RE) for files, display as AdjHE-FE/AdjHE-RE (hyphen)
 preferred_mash_col <- c(
-  "gordon" = "h2_gordon_AdjHE_FE",
-  "probaConns" = "h2_proba_AdjHE_FE",
-  "SA" = "h2_SA_AdjHE_FE"
-)
-fallback_mash_col <- c(
   "gordon" = "h2_gordon_AdjHE_RE",
   "probaConns" = "h2_proba_AdjHE_RE",
   "SA" = "h2_SA_AdjHE_RE"
+)
+fallback_mash_col <- c(
+  "gordon" = "h2_gordon_AdjHE_FE",
+  "probaConns" = "h2_proba_AdjHE_FE",
+  "SA" = "h2_SA_AdjHE_FE"
 )
 
 mash_col_for_set <- preferred_mash_col

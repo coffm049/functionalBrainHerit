@@ -2,13 +2,13 @@
 """
 Heatmap of FC heritability (h2) ordered by Sys-Sys network labels.
 
-For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-FE, 20 PCs):
+For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-RE, 20 PCs):
   * Rebuild the full N x N h2 matrix from mash_twin_wide.csv
   * Order parcels by network (as in circular plot: argsort(networks))
   * Plot heatmap with networks as blocks, ordered by Sys-Sys labels, red (low) -> yellow (high), 0-1
   * Save as results/summary/plots/heatmap_{atlas}_{method}.png
 
-  Publication-ready: minimal whitespace, no title numbers, stats to CSV, AdjHE-FE naming, 0-1 colorbar.
+  Publication-ready: minimal whitespace, no title numbers, stats to CSV, AdjHE-RE naming, 0-1 colorbar.
 
 Run:
   .venv/bin/python summary/04c_FC_heatmap.py
@@ -138,13 +138,14 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
     uniq, counts = np.unique(networks_ordered, return_counts=True)
     print(f"[{atlas}] order {networks_ordered[:10]}... uniq {list(zip(uniq, counts))}")
 
-    # Prefer FE for FC; fall back to RE if not present
-    col_pref = f"h2_{atlas}_AdjHE_FE"
-    col_alt = f"h2_{atlas}_AdjHE_RE"
-    method_label = "AdjHE-FE"
+    # AdjHE-RE is the reported SNP method (it is the only AdjHE variant with a
+    # conditioning screen). Fall back to FE only if RE has not been run.
+    col_pref = f"h2_{atlas}_AdjHE_RE"
+    col_alt = f"h2_{atlas}_AdjHE_FE"
+    method_label = "AdjHE-RE"
     if col_pref not in wide.columns and col_alt in wide.columns:
         col_pref = col_alt
-        method_label = "AdjHE-RE"
+        method_label = "AdjHE-FE"
     elif col_pref not in wide.columns:
         alt = col_pref.replace("probaConns","proba")
         if alt in wide.columns:

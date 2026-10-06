@@ -2,7 +2,7 @@
 """
 Correlation between FC heritability (per-parcel average / 90th percentile) and SA heritability by system.
 
-For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-FE, 20 PCs):
+For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-RE, 20 PCs):
   * Rebuild the full N x N FC h2 matrix from mash_twin_wide.csv (oK -> triu)
   * For each parcel p, compute:
       - mean_h2[p] = mean of row p (all edges incident to p, nan on diagonal)
@@ -157,7 +157,6 @@ for _,row in sa_sub.iterrows():
         # WIDE's SA columns are all w_total after the 01_compare switch, so this
         # block loads the primary (w_total) SA panels only.
         sa_map_w[net] = {"Twin": float(row["Twin_h2"]) if pd.notna(row["Twin_h2"]) else np.nan,
-                         "AdjHE-FE": float(row["h2_SA_AdjHE_FE"]) if "h2_SA_AdjHE_FE" in row and pd.notna(row["h2_SA_AdjHE_FE"]) else np.nan,
                          "AdjHE-RE": float(row["h2_SA_AdjHE_RE"]) if "h2_SA_AdjHE_RE" in row and pd.notna(row["h2_SA_AdjHE_RE"]) else np.nan}
     except: pass
 # wo_total comes from the two CSVs 01_compare exports specifically for that
@@ -180,7 +179,6 @@ try:
         twin_rows = _wot_twin[_wot_twin["Pheno"] == row["Pheno"]]
         sa_map_wo[net] = {
             "Twin": float(twin_rows.iloc[0]["Twin_h2"]) if len(twin_rows) and pd.notna(twin_rows.iloc[0]["Twin_h2"]) else np.nan,
-            "AdjHE-FE": float(row["h2_SA_AdjHE_FE"]) if "h2_SA_AdjHE_FE" in row and pd.notna(row["h2_SA_AdjHE_FE"]) else np.nan,
             "AdjHE-RE": float(row["h2_SA_AdjHE_RE"]) if "h2_SA_AdjHE_RE" in row and pd.notna(row["h2_SA_AdjHE_RE"]) else np.nan}
 except Exception as _e:
     print(f"wo_total SA load failed: {_e}")
@@ -230,15 +228,15 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
         # Also ensure canonical SA name for merging
         print(f"[{atlas}][{sa_type}] networks {sorted(set(networks))} -> keep {sorted(networks_keep)}")
 
-        # Prefer AdjHE-FE for every atlas (SA via SA/AdjHE_FE_wo_total.json);
-        # fall back to AdjHE-RE when the FE stream has not been run.
-        col_pref = f"h2_{atlas}_AdjHE_FE"
-        col_alt = f"h2_{atlas}_AdjHE_RE"
-        method_label = "AdjHE-FE"
+        # AdjHE-RE is the reported SNP method for every atlas; fall back to
+        # AdjHE-FE only when the RE stream has not been run.
+        col_pref = f"h2_{atlas}_AdjHE_RE"
+        col_alt = f"h2_{atlas}_AdjHE_FE"
+        method_label = "AdjHE-RE"
         col = col_pref
         if col not in wide.columns and col_alt in wide.columns:
             col = col_alt
-            method_label = "AdjHE-RE"
+            method_label = "AdjHE-FE"
         elif col not in wide.columns:
             alt = col.replace("probaConns","proba")
             if alt in wide.columns:
@@ -280,8 +278,8 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
                     sa_h2_entry=sa_key
                 else:
                     sa_h2_entry=sa_key
-                # sa_h2_entry is dict with Twin/AdjHE-FE/AdjHE-RE (wo_total);
-                # the w_total map is Twin/AdjHE-RE only.
+                # sa_h2_entry is a dict keyed by method (Twin, AdjHE-RE); the
+                # reported SNP method is AdjHE-RE throughout.
                 if isinstance(sa_h2_entry, dict):
                     sa_h2 = sa_h2_entry.get(method, np.nan)
                     if not np.isfinite(sa_h2):

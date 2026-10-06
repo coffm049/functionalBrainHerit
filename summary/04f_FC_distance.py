@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-FC heritability vs distance — per edge, both Twin and AdjHE-FE, Euclidean + geodesic.
+FC heritability vs distance — per edge, both Twin and AdjHE-RE, Euclidean + geodesic.
 
-For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-FE, 20 PCs):
+For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-RE, 20 PCs):
   * Rebuild N x N h2 matrix from mash_twin_wide.csv
   * Compute parcel centroids from Conte69 surfaces + dlabel (as in 02a/b)
   * For each edge (i,j) with h2, compute:
@@ -12,7 +12,7 @@ For each atlas (Gordon 352, ProbaConns 80) and each method (Twin, AdjHE-FE, 20 P
 
 Outputs:
   results/summary/fc_distance_per_edge.csv  (atlas, method, i, j, h2, euclidean_dist, geodesic_dist, same_network)
-  results/summary/plots/fc_distance_{atlas}_{method}.png  (scatter, per edge, Twin vs AdjHE-FE separate)
+  results/summary/plots/fc_distance_{atlas}_{method}.png  (scatter, per edge, Twin vs AdjHE-RE separate)
 
 Run:
   .venv/bin/python summary/04f_FC_distance.py
@@ -268,13 +268,14 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
     centroids, centroid_vertex = parcel_centroids(dlabel, N, SURF_L, SURF_R)
     # Try geodesic (will fallback to None) — now returns cache dict
     geo_cache=geodesic_distances_via_wb(SURF_L, SURF_R, centroids, centroid_vertex)
-    # Prefer FE for FC; fall back to RE if not present
-    col_pref = f"h2_{atlas}_AdjHE_FE"
-    col_alt = f"h2_{atlas}_AdjHE_RE"
-    method_label = "AdjHE-FE"
+    # AdjHE-RE is the reported SNP method (it is the only AdjHE variant with a
+    # conditioning screen). Fall back to FE only if RE has not been run.
+    col_pref = f"h2_{atlas}_AdjHE_RE"
+    col_alt = f"h2_{atlas}_AdjHE_FE"
+    method_label = "AdjHE-RE"
     if col_pref not in wide.columns and col_alt in wide.columns:
         col_pref = col_alt
-        method_label = "AdjHE-RE"
+        method_label = "AdjHE-FE"
     elif col_pref not in wide.columns:
         alt = col_pref.replace("probaConns","proba")
         if alt in wide.columns:
@@ -314,7 +315,7 @@ df=pd.DataFrame(rows)
 df.to_csv(OUT_CSV, index=False)
 print(f"Wrote {OUT_CSV} with {len(df)} rows")
 # Scatter + zero-aware smoothed curves per atlas/method.
-# h2 is heavy zero-inflated (AdjHE-FE truncated at 0; Twin near-0): a plain
+# h2 is heavy zero-inflated (AdjHE-RE truncated at 0; Twin near-0): a plain
 # mean/LOESS smooth is dragged to zero, so we show quantile-binned medians:
 #   solid = median of ALL edges per bin (robust to zeros),
 #   dashed = median of h2 > ZERO_EPS per bin (non-zero mass),
