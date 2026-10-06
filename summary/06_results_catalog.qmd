@@ -239,8 +239,9 @@ To keep the summarised distributions on comparable footing, the pipeline
 therefore substitutes a **sign filter**: for streams with no `flag` column
 (GCTA, HEreg) any row with `h2 <= 0` is dropped. This is a sign test, not a
 conditioning screen — it removes clamped negatives but cannot detect a
-well-conditioned solve that is nonetheless unreliable. This is why GCTA returns
-`h2 = 0` for a large fraction of FC edges and is excluded from the panels below.
+well-conditioned solve that is nonetheless unreliable. GCTA returns `h2 = 0` for
+a large fraction of FC edges, which is one reason it is not reported alongside
+AdjHE-RE below.
 
 ### Why AdjHE-RE is the reported SNP method
 
@@ -342,10 +343,12 @@ kable(filter_n0(fivenum_gordon), caption="Gordon — h2 five-number summary (Twi
 
 ```{r gordon-corr}
 corr <- read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="gordon")
+# Report only the AdjHE-RE row; FE/GCTA/HEreg stay in the CSV for 07 diagnostics.
+corr <- corr %>% filter(grepl("AdjHE_RE", MashMethod))
 corr <- corr %>% filter(n != 0)
 # Only Pearson R per user (remove Spearman/R2)
 corr <- corr %>% select(any_of(c("Set","MashMethod","n","Pearson_r"))) %>% mutate(Pearson_r = round(Pearson_r, 3))
-kable(filter_n0(corr), caption="Gordon — Twin vs MASH Pearson R")
+kable(filter_n0(corr), caption="Gordon — Twin vs MASH Pearson R (AdjHE-RE)")
 ```
 
 ### Gordon — Within vs Outside Network h2 (10th, 50th, 90th)
@@ -418,10 +421,12 @@ kable(filter_n0(fivenum_proba), caption="ProbaConns — h2 five-number summary (
 
 ```{r proba-corr}
 corr <- read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="probaConns")
+# Report only the AdjHE-RE row; FE/GCTA/HEreg stay in the CSV for 07 diagnostics.
+corr <- corr %>% filter(grepl("AdjHE_RE", MashMethod))
 # Only Pearson R per user (remove Spearman/R2), filter n=0
 corr <- corr %>% filter(n != 0)
 corr <- corr %>% select(any_of(c("Set","MashMethod","n","Pearson_r"))) %>% mutate(Pearson_r = round(Pearson_r, 3))
-kable(filter_n0(corr), caption="ProbaConns — Twin vs MASH Pearson R")
+kable(filter_n0(corr), caption="ProbaConns — Twin vs MASH Pearson R (AdjHE-RE)")
 ```
 
 ### ProbaConns — Within vs Outside Network h2 (10th, 50th, 90th)
