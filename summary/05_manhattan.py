@@ -322,6 +322,9 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
         small_order = stats.loc[~stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
     connection_order = large_order + small_order
 
+    # Reindex to full shared order so x-axis spans full range even if method
+    # lacks some connections (e.g., Twin missing some Sys-Sys groups)
+    df = df.set_index("connection").reindex(connection_order).reset_index()
     df["connection"] = pd.Categorical(df["connection"], categories=connection_order, ordered=True)
     df = df.sort_values("connection").reset_index(drop=True).reset_index(drop=False).rename(columns={"index": "idx"})
     df["index"] = df["idx"]
