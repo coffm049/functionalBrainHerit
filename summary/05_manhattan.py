@@ -326,6 +326,12 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
     df = df.sort_values("connection").reset_index(drop=True).reset_index(drop=False).rename(columns={"index": "idx"})
     df["index"] = df["idx"]
 
+    # Build a mapping from connection to its position in connection_order
+    # This ensures plot_index spans the full connection_order even if some
+    # connections are missing from this method's data
+    conn_to_pos = {conn: i for i, conn in enumerate(connection_order)}
+    df["conn_pos"] = df["connection"].map(conn_to_pos)
+
     # compute plot_index with 100× compression for the small tail
     # only compress if small groups represent a meaningful fraction (>20%) of connections
     if small_order:
@@ -333,7 +339,7 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
         small_frac = small_mask.sum() / len(df)
         if small_frac > 0.20:  # only compress if small groups are >20% of connections
             try:
-                divider = df.loc[small_mask, "index"].min()
+                divider = float(df.loc[small_mask, "conn_pos"].min())
             except Exception:
                 divider = None
             if pd.isna(divider):
@@ -345,9 +351,13 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
 
     if divider is not None:
         mask_small = df["connection"].isin(small_order)
-        df["plot_index"] = np.where(mask_small, (df["index"].astype(float) - float(divider)) / 100.0 + float(divider), df["index"].astype(float))
+        df["plot_index"] = np.where(
+            mask_small,
+            (df["conn_pos"].astype(float) - float(divider)) / 100.0 + float(divider),
+            df["conn_pos"].astype(float)
+        )
     else:
-        df["plot_index"] = df["index"].astype(float)
+        df["plot_index"] = df["conn_pos"].astype(float)
 
     grouped = df.groupby("connection", observed=True)
 
