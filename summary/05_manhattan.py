@@ -322,9 +322,6 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
         small_order = stats.loc[~stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
     connection_order = large_order + small_order
 
-    # Reindex to full shared order so x-axis spans full range even if method
-    # lacks some connections (e.g., Twin missing some Sys-Sys groups)
-    df = df.set_index("connection").reindex(connection_order).reset_index()
     df["connection"] = pd.Categorical(df["connection"], categories=connection_order, ordered=True)
     df = df.sort_values("connection").reset_index(drop=True).reset_index(drop=False).rename(columns={"index": "idx"})
     df["index"] = df["idx"]
@@ -389,11 +386,21 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
         ax.set_xlabel("")
         ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
 
-    # span whole x-axis: use compressed max, not original (fixes ~25% width bug)
-    xmax = float(df["plot_index"].max())
-    xmin = float(df["plot_index"].min())
-    pad = (xmax - xmin) * 0.015 if xmax > xmin else 1
-    ax.set_xlim([xmin - pad, xmax + pad])
+    # span whole x-axis: use full connection_order range (compressed if applicable)
+    # so that Twin and SNP share the same x-axis span even if some groups are missing
+    full_n = len(connection_order)
+    if divider is not None:
+        # With compression: large groups at full resolution, small groups compressed 100x
+        n_large = len(largest_20)
+        n_small = len(small_order)
+        xmin_full = 0.0
+        xmax_full = float(n_large) + float(n_small) / 100.0
+    else:
+        xmin_full = 0.0
+        xmax_full = float(full_n - 1) if full_n > 0 else 1.0
+
+    pad = (xmax_full - xmin_full) * 0.015 if xmax_full > xmin_full else 1
+    ax.set_xlim([xmin_full - pad, xmax_full + pad])
     ax.set_ylim([0, 1])
     disp = {"gordon": "Gordon", "probaConns": "ProbaConns", "SA": "SA"}.get(atlas, atlas)
     ax.set_ylabel(r"Heritability ($h^2$)", size=11)
