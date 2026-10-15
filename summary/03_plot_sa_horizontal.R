@@ -72,7 +72,10 @@ plot_sa <- function(df, out_path, title_suffix) {
     # bars fell back to the default grey and its legend entry disappeared,
     # leaving a legend that showed only Twin. Keys use the underscore; only the
     # displayed label carries the hyphen.
-    scale_fill_manual(values = c("Twin" = "#1f77b4", "AdjHE_RE" = "#ff7f0e"),
+    # Twin is the accent colour; the SNP series is the recessive one, so it is
+    # grey. This also matches the compressed tail of the Manhattan panels, where
+    # non-highlighted points are drawn in grey.
+    scale_fill_manual(values = c("Twin" = "#1f77b4", "AdjHE_RE" = "grey50"),
                       labels = c("Twin" = "Twin", "AdjHE_RE" = "AdjHE-RE"),
                       drop = FALSE) +
     labs(x = expression(paste("Heritability (", h^2, ")")), y = "", fill = "") +
@@ -81,9 +84,22 @@ plot_sa <- function(df, out_path, title_suffix) {
       axis.text.y = element_text(face = "bold", size = 9, margin = margin(r = 4)),
       axis.text.x = element_text(size = 9, margin = margin(t = 4)),
       axis.title.x = element_text(size = 11, face = "bold", margin = margin(t = 8)),
-      legend.position = "bottom",
+      # Legend sits inside the panel at the bottom right. The SMl and Tpole
+      # networks have no bars, so that corner is reliably empty; legend.position
+      # as a two-element numeric vector places it in normalised panel
+      # coordinates and legend.justification anchors its bottom-right corner,
+      # which keeps it inside the plot area in every ggplot2 since 2.2.
+      legend.position = c(0.99, 0.01),
+      legend.justification = c(1, 0),
       legend.text = element_text(size = 9),
-      legend.margin = margin(t = 4, b = 0),
+      legend.title = element_blank(),
+      legend.margin = margin(4, 4, 4, 4),
+      legend.key.width = grid::unit(16, "pt"),
+      legend.key.height = grid::unit(9, "pt"),
+      # Bars run left to right, so the legend needs its own background to stay
+      # readable where it overlaps the gridlines.
+      legend.background = element_rect(fill = "white", colour = NA, alpha = 0.88),
+      legend.spacing.y = grid::unit(0.5, "lines"),
       panel.grid.major.y = element_blank(),
       panel.grid.minor = element_blank(),
       plot.margin = margin(4, 4, 2, 2),
