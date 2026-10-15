@@ -347,33 +347,37 @@ def _get_shared_order(dfs: dict, order_method: str = "AdjHE-RE"):
         "ref_median", ascending=False, na_position="last").index.tolist()
     small_order = ranked.loc[~ranked.index.isin(largest_20)].sort_values(
         "ref_median", ascending=False, na_position="last").index.tolist()
-    return large_order, small_order, largest_20
+    # Pooled per-group edge counts. The axis geometry is built from these, not
+    # from any one method's counts, so Twin and AdjHE-RE occupy the same axis
+    # while each still spreads its own edges across the full group width.
+    group_counts = pooled.astype(float).to_dict()
+    return large_order, small_order, largest_20, group_counts
 
 
 def prepare_manhattan_df(df, shared_order=None):
     """Sort, position and compress one method's rows for plotting.
 
     Returns (df, layout, large_order, largest_20). Kept separate from drawing so
-    the composite figure script can reuse the same geometry.
+    the geometry can be checked without rendering a figure.
     """
+    group_counts = None
     if shared_order is not None:
-        large_order, small_order, largest_20 = shared_order
+        large_order, small_order, largest_20, group_counts = shared_order
     else:
         stats = df.groupby("connection")["h2"].agg(median="median", size="size")
         largest_20 = stats.sort_values("size", ascending=False).head(20).index.tolist()
         large_order = stats.loc[stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
         small_order = stats.loc[~stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
+        group_counts = stats["size"].astype(float).to_dict()
     connection_order = large_order + small_order
 
-    # Axis geometry is computed from the ordering alone, not from this method's
-    # retained rows, so every panel for an atlas spans the same x-axis even when
-    # a method is missing some Sys-Sys groups (see summary/plotstyle.py).
+    # Axis geometry is computed from the pooled group counts alone, never from
+    # this method's retained rows (see summary/plotstyle.py).
     layout = compute_axis_layout(connection_order, largest_20, small_order,
-                                 n_rows=int(len(df)))
+                                 group_counts=group_counts)
 
     df = df.copy()
-    df["connection"] = pd.Categorical(df["connection"], categories=connection_order, ordered=True)
-    df = df.sort_values("connection").reset_index(drop=True)
+    df["connection"] = df["connection"].astype(str)
     df = apply_plot_index(df, layout, small_order)
     return df, layout, large_order, largest_20
 
@@ -382,10 +386,8 @@ def draw_manhattan_panel(ax, df, layout, large_order, largest_20, atlas=None,
                          xlabel=True):
     """Draw one Manhattan panel into an existing axes.
 
-    Split out of manhattan_for_df so the composite figures can place the
-    Manhattan in a subplot of a larger figure instead of its own canvas. Text
-    sizes come from summary/plotstyle.py so a panel looks the same whether it is
-    standalone or embedded.
+    Split out of manhattan_for_df so the axis geometry and the drawing can be
+    reasoned about separately. Text sizes come from summary/plotstyle.py.
     """
     grouped = df.groupby("connection", observed=True)
 
@@ -398,7 +400,8 @@ def draw_manhattan_panel(ax, df, layout, large_order, largest_20, atlas=None,
         else:
             col = ALT_COLORS[large_order.index(name) % 2]
             alpha, sz = 0.9, 9
-            # midpoint of this Sys-Sys block on the compressed axis
+            # Centre the label on the group's own extent, which is not the
+            # group's slot midpoint now that edges can fill the whole slot.
             mid = float(group["plot_index"].iloc[0] + group["plot_index"].iloc[-1]) / 2.0
             x_labels.append(str(name))
             x_labels_pos.append(mid)
@@ -478,9 +481,8 @@ _WIDE = None
 def load_wide():
     """Read mash_twin_wide.csv once, on demand.
 
-    Kept lazy so this module can be imported (e.g. by
-    make_composite_figures.py, which reuses prepare_manhattan_df and
-    draw_manhattan_panel) without re-running the whole build as a side effect.
+    Kept lazy so importing this module does not trigger the whole build as a
+    side effect.
     """
     global _WIDE
     if _WIDE is None:
@@ -568,13 +570,13 @@ def main():
         # assert it so a future change that reintroduces data dependence fails
         # loudly rather than silently mis-drawing one panel.
         if shared_order is not None:
-            large_order, small_order, largest_20 = shared_order
+            large_order, small_order, largest_20, group_counts = shared_order
             order = large_order + small_order
             ref = compute_axis_layout(order, largest_20, small_order,
-                                      n_rows=int(len(df)))
+                                      group_counts=group_counts)
             for method, mdf in dfs.items():
                 lay = compute_axis_layout(order, largest_20, small_order,
-                                          n_rows=int(len(mdf)))
+                                          group_counts=group_counts)
                 check_layout_agrees(ref, lay, label_a="Twin", label_b=method)
 
         for method, df in dfs.items():
