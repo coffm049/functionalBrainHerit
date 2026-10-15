@@ -33,6 +33,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from plotstyle import (ALT_COLORS, FS_AXIS_LABEL, FS_AXIS_LABEL_X, FS_TICK,
+                       FS_TICK_ROTATED, SMALL_COLOR, apply_plot_index,
+                       check_layout_agrees, compute_axis_layout,
+                       savefig_publication)
+
 ROOT = Path(__file__).resolve().parents[1]
 WIDE = ROOT / "results/summary/mash_twin_wide.csv"
 PLOT_DIR = ROOT / "results/summary/plots"
@@ -297,17 +302,51 @@ def _get_ordering(df, atlas, method):
     return large_order, small_order, largest_20
 
 def _get_shared_order(dfs: dict, order_method: str = "AdjHE-RE"):
-    """Sys-Sys ordering based on a single reference method (default: AdjHE-RE)."""
+    """Sys-Sys ordering shared by every method for one atlas.
+
+    Ranking is by the reference method (AdjHE-RE) median h2, descending, so the
+    panels read left-to-right in order of SNP heritability.
+
+    The ordering covers the UNION of connections across methods, not just the
+    reference method's. Twin retains more phenotypes than AdjHE-RE, so some
+    Sys-Sys groups exist only in Twin; taking the union means every method's
+    groups get a slot on the axis. A union built from the reference method alone
+    left Twin groups with no position at all, which is what made the
+    probaConns Twin panel occupy a fraction of the axis. Groups absent from the
+    reference rank after the reference-ranked ones, ordered by their own median.
+    """
     ref_df = dfs.get(order_method)
     if ref_df is None:
         return None
     ref = ref_df[["connection", "h2"]].dropna()
     if ref.empty:
         return None
-    stats = ref.groupby("connection")["h2"].agg(median="median", size="size")
-    largest_20 = stats.sort_values("size", ascending=False).head(20).index.tolist()
-    large_order = stats.loc[stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
-    small_order = stats.loc[~stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
+
+    ref_stats = ref.groupby("connection", observed=True)["h2"].agg(
+        median="median", size="size")
+
+    # Size ranking prefers the reference method's count, falling back to the
+    # pooled count for groups the reference method never retained -- otherwise a
+    # large group drops out of the top 20 purely because AdjHE-RE dropped it.
+    pooled = pd.concat(
+        [d.groupby("connection", observed=True)["h2"].agg(size="size")
+         for d in dfs.values() if d is not None and not d.empty],
+        axis=1).fillna(0).sum(axis=1)
+    size_rank = ref_stats["size"].reindex(pooled.index).fillna(pooled)
+
+    ranked = pd.DataFrame({
+        "ref_median": ref_stats["median"].reindex(pooled.index),
+        "size": size_rank,
+    })
+    # Reference-ranked first (descending median), then reference-absent groups.
+    ranked = ranked.sort_values(
+        ["ref_median", "size"], ascending=[False, False], na_position="last")
+
+    largest_20 = ranked.sort_values("size", ascending=False).head(20).index.tolist()
+    large_order = ranked.loc[ranked.index.isin(largest_20)].sort_values(
+        "ref_median", ascending=False, na_position="last").index.tolist()
+    small_order = ranked.loc[~ranked.index.isin(largest_20)].sort_values(
+        "ref_median", ascending=False, na_position="last").index.tolist()
     return large_order, small_order, largest_20
 
 
@@ -322,58 +361,33 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
         small_order = stats.loc[~stats.index.isin(largest_20)].sort_values("median", ascending=False).index.tolist()
     connection_order = large_order + small_order
 
+    # Axis geometry is computed from the ordering alone, not from this method's
+    # retained rows, so every panel for an atlas spans the same x-axis even when
+    # a method is missing some Sys-Sys groups (see summary/plotstyle.py).
+    layout = compute_axis_layout(connection_order, largest_20, small_order,
+                                 n_rows=int(len(df)))
+    conn_to_pos = layout["conn_pos"]
+    divider = layout["divider"]
+
     df["connection"] = pd.Categorical(df["connection"], categories=connection_order, ordered=True)
-    df = df.sort_values("connection").reset_index(drop=True).reset_index(drop=False).rename(columns={"index": "idx"})
-    df["index"] = df["idx"]
-
-    # Build a mapping from connection to its position in connection_order
-    # This ensures plot_index spans the full connection_order even if some
-    # connections are missing from this method's data
-    conn_to_pos = {conn: i for i, conn in enumerate(connection_order)}
-    df["conn_pos"] = df["connection"].map(conn_to_pos)
-
-    # compute plot_index with 100× compression for the small tail
-    # only compress if small groups represent a meaningful fraction (>20%) of connections
-    if small_order:
-        small_mask = df["connection"].isin(small_order)
-        small_frac = small_mask.sum() / len(df)
-        if small_frac > 0.20:  # only compress if small groups are >20% of connections
-            try:
-                divider = float(df.loc[small_mask, "conn_pos"].min())
-            except Exception:
-                divider = None
-            if pd.isna(divider):
-                divider = None
-        else:
-            divider = None
-    else:
-        divider = None
-
-    if divider is not None:
-        mask_small = df["connection"].isin(small_order)
-        df["plot_index"] = np.where(
-            mask_small,
-            (df["conn_pos"].astype(float) - float(divider)) / 100.0 + float(divider),
-            df["conn_pos"].astype(float)
-        )
-    else:
-        df["plot_index"] = df["conn_pos"].astype(float)
+    df = df.sort_values("connection").reset_index(drop=True)
+    df = apply_plot_index(df, layout, small_order)
 
     grouped = df.groupby("connection", observed=True)
 
     # wider figsize so the full Sys-Sys axis spans the slide; extra bottom for 45° labels
     fig, ax = plt.subplots(1, figsize=(14, 4.5))
 
-    alt_colors = ["#1f77b4", "#ff7f0e"]
+    alt_colors = ALT_COLORS
     # collect x-labels for the Sys-Sys groups (large 20) — style from 03-matrixManhattan2.py / 03c-matrixManhattan-separate.py
     x_labels = []
     x_labels_pos = []
     for name, group in grouped:
         is_large = name in largest_20
         if not is_large:
-            col, alpha, sz = "grey", 0.35, 6
+            col, alpha, sz = SMALL_COLOR, 0.35, 6
         else:
-            col = alt_colors[large_order.index(name) % 2] if is_large else "grey"
+            col = alt_colors[large_order.index(name) % 2] if is_large else SMALL_COLOR
             alpha, sz = 0.9, 9
             # midpoint of this Sys-Sys block on the compressed axis (cf. 03c: x_labels_pos)
             mid = float(group["plot_index"].iloc[0] + group["plot_index"].iloc[-1]) / 2.0
@@ -388,39 +402,26 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
         x_labels = [x_labels[i] for i in order_idx]
         x_labels_pos = [x_labels_pos[i] for i in order_idx]
         ax.set_xticks(x_labels_pos)
-        ax.set_xticklabels(x_labels, rotation=45, ha="right", fontsize=7, fontweight="bold")
+        ax.set_xticklabels(x_labels, rotation=45, ha="right", fontsize=FS_TICK_ROTATED, fontweight="bold")
         ax.tick_params(axis="x", which="both", bottom=True, top=False, labelbottom=True, pad=2)
-        ax.set_xlabel("Sys-Sys connection", fontsize=10)
+        ax.set_xlabel("Sys-Sys connection", fontsize=FS_AXIS_LABEL_X)
         plt.subplots_adjust(bottom=0.28)
     else:
         ax.set_xlabel("")
         ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
 
-    # span whole x-axis: use full connection_order range (compressed if applicable)
-    # so that Twin and SNP share the same x-axis span even if some groups are missing
-    full_n = len(connection_order)
-    if divider is not None:
-        # With compression: large groups at full resolution, small groups compressed 100x
-        n_large = len(largest_20)
-        n_small = len(small_order)
-        xmin_full = 0.0
-        xmax_full = float(n_large) + float(n_small) / 100.0
-    else:
-        xmin_full = 0.0
-        xmax_full = float(full_n - 1) if full_n > 0 else 1.0
-
-    pad = (xmax_full - xmin_full) * 0.015 if xmax_full > xmin_full else 1
-    ax.set_xlim([xmin_full - pad, xmax_full + pad])
+    # X-axis span comes straight from the shared layout, so Twin and AdjHE-RE
+    # panels for this atlas are guaranteed to be drawn on the same axis.
+    ax.set_xlim(layout["xlim"])
     ax.set_ylim([0, 1])
     disp = {"gordon": "Gordon", "probaConns": "ProbaConns", "SA": "SA"}.get(atlas, atlas)
-    ax.set_ylabel(r"Heritability ($h^2$)", size=11)
+    ax.set_ylabel(r"Heritability ($h^2$)", size=FS_AXIS_LABEL)
     ax.set_yticks([0, 0.25, 0.5, 0.75, 1])
-    ax.set_yticklabels([0, 0.25, 0.5, 0.75, 1], size=9)
+    ax.set_yticklabels([0, 0.25, 0.5, 0.75, 1], size=FS_TICK)
     # Publication-ready: no title, no legend, no annotations, minimal whitespace
     n_rows, n_conn = int(len(df)), int(df["connection"].nunique())
     fig.tight_layout(pad=0.4)
-    plt.savefig(out_path, dpi=300, bbox_inches="tight", pad_inches=0.05)
-    plt.close(fig)
+    savefig_publication(fig, out_path)
     # Save stats for quarto (instead of title numbers). median_h2/mean_h2 are read
     # back by 06_results_catalog.qmd so the per-panel prose can interpolate the
     # FE/RE median ratio instead of hardcoding a number that drifts whenever a
@@ -428,10 +429,18 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
     try:
         stats_out = str(out_path).replace(".png", "_stats.csv")
         _h2 = pd.to_numeric(df["h2"], errors="coerce").dropna()
-        pd.DataFrame([{"atlas": atlas, "method": method, "n": n_rows, "n_connections": n_conn, "groups": int(len(grouped)), "large20": int(len(largest_20)), "divider": float(divider) if divider is not None else np.nan, "xmax_compressed": float(xmax_full), "median_h2": float(_h2.median()) if len(_h2) else np.nan, "mean_h2": float(_h2.mean()) if len(_h2) else np.nan}]).to_csv(stats_out, index=False)
+        # How much of the shared axis this panel actually fills. Below 1.0 the
+        # method retained no rows in some Sys-Sys groups that the shared
+        # ordering still reserves space for. That is expected when a method
+        # drops phenotypes, but it should be visible rather than discovered by
+        # eye, so it is written out next to the xlim.
+        _lo, _hi = layout["xlim"]
+        _span = float(df["plot_index"].max() - df["plot_index"].min()) if n_rows else 0.0
+        _fill = (_span / (_hi - _lo)) if (_hi - _lo) > 0 else 0.0
+        pd.DataFrame([{"atlas": atlas, "method": method, "n": n_rows, "n_connections": n_conn, "groups": int(len(grouped)), "large20": int(len(largest_20)), "divider": float(divider) if divider is not None else np.nan, "xlim_lo": float(_lo), "xlim_hi": float(_hi), "axis_fill_fraction": float(_fill), "median_h2": float(_h2.median()) if len(_h2) else np.nan, "mean_h2": float(_h2.mean()) if len(_h2) else np.nan}]).to_csv(stats_out, index=False)
     except Exception:
         pass
-    print(f"  wrote {out_path}  n={n_rows} conns={n_conn} groups={len(grouped)} large20={len(largest_20)} divider={divider} xmax_compressed={xmax_full:.1f}")
+    print(f"  wrote {out_path}  n={n_rows} conns={n_conn} groups={len(grouped)} large20={len(largest_20)} divider={divider} xlim={layout['xlim']}")
 
 
 wide = pd.read_csv(WIDE)
@@ -506,16 +515,27 @@ for atlas in ["gordon", "probaConns", "SA"]:
 
     shared_order = _get_shared_order(dfs) if dfs else None
 
+    # Guard (plain assert, no pytest): every panel for this atlas must be drawn
+    # on the same x-axis, even though each method retains a different number of
+    # rows. A panel spanning only its own rows was a real bug -- it made the
+    # probaConns Twin panel occupy a fraction of the axis. The layout depends
+    # on the ordering alone, so this should hold by construction; assert it so a
+    # future change that reintroduces data dependence fails loudly.
+    if shared_order is not None:
+        large_order, small_order, largest_20 = shared_order
+        order = large_order + small_order
+        ref = compute_axis_layout(order, largest_20, small_order,
+                                  n_rows=int(len(df)))
+        for method, mdf in dfs.items():
+            lay = compute_axis_layout(order, largest_20, small_order,
+                                      n_rows=int(len(mdf)))
+            check_layout_agrees(ref, lay, label_a="Twin", label_b=method)
+
     for method, df in dfs.items():
         out = PLOT_DIR / f"manhattan_{atlas}_{method.replace('-', '')}.png"
         manhattan_for_df(df, atlas, method, out, shared_order=shared_order)
 
-# ---- Manhattan Overview: rows = atlas, cols = method ----
-# Regenerated alongside the individual panels so every method appears, not
-# only the ordering reference. (The previous version drew just one method per atlas:
-# the drawing block was indented outside the method loop, so `ax` was left
-# pointing at the last method and `method` held that same value.)
-
-# Overview grid disabled per user request
+# The Manhattan overview grid (atlas x method) is intentionally not generated:
+# it was never referenced by the report and duplicated every individual panel.
 
 print("Done.")
