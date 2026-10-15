@@ -35,11 +35,18 @@ SMALL_COLOR = "grey"
 CMAP = "coolwarm"
 
 # --- font scale (points) ----------------------------------------------------
+# One scale for the whole report. A standalone panel and the same panel inside a
+# composite must use the same sizes, or the two disagree once they sit side by
+# side in a manuscript.
+FS_PANEL_LABEL = 11   # short caption above a composite sub-panel
 FS_TITLE = 12
 FS_AXIS_LABEL = 11
-FS_AXIS_LABEL_X = 10
-FS_TICK = 9
-FS_TICK_ROTATED = 7
+FS_AXIS_LABEL_X = 11
+FS_TICK = 10
+# Rotated 45 degree Sys-Sys labels are the densest text in the report, so they
+# sit one step below the tick size rather than far below it -- at 7 pt they were
+# effectively unreadable once the panel was scaled into a composite figure.
+FS_TICK_ROTATED = 9
 
 # --- Manhattan geometry -----------------------------------------------------
 COMPRESS_FACTOR = 100.0
@@ -47,6 +54,21 @@ COMPRESS_FACTOR = 100.0
 # panel. Below this the divider lands too early and squashes the plot.
 MIN_SMALL_FRACTION = 0.20
 XLIM_PAD_FRACTION = 0.015
+
+# --- figure sizes (inches) --------------------------------------------------
+# Wide because a Sys-Sys x-axis carries 20 rotated labels across the full width.
+MANHATTAN_FIGSIZE = (14.0, 4.5)
+# Bottom margin reserved for those rotated labels.
+MANHATTAN_BOTTOM = 0.28
+# Composite layouts. FC stacks a surface above a Manhattan; SA puts a barplot
+# at the left spanning both rows with two surfaces stacked at the right.
+FC_COMPOSITE_FIGSIZE = (13.0, 9.6)
+FC_COMPOSITE_ROWS = (0.44, 0.56)   # (surface, manhattan) height fractions
+SA_COMPOSITE_FIGSIZE = (13.6, 8.4)
+# The barplot is naturally wide-ish (roughly 1.4:1) while its column is tall and
+# narrow, so give it more width than an even split or it letterboxes badly.
+SA_COMPOSITE_BAR_WIDTH = 0.40
+SA_COMPOSITE_ROWS = (0.5, 0.5)
 
 
 def savefig_publication(fig, path, dpi=DPI, bbox=BBOX, pad_inches=PAD_INCHES):

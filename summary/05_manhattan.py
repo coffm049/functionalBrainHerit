@@ -34,9 +34,9 @@ import numpy as np
 import pandas as pd
 
 from plotstyle import (ALT_COLORS, FS_AXIS_LABEL, FS_AXIS_LABEL_X, FS_TICK,
-                       FS_TICK_ROTATED, SMALL_COLOR, apply_plot_index,
-                       check_layout_agrees, compute_axis_layout,
-                       savefig_publication)
+                       FS_TICK_ROTATED, MANHATTAN_BOTTOM, MANHATTAN_FIGSIZE,
+                       SMALL_COLOR, apply_plot_index, check_layout_agrees,
+                       compute_axis_layout, savefig_publication)
 
 ROOT = Path(__file__).resolve().parents[1]
 WIDE = ROOT / "results/summary/mash_twin_wide.csv"
@@ -350,8 +350,12 @@ def _get_shared_order(dfs: dict, order_method: str = "AdjHE-RE"):
     return large_order, small_order, largest_20
 
 
-def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
-    # median h2 and size per Sys-Sys group — if shared_order provided (from SNP), use it for both Twin and SNP per user
+def prepare_manhattan_df(df, shared_order=None):
+    """Sort, position and compress one method's rows for plotting.
+
+    Returns (df, layout, large_order, largest_20). Kept separate from drawing so
+    the composite figure script can reuse the same geometry.
+    """
     if shared_order is not None:
         large_order, small_order, largest_20 = shared_order
     else:
@@ -366,20 +370,25 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
     # a method is missing some Sys-Sys groups (see summary/plotstyle.py).
     layout = compute_axis_layout(connection_order, largest_20, small_order,
                                  n_rows=int(len(df)))
-    conn_to_pos = layout["conn_pos"]
-    divider = layout["divider"]
 
+    df = df.copy()
     df["connection"] = pd.Categorical(df["connection"], categories=connection_order, ordered=True)
     df = df.sort_values("connection").reset_index(drop=True)
     df = apply_plot_index(df, layout, small_order)
+    return df, layout, large_order, largest_20
 
+
+def draw_manhattan_panel(ax, df, layout, large_order, largest_20, atlas=None,
+                         xlabel=True):
+    """Draw one Manhattan panel into an existing axes.
+
+    Split out of manhattan_for_df so the composite figures can place the
+    Manhattan in a subplot of a larger figure instead of its own canvas. Text
+    sizes come from summary/plotstyle.py so a panel looks the same whether it is
+    standalone or embedded.
+    """
     grouped = df.groupby("connection", observed=True)
 
-    # wider figsize so the full Sys-Sys axis spans the slide; extra bottom for 45° labels
-    fig, ax = plt.subplots(1, figsize=(14, 4.5))
-
-    alt_colors = ALT_COLORS
-    # collect x-labels for the Sys-Sys groups (large 20) — style from 03-matrixManhattan2.py / 03c-matrixManhattan-separate.py
     x_labels = []
     x_labels_pos = []
     for name, group in grouped:
@@ -387,40 +396,56 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
         if not is_large:
             col, alpha, sz = SMALL_COLOR, 0.35, 6
         else:
-            col = alt_colors[large_order.index(name) % 2] if is_large else SMALL_COLOR
+            col = ALT_COLORS[large_order.index(name) % 2]
             alpha, sz = 0.9, 9
-            # midpoint of this Sys-Sys block on the compressed axis (cf. 03c: x_labels_pos)
+            # midpoint of this Sys-Sys block on the compressed axis
             mid = float(group["plot_index"].iloc[0] + group["plot_index"].iloc[-1]) / 2.0
             x_labels.append(str(name))
             x_labels_pos.append(mid)
-        ax.scatter(group["plot_index"], group["h2"], color=col, s=sz, alpha=alpha, zorder=10, linewidths=0.3, edgecolors="black" if is_large else "none")
+        ax.scatter(group["plot_index"], group["h2"], color=col, s=sz, alpha=alpha,
+                   zorder=10, linewidths=0.3,
+                   edgecolors="black" if is_large else "none")
 
-    # Sys-Sys x-labels (cf. 03c-matrixManhattan-separate.py: ax.set_xticks / set_xticklabels rotation 45 bold)
     if x_labels:
-        # order labels by their position (already ordered by large_order median, but sort by pos to be safe)
         order_idx = np.argsort(x_labels_pos)
         x_labels = [x_labels[i] for i in order_idx]
         x_labels_pos = [x_labels_pos[i] for i in order_idx]
         ax.set_xticks(x_labels_pos)
-        ax.set_xticklabels(x_labels, rotation=45, ha="right", fontsize=FS_TICK_ROTATED, fontweight="bold")
-        ax.tick_params(axis="x", which="both", bottom=True, top=False, labelbottom=True, pad=2)
-        ax.set_xlabel("Sys-Sys connection", fontsize=FS_AXIS_LABEL_X)
-        plt.subplots_adjust(bottom=0.28)
+        ax.set_xticklabels(x_labels, rotation=45, ha="right",
+                           fontsize=FS_TICK_ROTATED, fontweight="bold")
+        ax.tick_params(axis="x", which="both", bottom=True, top=False,
+                       labelbottom=True, pad=2)
+        if xlabel:
+            ax.set_xlabel("Sys-Sys connection", fontsize=FS_AXIS_LABEL_X)
     else:
         ax.set_xlabel("")
-        ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
+        ax.tick_params(axis="x", which="both", bottom=False, top=False,
+                       labelbottom=False)
 
     # X-axis span comes straight from the shared layout, so Twin and AdjHE-RE
     # panels for this atlas are guaranteed to be drawn on the same axis.
     ax.set_xlim(layout["xlim"])
     ax.set_ylim([0, 1])
-    disp = {"gordon": "Gordon", "probaConns": "ProbaConns", "SA": "SA"}.get(atlas, atlas)
     ax.set_ylabel(r"Heritability ($h^2$)", size=FS_AXIS_LABEL)
     ax.set_yticks([0, 0.25, 0.5, 0.75, 1])
     ax.set_yticklabels([0, 0.25, 0.5, 0.75, 1], size=FS_TICK)
-    # Publication-ready: no title, no legend, no annotations, minimal whitespace
-    n_rows, n_conn = int(len(df)), int(df["connection"].nunique())
-    fig.tight_layout(pad=0.4)
+    return x_labels
+
+
+def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
+    df, layout, large_order, largest_20 = prepare_manhattan_df(df, shared_order)
+    divider = layout["divider"]
+
+    # wider figsize so the full Sys-Sys axis spans the slide; extra bottom for 45° labels
+    fig, ax = plt.subplots(1, figsize=MANHATTAN_FIGSIZE)
+
+    grouped = df.groupby("connection", observed=True)
+    draw_manhattan_panel(ax, df, layout, large_order, largest_20, atlas=atlas)
+    if len(ax.get_xticklabels()):
+        # extra bottom margin for the rotated 45° Sys-Sys labels
+        fig.subplots_adjust(bottom=MANHATTAN_BOTTOM)
+    else:
+        fig.tight_layout(pad=0.4)
     savefig_publication(fig, out_path)
     # Save stats for quarto (instead of title numbers). median_h2/mean_h2 are read
     # back by 06_results_catalog.qmd so the per-panel prose can interpolate the
@@ -429,6 +454,8 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
     try:
         stats_out = str(out_path).replace(".png", "_stats.csv")
         _h2 = pd.to_numeric(df["h2"], errors="coerce").dropna()
+        n_rows, n_conn = int(len(df)), int(df["connection"].nunique())
+        grouped = df.groupby("connection", observed=True)
         # How much of the shared axis this panel actually fills. Below 1.0 the
         # method retained no rows in some Sys-Sys groups that the shared
         # ordering still reserves space for. That is expected when a method
@@ -443,8 +470,22 @@ def manhattan_for_df(df, atlas, method, out_path, shared_order=None):
     print(f"  wrote {out_path}  n={n_rows} conns={n_conn} groups={len(grouped)} large20={len(largest_20)} divider={divider} xlim={layout['xlim']}")
 
 
-wide = pd.read_csv(WIDE)
 set_N = {"gordon": 352, "probaConns": 80, "SA": 17}
+
+_WIDE = None
+
+
+def load_wide():
+    """Read mash_twin_wide.csv once, on demand.
+
+    Kept lazy so this module can be imported (e.g. by
+    make_composite_figures.py, which reuses prepare_manhattan_df and
+    draw_manhattan_panel) without re-running the whole build as a side effect.
+    """
+    global _WIDE
+    if _WIDE is None:
+        _WIDE = pd.read_csv(WIDE)
+    return _WIDE
 
 # Which h2 columns to plot, per atlas, in panel order. AdjHE-RE is the single
 # reported SNP method: it is the only AdjHE variant that applies a conditioning
@@ -475,6 +516,7 @@ OVERVIEW_COLS = ["Twin", "AdjHE-RE"]
 
 def _resolve_col(col):
     """The column present in `wide`, tolerating a renamed proba stream label."""
+    wide = load_wide()
     if col in wide.columns:
         return col
     alt = col.replace("h2_proba_", "h2_probaConns_")
@@ -483,6 +525,7 @@ def _resolve_col(col):
 
 def specs_for(atlas):
     """(method, column) pairs for `atlas` that actually carry data."""
+    wide = load_wide()
     sub = wide[wide["Set"] == atlas]
     out = []
     for method, col in METHOD_SPECS[atlas]:
@@ -497,45 +540,52 @@ def specs_for(atlas):
     return out
 
 
-for atlas in ["gordon", "probaConns", "SA"]:
-    N = set_N[atlas]
-    specs = specs_for(atlas)
-    if not specs:
-        continue
-
-    dfs = {}
-    for method, col in specs:
-        df = build_long_for_set(wide, atlas, N, col)
-        if df.empty:
-            print(f"skip {atlas} {method}: empty df")
+def main():
+    wide = load_wide()
+    for atlas in ["gordon", "probaConns", "SA"]:
+        N = set_N[atlas]
+        specs = specs_for(atlas)
+        if not specs:
             continue
-        dfs[method] = df
-    if not dfs:
-        continue
 
-    shared_order = _get_shared_order(dfs) if dfs else None
+        dfs = {}
+        for method, col in specs:
+            df = build_long_for_set(wide, atlas, N, col)
+            if df.empty:
+                print(f"skip {atlas} {method}: empty df")
+                continue
+            dfs[method] = df
+        if not dfs:
+            continue
 
-    # Guard (plain assert, no pytest): every panel for this atlas must be drawn
-    # on the same x-axis, even though each method retains a different number of
-    # rows. A panel spanning only its own rows was a real bug -- it made the
-    # probaConns Twin panel occupy a fraction of the axis. The layout depends
-    # on the ordering alone, so this should hold by construction; assert it so a
-    # future change that reintroduces data dependence fails loudly.
-    if shared_order is not None:
-        large_order, small_order, largest_20 = shared_order
-        order = large_order + small_order
-        ref = compute_axis_layout(order, largest_20, small_order,
-                                  n_rows=int(len(df)))
-        for method, mdf in dfs.items():
-            lay = compute_axis_layout(order, largest_20, small_order,
-                                      n_rows=int(len(mdf)))
-            check_layout_agrees(ref, lay, label_a="Twin", label_b=method)
+        shared_order = _get_shared_order(dfs)
 
-    for method, df in dfs.items():
-        out = PLOT_DIR / f"manhattan_{atlas}_{method.replace('-', '')}.png"
-        manhattan_for_df(df, atlas, method, out, shared_order=shared_order)
+        # Guard (plain assert, no pytest): every panel for this atlas must be
+        # drawn on the same x-axis, even though each method retains a different
+        # number of rows. A panel spanning only its own rows was a real bug -- it
+        # made the probaConns Twin panel occupy a fraction of the axis. The
+        # layout depends on the ordering alone, so this holds by construction;
+        # assert it so a future change that reintroduces data dependence fails
+        # loudly rather than silently mis-drawing one panel.
+        if shared_order is not None:
+            large_order, small_order, largest_20 = shared_order
+            order = large_order + small_order
+            ref = compute_axis_layout(order, largest_20, small_order,
+                                      n_rows=int(len(df)))
+            for method, mdf in dfs.items():
+                lay = compute_axis_layout(order, largest_20, small_order,
+                                          n_rows=int(len(mdf)))
+                check_layout_agrees(ref, lay, label_a="Twin", label_b=method)
+
+        for method, df in dfs.items():
+            out = PLOT_DIR / f"manhattan_{atlas}_{method.replace('-', '')}.png"
+            manhattan_for_df(df, atlas, method, out, shared_order=shared_order)
+
+    print("Done.")
+
 
 # The Manhattan overview grid (atlas x method) is intentionally not generated:
 # it was never referenced by the report and duplicated every individual panel.
 
-print("Done.")
+if __name__ == "__main__":
+    main()

@@ -66,7 +66,15 @@ plot_sa <- function(df, out_path, title_suffix) {
     ggplot(aes(y = pheno_label, x = h2, fill = Type)) +
     geom_col(position = position_dodge2(width = 0.8, preserve = "single"), width = 0.7) +
     scale_x_continuous(limits = c(0, 0.5), breaks = seq(0, 0.5, 0.1), expand = expansion(mult = c(0, 0.02))) +
-    scale_fill_manual(values = c("Twin" = "#1f77b4", "AdjHE-RE" = "#ff7f0e"), labels = c("Twin", "AdjHE-RE")) +
+    # Data levels are "Twin" / "AdjHE_RE" (underscore -- that is what the
+    # pivot_longer and recode calls produce). The keys below must match the data
+    # exactly or scale_fill_manual silently drops the unmatched level: AdjHE_RE
+    # bars fell back to the default grey and its legend entry disappeared,
+    # leaving a legend that showed only Twin. Keys use the underscore; only the
+    # displayed label carries the hyphen.
+    scale_fill_manual(values = c("Twin" = "#1f77b4", "AdjHE_RE" = "#ff7f0e"),
+                      labels = c("Twin" = "Twin", "AdjHE_RE" = "AdjHE-RE"),
+                      drop = FALSE) +
     labs(x = expression(paste("Heritability (", h^2, ")")), y = "", fill = "") +
     theme_minimal(base_size = 11) +
     theme(

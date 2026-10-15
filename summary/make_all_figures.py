@@ -56,6 +56,7 @@ STAGES = [
     ("proba-brain", "02b_brain_probaconns.py", "ProbaConns surfaces + chords"),
     ("sa-brain-wo", "02c_brain_sa.py", "SA wo_total surfaces"),
     ("sa-brain-wtot", "02d_brain_sa_total.py", "SA w_total surfaces"),
+    ("trim", "trim_png_margins.py", "crop white margins from brain figures"),
 ]
 
 # Produced by the R scripts, run separately in the gdc env.
@@ -83,9 +84,15 @@ def _run(name: str, script: str, desc: str) -> int:
         print(f"  SKIP {name}: {script} not found")
         return 1
     print(f"\n=== {name}: {desc}")
-    print(f"    python {path.relative_to(ROOT)}")
+    # The trim stage edits the files the brain stages just wrote, so it runs
+    # in place and keeps a .orig copy.
+    argv = [sys.executable, str(path)]
+    if name == "trim":
+        argv += ["--dir", str(ROOT / "results" / "summary" / "brain"),
+                 "--inplace", "--backup"]
+    print(f"    {' '.join(argv[1:])}")
     t0 = time.time()
-    proc = subprocess.run([sys.executable, str(path)], cwd=str(ROOT))
+    proc = subprocess.run(argv, cwd=str(ROOT))
     dt = time.time() - t0
     if proc.returncode != 0:
         print(f"    FAILED ({proc.returncode}) after {dt:.1f}s")
