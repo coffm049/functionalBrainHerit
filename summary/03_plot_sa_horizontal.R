@@ -61,11 +61,24 @@ plot_sa <- function(df, out_path, title_suffix) {
     write_csv(cor_df %>% mutate(suffix = title_suffix), stats_path)
   }, error = function(e) NULL)
 
+  # X-scale constants, declared here because the legend anchor is derived from
+  # them. ggplot2 places legends in normalised panel coordinates, so a data
+  # value like 0.4 has to be converted before it can be used as a position.
+  x_lim <- c(0, 0.5)
+  x_expand_right <- 0.02            # matches expansion(mult = c(0, 0.02))
+  legend_anchor_x <- 0.4            # data value the legend's right edge sits on
+  # The right expansion widens the drawn panel to 0.5 * 1.02, so the panel span
+  # is larger than the raw limit range and the 0.4 mark sits left of where a
+  # naive 0.4/0.5 would put it.
+  x_panel_span <- diff(x_lim) * (1 + x_expand_right)
+  legend_pos_x <- legend_anchor_x / x_panel_span
+
   p <- df %>%
     mutate(pheno_label = factor(pheno_label, levels = twin_order)) %>%
     ggplot(aes(y = pheno_label, x = h2, fill = Type)) +
     geom_col(position = position_dodge2(width = 0.8, preserve = "single"), width = 0.7) +
-    scale_x_continuous(limits = c(0, 0.5), breaks = seq(0, 0.5, 0.1), expand = expansion(mult = c(0, 0.02))) +
+    scale_x_continuous(limits = x_lim, breaks = seq(x_lim[1], x_lim[2], by = 0.1),
+                       expand = expansion(mult = c(0, x_expand_right))) +
     # Data levels are "Twin" / "AdjHE_RE" (underscore -- that is what the
     # pivot_longer and recode calls produce). The keys below must match the data
     # exactly or scale_fill_manual silently drops the unmatched level: AdjHE_RE
@@ -83,19 +96,19 @@ plot_sa <- function(df, out_path, title_suffix) {
     # the legend is reversed to match that top-to-bottom reading order instead of
     # listing the series in the opposite sequence.
     guides(fill = guide_legend(reverse = TRUE)) +
-    theme_minimal(base_size = 11) +
+    theme_minimal(base_size = 13) +
     theme(
-      axis.text.y = element_text(face = "bold", size = 9, margin = margin(r = 4)),
-      axis.text.x = element_text(size = 9, margin = margin(t = 4)),
-      axis.title.x = element_text(size = 11, face = "bold", margin = margin(t = 8)),
-      # Legend sits inside the panel at the bottom right. The SMl and Tpole
-      # networks have no bars, so that corner is reliably empty; legend.position
-      # as a two-element numeric vector places it in normalised panel
-      # coordinates and legend.justification anchors its bottom-right corner,
-      # which keeps it inside the plot area in every ggplot2 since 2.2.
-      legend.position = c(0.99, 0.01),
+      axis.text.y = element_text(face = "bold", size = 11, margin = margin(r = 4)),
+      axis.text.x = element_text(size = 11, margin = margin(t = 4)),
+      axis.title.x = element_text(size = 13, face = "bold", margin = margin(t = 8)),
+      # Legend sits inside the panel, its right edge anchored on the 0.4 mark of
+      # the h2 axis. SMl and Tpole have no bars, so that corner is reliably
+      # empty. legend.position as a two-element numeric vector is in normalised
+      # panel coordinates and legend.justification anchors the box's own
+      # bottom-right corner there; the data value is converted via legend_pos_x.
+      legend.position = c(legend_pos_x, 0.01),
       legend.justification = c(1, 0),
-      legend.text = element_text(size = 8),
+      legend.text = element_text(size = 10),
       legend.title = element_blank(),
       legend.margin = margin(3, 3, 3, 3),
       # Small fixed keys. The legend occupies one corner of a 7x5 in figure, and
@@ -118,7 +131,9 @@ plot_sa <- function(df, out_path, title_suffix) {
       plot.title = element_blank(),
       plot.subtitle = element_blank()
     )
-  ggsave(out_path, p, width = 7, height = 5, dpi = 300)
+  # Canvas grew with the text: +2pt on the axis labels and base_size is what the
+  # 11pt network names and title were scaled from.
+  ggsave(out_path, p, width = 8, height = 6, dpi = 300)
   message("Wrote ", out_path)
   print(cor_df)
 }
