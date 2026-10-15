@@ -18,6 +18,10 @@ import re
 import numpy as np
 import pandas as pd
 import nibabel as nib
+
+# Imaging Neuroscience requires Arial/Helvetica in figures; importing this
+# module applies it. See summary/figure_font.py.
+import figure_font  # noqa: F401
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt

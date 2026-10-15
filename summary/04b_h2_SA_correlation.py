@@ -28,6 +28,10 @@ import numpy as np
 import pandas as pd
 import nibabel as nib
 
+# Imaging Neuroscience requires Arial/Helvetica in figures; importing this
+# module applies it. See summary/figure_font.py.
+import figure_font  # noqa: F401
+
 ROOT = Path(__file__).resolve().parents[1]
 WIDE = ROOT / "results/summary/mash_twin_wide.csv"
 OUT_CSV = ROOT / "results/summary/sa_fc_h2_correlation.csv"

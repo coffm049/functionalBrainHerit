@@ -24,6 +24,10 @@ from __future__ import annotations
 
 import matplotlib.pyplot as plt
 
+# Imaging Neuroscience requires Arial or Helvetica in figures. Importing this
+# module sets that, so every script that imports plotstyle inherits it.
+from figure_font import RESOLVED_FONT, apply_font  # noqa: F401
+
 # --- publication output -----------------------------------------------------
 DPI = 300
 BBOX = "tight"

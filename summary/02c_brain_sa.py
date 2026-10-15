@@ -31,6 +31,10 @@ import pandas as pd
 import nibabel as nib
 import nilearn.plotting as niplot
 
+# Imaging Neuroscience requires Arial/Helvetica in figures; importing this
+# module applies it. See summary/figure_font.py.
+import figure_font  # noqa: F401
+
 
 def _display_tag(tag: str) -> str:
     parts = tag.split("_")

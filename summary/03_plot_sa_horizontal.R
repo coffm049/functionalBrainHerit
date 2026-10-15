@@ -96,7 +96,7 @@ plot_sa <- function(df, out_path, title_suffix) {
     # the legend is reversed to match that top-to-bottom reading order instead of
     # listing the series in the opposite sequence.
     guides(fill = guide_legend(reverse = TRUE)) +
-    theme_minimal(base_size = 13) +
+    theme_minimal(base_size = 13, base_family = "Arial") +
     theme(
       axis.text.y = element_text(face = "bold", size = 11, margin = margin(r = 4)),
       axis.text.x = element_text(size = 11, margin = margin(t = 4)),
