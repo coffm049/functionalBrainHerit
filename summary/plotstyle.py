@@ -165,21 +165,25 @@ def apply_plot_index(df, layout, small_order, compress_factor=COMPRESS_FACTOR):
     df = df.sort_values("connection", kind="stable")
     # rank within group, in row order, so the layout is reproducible
     df["_rank"] = df.groupby("connection", observed=True).cumcount()
+    # how many edges THIS method retains in each group
+    df["_own"] = df.groupby("connection", observed=True)["connection"].transform("size")
     df["_start"] = df["connection"].map(slot_start).astype(float)
     df["_width"] = df["connection"].map(slot_width).astype(float)
 
-    # Spread this method's own edges evenly across the group's pooled slot.
-    # Using the method's own rank (not its own count) is what keeps two methods
-    # on the same axis while still filling the full width of a big group.
-    denom = df["_width"].where(df["_width"] > 0, 1.0)
-    df["plot_index"] = df["_start"] + (df["_rank"] + 0.5) / denom * df["_width"]
+    # Spread this method's own edges across the whole of the group's pooled
+    # slot: first edge at slot start + half a step, last at the slot end. A
+    # method that retains fewer edges than the pooled count therefore fills its
+    # slot at lower density instead of leaving a blank gap before the next pair.
+    own = df["_own"].where(df["_own"] > 0, 1.0).astype(float)
+    width = df["_width"].where(df["_width"] > 0, 1.0).astype(float)
+    df["plot_index"] = df["_start"] + (df["_rank"] + 0.5) / own * width
 
     if divider is not None:
         mask_small = df["connection"].isin(set(small_order))
         df.loc[mask_small, "plot_index"] = (
             divider + (df.loc[mask_small, "plot_index"] - divider) / compress_factor)
 
-    df = df.drop(columns=["_rank", "_start", "_width"])
+    df = df.drop(columns=["_rank", "_own", "_start", "_width"])
     if np.isnan(df["plot_index"]).any():
         raise ValueError("plot_index contains NaN after layout")
     return df
