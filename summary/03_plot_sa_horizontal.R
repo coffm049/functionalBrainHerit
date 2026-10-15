@@ -79,6 +79,10 @@ plot_sa <- function(df, out_path, title_suffix) {
                       labels = c("Twin" = "Twin", "AdjHE_RE" = "AdjHE-RE"),
                       drop = FALSE) +
     labs(x = expression(paste("Heritability (", h^2, ")")), y = "", fill = "") +
+    # Within each network the dodged bars run Twin on top and AdjHE-RE below, so
+    # the legend is reversed to match that top-to-bottom reading order instead of
+    # listing the series in the opposite sequence.
+    guides(fill = guide_legend(reverse = TRUE)) +
     theme_minimal(base_size = 11) +
     theme(
       axis.text.y = element_text(face = "bold", size = 9, margin = margin(r = 4)),
@@ -91,15 +95,22 @@ plot_sa <- function(df, out_path, title_suffix) {
       # which keeps it inside the plot area in every ggplot2 since 2.2.
       legend.position = c(0.99, 0.01),
       legend.justification = c(1, 0),
-      legend.text = element_text(size = 9),
+      legend.text = element_text(size = 8),
       legend.title = element_blank(),
-      legend.margin = margin(4, 4, 4, 4),
-      legend.key.width = grid::unit(16, "pt"),
-      legend.key.height = grid::unit(9, "pt"),
+      legend.margin = margin(3, 3, 3, 3),
+      # Small fixed keys. The legend occupies one corner of a 7x5 in figure, and
+      # the default keys are sized in text lines, so they made the box compete
+      # with the data for attention.
+      legend.key.width = grid::unit(11, "pt"),
+      legend.key.height = grid::unit(7, "pt"),
+      legend.spacing.x = grid::unit(2, "pt"),
       # Bars run left to right, so the legend needs its own background to stay
-      # readable where it overlaps the gridlines.
-      legend.background = element_rect(fill = "white", colour = NA, alpha = 0.88),
-      legend.spacing.y = grid::unit(0.5, "lines"),
+      # readable where it overlaps the gridlines. element_rect takes no `alpha`
+      # argument -- passing one raises "`...` must be empty" and the rect falls
+      # back to opaque. The translucency has to live in the colour itself, via
+      # alpha() from scales.
+      legend.background = element_rect(fill = alpha("white", 0.88), colour = NA),
+      legend.spacing.y = grid::unit(0.1, "lines"),
       panel.grid.major.y = element_blank(),
       panel.grid.minor = element_blank(),
       plot.margin = margin(4, 4, 2, 2),
