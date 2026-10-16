@@ -35,20 +35,46 @@ theme_set(theme_minimal(base_family = BASE_FAMILY))
 theme_update(base_family = BASE_FAMILY,
              text = element_text(family = BASE_FAMILY))
 
-# Report what the family actually resolves to, so the log records the real font
-# rather than the requested one. systemfonts will substitute if Arial is absent,
-# which is worth knowing before submission.
+# Report what the family will actually resolve to, so the log records the real
+# font rather than the requested one.
+#
+# Arial is proprietary and is generally NOT installed on a Linux cluster, and
+# systemfonts::match_fonts() cannot be used to detect that: given a family that
+# does not exist at all it still returns a fallback font rather than failing. So
+# presence is checked directly against the enumerated family list instead.
+#
+# What matters for the journal is that the rendered glyphs match Arial.
+# Liberation Sans / Arimo are metric-compatible with Arial and are what
+# fontconfig substitutes for it by default, so those are reported as acceptable.
+# Only a total absence of both Arial and a substitute is a real failure, because
+# then the figures fall back to DejaVu Sans, which does not meet the rule.
 .report_font <- function() {
-  if (!requireNamespace("systemfonts", quietly = TRUE)) return(invisible(NULL))
-  fams <- tryCatch(systemfonts::system_fonts()$family, error = function(e) character())
-  hit <- grep("^arial$", fams, ignore.case = TRUE, value = TRUE)
-  if (length(hit)) {
+  if (!requireNamespace("systemfonts", quietly = TRUE)) {
+    message("plotstyle: systemfonts not installed, cannot verify the font.")
+    return(invisible(NULL))
+  }
+  fams <- tryCatch(unique(systemfonts::system_fonts()$family),
+                   error = function(e) character())
+  has_arial <- any(tolower(fams) == "arial")
+
+  # Metric-compatible substitutes, best first.
+  subs <- c("liberation sans", "arimo", "nimbus sans", "helvetica")
+  # which() over subs (not over fams) so the indices address the candidate list,
+  # and so a single match cannot recycle and pick the wrong entry.
+  hit <- subs[which(subs %in% tolower(fams))]
+
+  if (has_arial) {
     message("plotstyle: Arial present; figures will render in Arial.")
+  } else if (length(hit)) {
+    message("plotstyle: Arial itself is not installed. fontconfig will render ",
+            hit[1], ", which is metric-compatible with Arial and is the normal ",
+            "Linux substitute. The font embedded in the output will be named ",
+            hit[1], ", not Arial.")
   } else {
-    sub <- grep("liberation ?sans|helvetica|nimbus ?sans|dejavu ?sans",
-                fams, ignore.case = TRUE, value = TRUE)
-    message("plotstyle: WARNING Arial not installed; closest match(es): ",
-            paste(utils::head(unique(sub), 3), collapse = ", "))
+    message("plotstyle: WARNING neither Arial nor a metric-compatible ",
+            "substitute (", paste(subs, collapse = "/"), ") is installed. ",
+            "Figures will fall back to the default sans (usually DejaVu Sans), ",
+            "which does NOT meet the Arial/Helvetica requirement.")
   }
   invisible(NULL)
 }
