@@ -24,8 +24,12 @@ execute:
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(knitr)
-ROOT <- "/users/4/coffm049/papers/functionalBrainHerit"
-# For local render (Windows) the same relative paths work; ROOT not needed for images
+# Repository root. Defaults to the HPC path so existing invocations are
+# unaffected; set FBH_ROOT to render anywhere else, e.g.
+#   FBH_ROOT=/path/to/functionalBrainHerit quarto render summary/06_results_catalog.qmd
+# Chunks below read their inputs through ROOT, so a hardcoded value makes the
+# catalog impossible to check without the cluster.
+ROOT <- Sys.getenv("FBH_ROOT", "/users/4/coffm049/papers/functionalBrainHerit")
 WIDE <- file.path(ROOT, "results/summary/mash_twin_wide.csv")
 wide <- read_csv(WIDE, show_col_types = FALSE)
 
@@ -106,6 +110,28 @@ filter_n0 <- function(df) {
   if ("n_networks" %in% names(df)) df <- df %>% filter(n_networks != 0)
   if ("n_pheno" %in% names(df)) df <- df %>% filter(n_pheno != 0)
   df
+}
+
+# Some producing scripts need brainTemplates and cannot run on a laptop, so
+# their output can be present but empty. Reading such a file should not abort the
+# whole render; report it in the output instead, and say which script to re-run.
+read_or_note <- function(path, producer) {
+  if (!file.exists(path)) {
+    message("NOTE: missing ", basename(path), " -- run ", producer)
+    return(NULL)
+  }
+  d <- suppressWarnings(read_csv(path, show_col_types = FALSE))
+  if (nrow(d) == 0) {
+    message("NOTE: ", basename(path), " is empty -- run ", producer)
+    return(NULL)
+  }
+  d
+}
+
+note_table <- function(path, producer) {
+  kable(data.frame(
+    note = paste0(basename(path), " is unavailable. Re-run ", producer, " on the HPC.")),
+    caption = "Data not available")
 }
 ```
 
@@ -573,7 +599,11 @@ kable(filter_n0(wo %>% select(atlas, method, group, n, mean, p10, p50, p90)), ca
 #| fig-width: 10
 #| fig-height: 5
 corr_path <- file.path(ROOT, "results/summary/sa_fc_h2_correlation.csv")
-corr_sa_fc <- read_csv(corr_path, show_col_types = FALSE)
+PRODUCER <- "summary/04b_h2_SA_correlation.py"
+corr_sa_fc <- read_or_note(corr_path, PRODUCER)
+if (is.null(corr_sa_fc)) {
+  note_table(corr_path, PRODUCER)
+} else {
 # Wide format: one column per method (Twin, AdjHE-RE), drop n_networks
 corr_sa_fc <- corr_sa_fc %>% filter(n_networks != 0)
 corr_wide <- corr_sa_fc %>%
@@ -584,7 +614,8 @@ corr_wide <- corr_sa_fc %>%
 # Order columns Twin then the reported SNP method (AdjHE-RE for all atlases)
 mcols <- intersect(c("Twin","AdjHE-RE"), names(corr_wide))
 corr_wide <- corr_wide %>% select(any_of(c("atlas","metric","sa_type")), all_of(mcols))
-kable(corr_wide, caption="SA-FC h2 by system: Pearson R of FC parcel-mean / p90 / within / outside h2 vs SA h2 (14 nets; rows = atlas × metric × SA type; SNP = AdjHE-RE for all atlases, falling back to AdjHE-FE where no RE run exists)")
+  kable(corr_wide, caption="SA-FC h2 by system: Pearson R of FC parcel-mean / p90 / within / outside h2 vs SA h2 (14 nets; rows = atlas A- metric A- SA type; SNP = AdjHE-RE for all atlases, falling back to AdjHE-FE where no RE run exists)")
+}
 ```
 
 ```{r sa-fc-scatter}
@@ -592,7 +623,11 @@ kable(corr_wide, caption="SA-FC h2 by system: Pearson R of FC parcel-mean / p90 
 #| fig-height: 5
 # SA h2 (x) vs FC within-system / outside-system h2 (y) per network — within vs across w.r.t. SA
 detail_path <- file.path(ROOT, "results/summary/sa_fc_per_network.csv")
-det <- read_csv(detail_path, show_col_types = FALSE)
+PRODUCER <- "summary/04b_h2_SA_correlation.py"
+det <- read_or_note(detail_path, PRODUCER)
+if (is.null(det)) {
+  note_table(detail_path, PRODUCER)
+} else {
 det_long <- det %>% select(any_of(c("atlas","method","sa_type","network","sa_h2","fc_within","fc_outside"))) %>%
   pivot_longer(c(fc_within, fc_outside), names_to = "metric", values_to = "fc_h2") %>%
   mutate(metric = recode(metric, fc_within = "within-system", fc_outside = "outside-system")) %>%
@@ -604,6 +639,7 @@ p <- ggplot(det_long, aes(x = sa_h2, y = fc_h2, color = metric)) +
   labs(x = "SA h2 per network", y = "FC h2 per network", color = "FC edges") +
   theme_minimal(base_size = 11)
 print(p)
+}
 ```
 
 ```{r sa-bar-stats}
