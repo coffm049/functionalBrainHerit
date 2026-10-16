@@ -787,24 +787,30 @@ kable(filter_n0(r2), caption="SA w_total vs wo_total — Pearson R (per Method)"
 This appendix provides the quantitative comparison between GCTA GREML, AdjHE-RE, and Twin heritability estimates for the Gordon atlas (352 parcels, 61,776 connections).
 
 ```{r gcta-appendix-table}
-# Load correlations_by_set for GCTA stats
-corr <- read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>%
-  filter(MashMethod %in% c("AdjHE_RE", "GCTA")) %>%
-  filter(n != 0)
+# All statistics come from WIDE (mash_twin_wide.csv), the same source as the
+# figures and Tables 1-6, so this appendix cannot drift from the rest of the
+# report. Nothing is read from correlations_by_set.csv.
 
 # Wide table for retention and distribution stats
 gcta_col <- "h2_gordon_GCTA"
 adjhe_col <- gordon_col
 
 # Retention and zero fraction
+# Threshold is 1e-6, matching Table 5, NOT the 1e-9 used for Table 3's
+# "Zero n" column. The two measure different things and both are reported:
+#   <= 1e-9  near-exact zeros, i.e. phenotypes with no detectable h2
+#   <= 1e-6  the GCTA sentinel as well, which is what makes GCTA's pile-up
+#            visible. At 1e-9 GCTA shows 0.0% and the sensitivity argument
+#            disappears.
+FLOOR <- 1e-6
 wide_gordon <- wide %>% filter(Set == "gordon")
 gcta_ret <- sum(!is.na(wide_gordon[[gcta_col]]))
 adjhe_ret <- sum(!is.na(wide_gordon[[adjhe_col]]))
 twin_ret <- sum(!is.na(wide_gordon$Twin_h2))
 
-gcta_zero <- sum(wide_gordon[[gcta_col]] <= 1e-9, na.rm=TRUE)
-adjhe_zero <- sum(wide_gordon[[adjhe_col]] <= 1e-9, na.rm=TRUE)
-twin_zero <- sum(wide_gordon$Twin_h2 <= 1e-9, na.rm=TRUE)
+gcta_zero <- sum(wide_gordon[[gcta_col]] <= FLOOR, na.rm=TRUE)
+adjhe_zero <- sum(wide_gordon[[adjhe_col]] <= FLOOR, na.rm=TRUE)
+twin_zero <- sum(wide_gordon$Twin_h2 <= FLOOR, na.rm=TRUE)
 
 # Summary stats
 gcta_vals <- wide_gordon[[gcta_col]][!is.na(wide_gordon[[gcta_col]])]
@@ -820,7 +826,7 @@ gcta_adjhe_cor <- cor(wide_gordon[[gcta_col]], wide_gordon[[adjhe_col]], use="co
 
 # Build comparison table
 comparison <- tibble(
-  Metric = c("Retention (n)", "Retention (%)", "Zero h2 (n)", "Zero h2 (%)",
+  Metric = c("Retention (n)", "Retention (%)", "At floor (n)", "At floor (%)",
              "Median h2", "Mean h2", "IQR (25th–75th)", "Max h2",
              "Pearson r vs Twin", "Pearson r vs AdjHE-RE"),
   GCTA = c(
@@ -864,5 +870,5 @@ comparison <- tibble(
 kable(comparison, caption="Gordon FC — GCTA GREML vs AdjHE-RE vs Twin: retention, zero fractions, distribution summaries, and Pearson correlations. IQR = 25th–75th percentiles.")
 ```
 
-*GCTA GREML lacks a conditioning screen and returns h² = 0 for ~50% of edges, rendering ill-conditioned solves indistinguishable from true zero heritability. AdjHE-RE applies `cond₂(XᵀX) > 10¹⁰`, retaining only well-conditioned solves. Twin h² reflects total heritability; the ~3.1× Twin-to-SNP mean ratio is consistent with the expected missing-heritability gap for complex functional traits.*
+*The distinction between the two kinds of low value matters here. GCTA GREML lacks a conditioning screen, and for 54.4% of retained Gordon FC edges it returns the floor value h² = 1e-6 rather than an estimate: 27,838 of its 51,158 retained edges sit exactly at 1e-6, with no value anywhere in (0, 1e-6] and no exact zeros, so an ill-conditioned solve is arithmetically indistinguishable from a true zero. AdjHE-RE applies `cond₂(XᵀX) > 10¹⁰`, retaining only well-conditioned solves, and leaves no value at the floor. Twin h² reaches the same 1e-6 threshold on 15.0% of edges, but that is a different phenomenon: those are values at or below 1e-9, only ~1.5% falling in (1e-9, 1e-6], so they represent phenotypes with little or no detectable heritability rather than a solver artifact. Twin h² reflects total heritability; the ~3.1× Twin-to-SNP mean ratio is consistent with the expected missing-heritability gap for complex functional traits.*
 
