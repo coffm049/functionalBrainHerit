@@ -34,7 +34,14 @@ r2_stats <- function(x, y) {
 # -------------------------------------------------------------------------
 melt <- wide %>%
   select(Set, Pheno, Twin_h2, starts_with("h2_")) %>%
-  pivot_longer(starts_with("h2_"), names_to = "MashMethod", values_to = "Mash_h2")
+  pivot_longer(starts_with("h2_"), names_to = "MashMethod", values_to = "Mash_h2") %>%
+  # The column name encodes which atlas it belongs to. A few WIDE rows carry a
+  # value for a different atlas than their Set, which would otherwise appear as
+  # near-empty panels such as "SA vs h2_gordon_AdjHE_FE" with a handful of
+  # points. Keep a row only when the atlas in the column name matches the Set.
+  mutate(method_atlas = sub("^h2_(.*?)_(AdjHE_RE|AdjHE_FE|GCTA|HEreg)$", "\\1", MashMethod),
+         method_atlas = recode(method_atlas, proba = "probaConns")) %>%
+  filter(method_atlas == Set)
 
 r2_by_set <- melt %>%
   group_by(Set, MashMethod) %>%
@@ -53,8 +60,13 @@ write_csv(r2_all, file.path(OUT_DIR, "r2_by_set.csv"))
 message("Wrote ", file.path(OUT_DIR, "r2_by_set.csv"))
 print(r2_all)
 
-# Scatter with R2 annotation per Set
+# Scatter, reported methods only. AdjHE-FE and HEreg are still estimated and
+# still written to r2_by_set.csv, but they do not appear in the paper or the
+# response, so they get no panel here either.
+REPORTED_METHODS <- "AdjHE_RE|GCTA"
+
 p1 <- melt %>%
+  filter(grepl(REPORTED_METHODS, MashMethod)) %>%
   filter(!is.na(Twin_h2), !is.na(Mash_h2)) %>%
   ggplot(aes(x = Twin_h2, y = Mash_h2)) +
   geom_point(alpha = 0.3, size = 0.7) +

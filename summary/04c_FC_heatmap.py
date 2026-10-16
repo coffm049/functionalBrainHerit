@@ -143,14 +143,13 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
     print(f"[{atlas}] order {networks_ordered[:10]}... uniq {list(zip(uniq, counts))}")
 
     # AdjHE-RE is the reported SNP method (it is the only AdjHE variant with a
-    # conditioning screen). Fall back to FE only if RE has not been run.
+    # conditioning screen). There is deliberately no fallback to FE: AdjHE-FE is
+    # computed and kept in the CSVs, but it does not appear in the paper or the
+    # response, so if RE is missing we skip the atlas rather than emit an FE
+    # panel that would have to be deleted again after every run.
     col_pref = f"h2_{atlas}_AdjHE_RE"
-    col_alt = f"h2_{atlas}_AdjHE_FE"
     method_label = "AdjHE-RE"
-    if col_pref not in wide.columns and col_alt in wide.columns:
-        col_pref = col_alt
-        method_label = "AdjHE-FE"
-    elif col_pref not in wide.columns:
+    if col_pref not in wide.columns:
         alt = col_pref.replace("probaConns","proba")
         if alt in wide.columns:
             col_pref = alt

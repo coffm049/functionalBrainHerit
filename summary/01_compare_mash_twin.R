@@ -239,8 +239,18 @@ corr_all <- melt %>% group_by(MashMethod) %>%
             .groups = "drop")
 write_csv(corr_all, file.path(OUT, "correlations_overall.csv"))
 
+# Figures are only produced for the methods the paper actually reports:
+# AdjHE-RE (primary), GCTA (estimator sensitivity, shown in the appendix), and
+# Twin. AdjHE-FE and HEreg are still estimated and still written to
+# correlations_by_set.csv / correlations_overall.csv for 07_method_diagnostics.R,
+# but they must not generate figures -- otherwise each run re-creates panels that
+# appear nowhere in the paper or the response.
+REPORTED_METHODS <- "AdjHE_RE|GCTA"
+
 plot_dir <- file.path(OUT, "plots"); dir.create(plot_dir, showWarnings = FALSE)
-for (sm in unique(melt$MashMethod)) {
+plot_methods <- unique(melt$MashMethod)[grepl(REPORTED_METHODS, unique(melt$MashMethod))]
+message("Plotting methods: ", paste(plot_methods, collapse = ", "))
+for (sm in plot_methods) {
   d <- melt %>% filter(MashMethod == sm, !is.na(Mash_h2), !is.na(Twin_h2))
   p <- ggplot(d, aes(x = Twin_h2, y = Mash_h2)) + geom_point(alpha = 0.3, size = 0.5) +
     geom_abline(intercept = 0, slope = 1, color = "red") + facet_wrap(~Set) +
