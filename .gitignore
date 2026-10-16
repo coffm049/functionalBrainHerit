@@ -71,3 +71,8 @@ results/
 .tex
 .docx
 *.docx
+
+# Figure decks. figures.pptx is a hand-assembled deck whose embedded images are
+# refreshed in place from results/ by summary/export_pptx_figures.py; it is a
+# working artifact, not a source file.
+*.pptx

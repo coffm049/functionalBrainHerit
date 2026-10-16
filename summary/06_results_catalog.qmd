@@ -285,6 +285,17 @@ with the expected heritability gap for complex functional traits. These results
 confirm that AdjHE-RE recovers plausible SNP heritability where GCTA returns
 predominantly floor values.
 
+The two panels below are the visual version of that statement. On the left, every
+Gordon Sys-Sys connection plotted by GCTA, on the same axes as the AdjHE-RE panel
+in the previous section; the near-total collapse onto the floor is visible as the
+absence of a body of points above it. On the right, GCTA h² against Twin h² for the
+same atlas, which shows no trend at all — the same view shown for AdjHE-RE
+alongside it for contrast.
+
+![Gordon GCTA GREML "Manhattan" - Sys-Sys pairs, same pooled x-axis as the AdjHE-RE panel above](../results/summary/plots/manhattan_gordon_GCTA.png){width="100%" style="object-fit:contain;"}
+
+![Gordon GCTA GREML h2 against Twin h2, to be compared with the AdjHE-RE scatter above](../results/summary/plots/scatter_h2_gordon_GCTA.png){width="100%" style="object-fit:contain;"}
+
 ### GCTA vs AdjHE-RE and Twin — Quantitative Comparison
 
 ```{r gcta-comparison}

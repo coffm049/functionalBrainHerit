@@ -48,12 +48,24 @@ plot_sa <- function(df, out_path, title_suffix) {
     arrange(m) %>%
     pull(pheno_label)
 
+  # Correlate on networks where BOTH estimates are real. The bars still draw 0 for
+  # missing or negative estimates, but those are not measurements, so they are
+  # excluded here -- otherwise the missing SNP estimates enter the correlation as
+  # zeros and inflate it (this is what made the CSV disagree with Table 2).
+  # n_nets is the number of networks plotted; n is the number actually correlated.
   cor_df <- df %>%
-    pivot_wider(names_from = Type, values_from = h2) %>%
+    pivot_wider(names_from = Type, values_from = c(h2, imputed)) %>%
+    mutate(pair_real = !coalesce(imputed_Twin, TRUE) & !coalesce(imputed_AdjHE_RE, TRUE)) %>%
     summarise(
-      n = sum(!is.na(Twin) & !is.na(AdjHE_RE)),
-      r = suppressWarnings(cor(Twin, AdjHE_RE, use = "pairwise.complete.obs")),
-      rho = suppressWarnings(cor(Twin, AdjHE_RE, method = "spearman", use = "pairwise.complete.obs"))
+      n_nets = n(),
+      n = sum(pair_real),
+      r = if (sum(pair_real) > 2)
+            suppressWarnings(cor(h2_Twin[pair_real], h2_AdjHE_RE[pair_real]))
+          else NA_real_,
+      rho = if (sum(pair_real) > 2)
+              suppressWarnings(cor(h2_Twin[pair_real], h2_AdjHE_RE[pair_real],
+                                   method = "spearman"))
+            else NA_real_
     )
   # Save stats for quarto (instead of subtitle numbers)
   stats_path <- sub("\\.png$", "_stats.csv", out_path)
@@ -165,7 +177,12 @@ build_sa_panel <- function(twin_rds_path, adj_csv) {
     pivot_longer(cols = c(Twin, AdjHE_RE), names_to = "Type", values_to = "h2") %>%
     mutate(pheno_num = parse_number(Pheno),
            pheno_label = recode(as.character(pheno_num), !!!networks, .default = NA_character_),
-           h2 = if_else(is.na(h2) | h2 < 0, 0, h2)) %>%
+           # NA and negative estimates are drawn as 0 so the bar still renders, but
+           # they are flagged first: a missing AdjHE-RE estimate turned into a 0 is
+           # a plotting choice, not a measurement, and must not enter the
+           # Twin-vs-SNP correlation.
+           imputed = is.na(h2) | h2 < 0,
+           h2 = if_else(imputed, 0, h2)) %>%
     drop_na(pheno_label)
 }
 
@@ -189,7 +206,8 @@ if (nrow(wide) > 0) {
         Type = recode(Type, Twin_h2 = "Twin", h2_w = "AdjHE_RE"),
         pheno_num = parse_number(Pheno),
         pheno_label = recode(as.character(pheno_num), !!!networks, .default = NA_character_),
-        h2 = if_else(is.na(h2) | h2 < 0, 0, h2)
+        imputed = is.na(h2) | h2 < 0,
+        h2 = if_else(imputed, 0, h2)
       ) %>%
       drop_na(pheno_label)
     message("Using WIDE w_total columns: ", w_twin_col, " + ", w_adj_col)
@@ -236,7 +254,8 @@ if (nrow(df_w) == 0) {
           Type = recode(Type, Twin_h2 = "Twin", h2_w = "AdjHE_RE"),
           pheno_num = parse_number(Pheno),
           pheno_label = recode(as.character(pheno_num), !!!networks, .default = NA_character_),
-          h2 = if_else(is.na(h2) | h2 < 0, 0, h2)
+          imputed = is.na(h2) | h2 < 0,
+          h2 = if_else(imputed, 0, h2)
         ) %>%
         drop_na(pheno_label)
       message("Built w_total from direct files: ", twin_w_path, " + ", adj_file)
