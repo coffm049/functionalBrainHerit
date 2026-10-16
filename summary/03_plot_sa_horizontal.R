@@ -77,12 +77,19 @@ plot_sa <- function(df, out_path, title_suffix) {
   # X-scale constants, declared here because the legend anchor is derived from
   # them. ggplot2 places legends in normalised panel coordinates, so a data
   # value like 0.4 has to be converted before it can be used as a position.
-  x_lim <- c(0, 0.5)
+  #
+  # The axis runs to 0.4 rather than 0.5 because the largest plotted estimate is
+  # 0.343 (VIS, Twin w_total); 0.5 left roughly a third of the panel empty. With
+  # 0.4 as the limit, the legend's 0.4 anchor is also the right edge of the panel,
+  # so it is derived from the same constant rather than restated.
+  x_lim <- c(0, 0.4)
   x_expand_right <- 0.02            # matches expansion(mult = c(0, 0.02))
-  legend_anchor_x <- 0.4            # data value the legend's right edge sits on
-  # The right expansion widens the drawn panel to 0.5 * 1.02, so the panel span
-  # is larger than the raw limit range and the 0.4 mark sits left of where a
-  # naive 0.4/0.5 would put it.
+  # Anchor just inside the 0.4 limit: at exactly 0.4 the legend box would be flush
+  # against the panel edge, so 0.39 leaves it clear of the border.
+  legend_anchor_x <- 0.39           # data value the legend's right edge sits on
+  # The right expansion widens the drawn panel to 0.4 * 1.02, so the panel span
+  # is larger than the raw limit range and the anchor must be divided by the
+  # wider span, not by the raw range.
   x_panel_span <- diff(x_lim) * (1 + x_expand_right)
   legend_pos_x <- legend_anchor_x / x_panel_span
 
