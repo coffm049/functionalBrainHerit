@@ -49,10 +49,18 @@ plot_sa <- function(df, out_path, title_suffix) {
     arrange(m) %>%
     pull(pheno_label)
 
-  # Correlate on networks where BOTH estimates are real. The bars still draw 0 for
-  # missing or negative estimates, but those are not measurements, so they are
-  # excluded here -- otherwise the missing SNP estimates enter the correlation as
-  # zeros and inflate it (this is what made the CSV disagree with Table 2).
+  # Correlate on networks where BOTH estimates are resolved and positive.
+  # Missing, negative and exactly-zero estimates are drawn as 0 so the bar still
+  # renders, but they are flagged first and excluded from the correlation.
+  #
+  # The zeros matter. Four of the fourteen plotted networks (FP, DMN, Tpole, SML)
+  # return exactly 0 from both methods, and those (0,0) points drag the fitted line
+  # toward the origin, lifting r from 0.5992 to 0.7292. Excluding them is also the
+  # only treatment consistent with this paper's own argument: an exact 0 from an
+  # SNP estimator is not a measurement of zero heritability, it is an unresolved
+  # solve, and counting it as one is precisely the GCTA behaviour criticised in
+  # the estimator-sensitivity section.
+  #
   # n_nets is the number of networks plotted; n is the number actually correlated.
   cor_df <- df %>%
     pivot_wider(names_from = Type, values_from = c(h2, imputed)) %>%
@@ -189,7 +197,7 @@ build_sa_panel <- function(twin_rds_path, adj_csv) {
            # they are flagged first: a missing AdjHE-RE estimate turned into a 0 is
            # a plotting choice, not a measurement, and must not enter the
            # Twin-vs-SNP correlation.
-           imputed = is.na(h2) | h2 < 0,
+           imputed = is.na(h2) | h2 <= 0,
            h2 = if_else(imputed, 0, h2)) %>%
     drop_na(pheno_label)
 }
@@ -214,7 +222,7 @@ if (nrow(wide) > 0) {
         Type = recode(Type, Twin_h2 = "Twin", h2_w = "AdjHE_RE"),
         pheno_num = parse_number(Pheno),
         pheno_label = recode(as.character(pheno_num), !!!networks, .default = NA_character_),
-        imputed = is.na(h2) | h2 < 0,
+        imputed = is.na(h2) | h2 <= 0,
         h2 = if_else(imputed, 0, h2)
       ) %>%
       drop_na(pheno_label)
@@ -262,7 +270,7 @@ if (nrow(df_w) == 0) {
           Type = recode(Type, Twin_h2 = "Twin", h2_w = "AdjHE_RE"),
           pheno_num = parse_number(Pheno),
           pheno_label = recode(as.character(pheno_num), !!!networks, .default = NA_character_),
-          imputed = is.na(h2) | h2 < 0,
+          imputed = is.na(h2) | h2 <= 0,
           h2 = if_else(imputed, 0, h2)
         ) %>%
         drop_na(pheno_label)
