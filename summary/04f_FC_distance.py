@@ -402,9 +402,8 @@ for atlas in ["gordon","probaConns"]:
         info = _plot_dist(ax, sub["euclidean_dist"].values, sub["h2"].values, sub["same_network"].values,
                    "Euclidean centroid distance (mm)")
         print(f"  [{atlas} {method}] euclid curves (n_edges, n_bins, n_bins_nz): {info}")
-        ax.text(0.02, 0.96, f"zero h2: {100*pzero:.1f}% (<=1e-9)", transform=ax.transAxes,
-                fontsize=7, va="top", ha="left", bbox=dict(fc="white", ec="none", alpha=0.7))
-        # No title per publication
+        # No title per publication; no summary statistics printed on the figure
+        # either -- zero-fraction and counts belong in Table 3, not on the axes.
         fig.tight_layout(pad=0.5)
         out=PLOT_DIR / f"fc_distance_{atlas}_{method.replace('-','')}.png"
         fig.savefig(out, dpi=300, bbox_inches="tight", pad_inches=0.05)
@@ -416,9 +415,6 @@ for atlas in ["gordon","probaConns"]:
             info_g = _plot_dist(ax, sub["geodesic_dist"].values, sub["h2"].values, sub["same_network"].values,
                        "Geodesic distance (mm)", color_within="#ff7f0e", color_across="#9467bd")
             print(f"  [{atlas} {method}] geodesic curves (n_edges, n_bins, n_bins_nz): {info_g}")
-            pzero_g = float(np.mean(sub.dropna(subset=["geodesic_dist"])["h2"].values <= ZERO_EPS))
-            ax.text(0.02, 0.96, f"zero h2: {100*pzero_g:.1f}% (<=1e-9)", transform=ax.transAxes,
-                    fontsize=7, va="top", ha="left", bbox=dict(fc="white", ec="none", alpha=0.7))
             fig.tight_layout(pad=0.5)
             out=PLOT_DIR / f"fc_distance_geodesic_{atlas}_{method.replace('-','')}.png"
             fig.savefig(out, dpi=300, bbox_inches="tight", pad_inches=0.05)

@@ -9,6 +9,7 @@
 # Run: Rscript summary/compare_r2.R
 
 library(tidyverse)
+source(file.path("summary", "plotstyle.R"))
 
 ROOT <- "/users/4/coffm049/papers/functionalBrainHerit"
 WIDE <- file.path(ROOT, "results/summary/mash_twin_wide.csv")
@@ -60,13 +61,12 @@ p1 <- melt %>%
   geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
   geom_smooth(method = "lm", se = FALSE, color = "blue", linewidth = 0.5) +
   facet_wrap(~Set + MashMethod, scales = "free", ncol = 3) +
-  labs(x = "Twin h2", y = "MASH h2", title = "Twin vs MASH h2 (R2 = Pearson r^2)") +
-  theme_minimal() +
-  geom_text(data = r2_all %>% filter(Set != "ALL"),
-            aes(label = sprintf("R2=%.2f\nn=%d", R2_pearson, n)),
-            x = -Inf, y = Inf, hjust = -0.1, vjust = 1.2, size = 2.5, inherit.aes = FALSE)
+  labs(x = "Twin h2", y = "MASH h2", title = "Twin vs MASH h2") +
+  # No summary statistics on the figure. R2, r and n are written to
+  # r2_by_set.csv / r2_all.csv and quoted in the tables instead.
+  theme_minimal()
 
-ggsave(file.path(PLOT_DIR, "r2_scatter_by_set.png"), p1, width = 9, height = 6, dpi = 300)
+ggsave(file.path(PLOT_DIR, "r2_scatter_by_set.png"), p1, width = 9, height = 6, dpi = 300, device = agg_dev)
 message("Wrote ", file.path(PLOT_DIR, "r2_scatter_by_set.png"))
 
 # -------------------------------------------------------------------------
@@ -164,12 +164,10 @@ if (!is.null(sa_w_vs_wo) && nrow(sa_w_vs_wo) > 0) {
     facet_wrap(~Method, scales = "free") +
     labs(x = "SA h2 wo_total (no total surface)", y = "SA h2 w_total (with total surface)",
          title = "SA: with vs without total surface control") +
-    theme_minimal() +
-    geom_text(data = r2_sa,
-              aes(label = sprintf("R2=%.2f\nn=%d", R2_pearson, n)),
-              x = -Inf, y = Inf, hjust = -0.1, vjust = 1.2, size = 3, inherit.aes = FALSE)
+    # No summary statistics on the figure; see r2_sa_w_vs_wo_total.csv.
+    theme_minimal()
 
-  ggsave(file.path(PLOT_DIR, "r2_sa_w_vs_wo.png"), p2, width = 7, height = 4, dpi = 300)
+  ggsave(file.path(PLOT_DIR, "r2_sa_w_vs_wo.png"), p2, width = 7, height = 4, dpi = 300, device = agg_dev)
   message("Wrote ", file.path(PLOT_DIR, "r2_sa_w_vs_wo.png"))
 } else {
   message("SA w_total vs wo_total files not found — run the w_total SLURM jobs first (SA/SLURM_AdjHE_RE_with_total.sh and SA/twinEsts/SLURM_twin_with_total.sh) and rebuild mash_twin_wide.csv")

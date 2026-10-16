@@ -7,6 +7,7 @@
 # Run: Rscript summary/03_plot_sa_horizontal.R  (on acn01 with R/4.4.0)
 
 library(tidyverse)
+source(file.path("summary", "plotstyle.R"))
 
 ROOT <- "/users/4/coffm049/papers/functionalBrainHerit"
 WIDE <- file.path(ROOT, "results/summary/mash_twin_wide.csv")
@@ -145,7 +146,7 @@ plot_sa <- function(df, out_path, title_suffix) {
     )
   # Canvas grew with the text: +2pt on the axis labels and base_size is what the
   # 11pt network names and title were scaled from.
-  ggsave(out_path, p, width = 8, height = 6, dpi = 300)
+  ggsave(out_path, p, width = 8, height = 6, dpi = 300, device = agg_dev)
   message("Wrote ", out_path)
   print(cor_df)
 }

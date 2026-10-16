@@ -1,4 +1,5 @@
 library(tidyverse)
+source(file.path("summary", "plotstyle.R"))
 
 ROOT <- "/users/4/coffm049/papers/functionalBrainHerit"
 NPC  <- 20
@@ -244,12 +245,12 @@ for (sm in unique(melt$MashMethod)) {
   p <- ggplot(d, aes(x = Twin_h2, y = Mash_h2)) + geom_point(alpha = 0.3, size = 0.5) +
     geom_abline(intercept = 0, slope = 1, color = "red") + facet_wrap(~Set) +
     labs(title = sm, x = "Twin h2 = A/(A+C+E)", y = "MASH h2") + theme_minimal()
-  ggsave(file.path(plot_dir, paste0("scatter_", sm, ".png")), p, width = 6, height = 4)
+  ggsave(file.path(plot_dir, paste0("scatter_", sm, ".png")), p, width = 6, height = 4, device = agg_dev)
   d2 <- d %>% mutate(diff = Mash_h2 - Twin_h2, avg = (Mash_h2 + Twin_h2) / 2)
   p2 <- ggplot(d2, aes(x = avg, y = diff)) + geom_point(alpha = 0.3, size = 0.5) +
     geom_hline(yintercept = mean(d2$diff, na.rm = TRUE), color = "red") + facet_wrap(~Set) +
     labs(title = paste("Bland-Altman", sm), x = "Mean h2", y = "MASH - Twin") + theme_minimal()
-  ggsave(file.path(plot_dir, paste0("blandaltman_", sm, ".png")), p2, width = 6, height = 4)
+  ggsave(file.path(plot_dir, paste0("blandaltman_", sm, ".png")), p2, width = 6, height = 4, device = agg_dev)
 }
 
 twin_labels <- c("SA" = "SA", "gordon" = "Gordon", "probaConns" = "ProbaConns")
@@ -274,7 +275,7 @@ for (s in c("SA", "gordon", "probaConns")) {
     theme_minimal(base_size = 11) +
     theme(legend.position = "bottom", plot.title = element_text(face = "bold", hjust = 0.5),
           panel.grid = element_blank())
-  ggsave(file.path(plot_dir, paste0("twin_composition_", s, ".png")), p, width = 7, height = 3.5, dpi = 300)
+  ggsave(file.path(plot_dir, paste0("twin_composition_", s, ".png")), p, width = 7, height = 3.5, dpi = 300, device = agg_dev)
 }
 
 cat("\n=== MASH vs Twin correlations (by set) ===\n")

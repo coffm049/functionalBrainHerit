@@ -113,7 +113,7 @@ def main():
     for ax, (e, *_r) in zip(axes, TOP5):
         v = df[e].dropna().values
         ax.hist(v, bins=60, color="#1f77b4", alpha=0.8)
-        ax.set_title(f"{e}\nTwin={_r[-2]:.2f} SNP=1.0", fontsize=9)
+        ax.set_title(e, fontsize=9)
         ax.set_xlabel("FC (raw)")
     axes[0].set_ylabel("count")
     fig.tight_layout()
