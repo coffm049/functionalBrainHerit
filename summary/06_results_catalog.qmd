@@ -428,12 +428,19 @@ kable(filter_n0(fivenum_gordon), caption="Gordon — h2 five-number summary (Twi
 ```
 
 ```{r gordon-corr}
-corr <- read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="gordon")
-# Report only the AdjHE-RE row; FE/GCTA/HEreg stay in the CSV for 07 diagnostics.
-corr <- corr %>% filter(grepl("AdjHE_RE", MashMethod))
-corr <- corr %>% filter(n != 0)
-# Only Pearson R per user (remove Spearman/R2)
-corr <- corr %>% select(any_of(c("Set","MashMethod","n","Pearson_r"))) %>% mutate(Pearson_r = round(Pearson_r, 3))
+# Computed from WIDE, like every other table here. correlations_by_set.csv is a
+# 2026-09-22 artifact whose MashMethod labels do not match this filter, so it
+# returns nothing for gordon.
+corr <- wide %>%
+  filter(Set == "gordon") %>%
+  select(Twin_h2, all_of(gordon_col)) %>%
+  drop_na() %>%
+  summarise(Set = "gordon",
+            MashMethod = "AdjHE-RE",
+            n = n(),
+            Pearson_r = cor(Twin_h2, .data[[gordon_col]], use = "complete.obs"),
+            .groups = "drop") %>%
+  mutate(Pearson_r = round(Pearson_r, 3))
 kable(filter_n0(corr), caption="Gordon — Twin vs MASH Pearson R (AdjHE-RE)")
 ```
 
@@ -506,12 +513,18 @@ kable(filter_n0(fivenum_proba), caption="ProbaConns — h2 five-number summary (
 ```
 
 ```{r proba-corr}
-corr <- read_csv(file.path(ROOT,"results/summary/correlations_by_set.csv"), show_col_types=FALSE) %>% filter(Set=="probaConns")
-# Report only the AdjHE-RE row; FE/GCTA/HEreg stay in the CSV for 07 diagnostics.
-corr <- corr %>% filter(grepl("AdjHE_RE", MashMethod))
-# Only Pearson R per user (remove Spearman/R2), filter n=0
-corr <- corr %>% filter(n != 0)
-corr <- corr %>% select(any_of(c("Set","MashMethod","n","Pearson_r"))) %>% mutate(Pearson_r = round(Pearson_r, 3))
+# Computed from WIDE for the same reason as gordon-corr: the on-disk
+# correlations_by_set.csv is a 2026-09-22 artifact and matches nothing here.
+corr <- wide %>%
+  filter(Set == "probaConns") %>%
+  select(Twin_h2, all_of(proba_col)) %>%
+  drop_na() %>%
+  summarise(Set = "probaConns",
+            MashMethod = "AdjHE-RE",
+            n = n(),
+            Pearson_r = cor(Twin_h2, .data[[proba_col]], use = "complete.obs"),
+            .groups = "drop") %>%
+  mutate(Pearson_r = round(Pearson_r, 3))
 kable(filter_n0(corr), caption="ProbaConns — Twin vs MASH Pearson R (AdjHE-RE)")
 ```
 
