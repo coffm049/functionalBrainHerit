@@ -394,10 +394,10 @@ def _plot_dist(ax, dist_all, h2_all, same_all, xlabel, color_within="#d62728", c
 # Iterate the methods actually present in the long frame rather than a hardcoded
 # list, so a rename of the reported method cannot silently skip every panel.
 # Only the reported methods get figures. AdjHE-FE is still computed and
-    # still lands in the per-edge CSV, but it does not appear in the paper or the
-    # response, so it must not generate a figure either -- otherwise every run
-    # quietly re-creates FE panels that then have to be deleted by hand.
-    plot_methods=[m for m in ("Twin","AdjHE-RE") if m in set(df["method"])]
+# still lands in the per-edge CSV, but it does not appear in the paper or the
+# response, so it must not generate a figure either -- otherwise every run
+# quietly re-creates FE panels that then have to be deleted by hand.
+plot_methods=[m for m in ("Twin","AdjHE-RE") if m in set(df["method"])]
 print(f"  plotting methods: {plot_methods}")
 for atlas in ["gordon","probaConns"]:
     for method in plot_methods:

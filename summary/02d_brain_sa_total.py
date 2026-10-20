@@ -187,8 +187,8 @@ def plot_sa_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     sides = [(h, s, v, w) for h, s, v, w in sides if v is not None]
     png = outdir / f"{tag}_surface.png"
     fig = plt.figure(figsize=(5.8 * len(sides), 4.2))
-    last = len(sides) - 1
-    for i, (hemi, surf, val, view) in enumerate(sides):
+    last = len(sides)
+    for i, (hemi, surf, val, view) in enumerate(sides, start=1):
         ax = fig.add_subplot(1, len(sides), i, projection="3d")
         # Colour bar on the last panel only, with a generous pad so it does not
         # land on the cortex.

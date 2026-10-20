@@ -415,8 +415,8 @@ def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     # the last panel with a generous pad (0.02 put it hard against the cortex)
     # and the right margin is reserved for it.
     fig = plt.figure(figsize=(5.8 * len(sides), 4.2))
-    last = len(sides) - 1
-    for i, (hemi, surf, val, view) in enumerate(sides):
+    last = len(sides)
+    for i, (hemi, surf, val, view) in enumerate(sides, start=1):
         ax = fig.add_subplot(1, len(sides), i, projection="3d")
         # HPC nilearn <0.12 does not support cbar_kwargs; handle both
         colorbar = (i == last)
@@ -496,7 +496,7 @@ def plot_surface_networks(net_left, net_right, net_names, surf_l, surf_r, outdir
     cmap, color_of = _network_palette(net_names, DLABEL)
     png = outdir / f"{tag}_networks_surface.png"
     fig = plt.figure(figsize=(5.5 * len(sides), 4.2))
-    for i, (hemi, surf, val, view) in enumerate(sides):
+    for i, (hemi, surf, val, view) in enumerate(sides, start=1):
         ax = fig.add_subplot(1, len(sides), i, projection="3d")
         niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, view=view, axes=ax, figure=fig,
                                    cmap=cmap, colorbar=False, threshold=None,
