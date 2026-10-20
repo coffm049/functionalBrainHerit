@@ -34,7 +34,7 @@ if (.has_ragg) {
 # the fallback where Cairo is unavailable. The signature mirrors agg_dev because
 # ggsave passes filename/width/height/units/res to any device given as a function.
 pdf_dev <- function(filename, width, height, units = "in", res = 300, ...) {
-  if (isTRUE(grDevices::capabilities("cairo"))) {
+  if (isTRUE(capabilities("cairo"))) {
     grDevices::cairo_pdf(filename = filename, width = width, height = height,
                          family = BASE_FAMILY, bg = "white")
   } else {
