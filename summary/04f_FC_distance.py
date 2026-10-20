@@ -27,6 +27,9 @@ import nibabel as nib
 # Imaging Neuroscience requires Arial/Helvetica in figures; importing this
 # module applies it. See summary/figure_font.py.
 import figure_font  # noqa: F401
+# Writes each figure as PNG (report/figures.pptx) and PDF (journal vector
+# submission). See summary/plotstyle.py.
+from plotstyle import savefig_publication
 
 ROOT = Path(__file__).resolve().parents[1]
 WIDE = ROOT / "results/summary/mash_twin_wide.csv"
@@ -410,8 +413,7 @@ for atlas in ["gordon","probaConns"]:
         # either -- zero-fraction and counts belong in Table 3, not on the axes.
         fig.tight_layout(pad=0.5)
         out=PLOT_DIR / f"fc_distance_{atlas}_{method.replace('-','')}.png"
-        fig.savefig(out, dpi=300, bbox_inches="tight", pad_inches=0.05)
-        plt.close(fig)
+        savefig_publication(fig, out)
         print(f"  wrote {out}")
         # Also geodesic if available (currently all NaN, skip)
         if sub["geodesic_dist"].notna().sum()>10:
@@ -421,8 +423,7 @@ for atlas in ["gordon","probaConns"]:
             print(f"  [{atlas} {method}] geodesic curves (n_edges, n_bins, n_bins_nz): {info_g}")
             fig.tight_layout(pad=0.5)
             out=PLOT_DIR / f"fc_distance_geodesic_{atlas}_{method.replace('-','')}.png"
-            fig.savefig(out, dpi=300, bbox_inches="tight", pad_inches=0.05)
-            plt.close(fig)
+            savefig_publication(fig, out)
             print(f"  wrote {out}")
 
 print("Done")

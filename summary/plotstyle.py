@@ -22,6 +22,9 @@ Usage:
 """
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 
 # Imaging Neuroscience requires Arial or Helvetica in figures. Importing this
@@ -32,6 +35,16 @@ from figure_font import RESOLVED_FONT, apply_font  # noqa: F401
 DPI = 300
 BBOX = "tight"
 PAD_INCHES = 0.05
+
+# Every figure is written in each of these formats. PNG keeps the Quarto
+# catalog and figures.pptx working; PDF is the vector file the journal wants
+# (figure_font sets pdf.fonttype=42, so text is embedded rather than outlined).
+# Override for a quick run with FBH_FIGURE_FORMATS="png".
+FIGURE_FORMATS = tuple(
+    ext.strip().lstrip(".").lower()
+    for ext in os.environ.get("FBH_FIGURE_FORMATS", "png,pdf").split(",")
+    if ext.strip()
+)
 
 # --- palette ----------------------------------------------------------------
 ALT_COLORS = ["#1f77b4", "#ff7f0e"]
@@ -62,9 +75,29 @@ MANHATTAN_FIGSIZE = (14.0, 4.5)
 MANHATTAN_BOTTOM = 0.28
 
 
-def savefig_publication(fig, path, dpi=DPI, bbox=BBOX, pad_inches=PAD_INCHES):
-    """Write a figure at publication resolution and close it."""
-    fig.savefig(path, dpi=dpi, bbox_inches=bbox, pad_inches=pad_inches)
+def figure_paths(path, formats=None) -> list[Path]:
+    """`path` written in every publication format.
+
+    The extension on `path` names the primary format and stays first, so a
+    caller that does `stats = str(path).replace('.png', '_stats.csv')` keeps
+    working while the PDF is written next to it.
+    """
+    fmts = FIGURE_FORMATS if formats is None else tuple(formats)
+    stem = Path(path).with_suffix("")
+    primary = Path(path).suffix.lstrip(".").lower() or "png"
+    ordered = [primary] + [f for f in fmts if f != primary]
+    return [stem.with_suffix("." + f) for f in ordered]
+
+
+def savefig_publication(fig, path, dpi=DPI, bbox=BBOX, pad_inches=PAD_INCHES,
+                        formats=None):
+    """Write a figure in every publication format, then close it.
+
+    Returns the primary path (the one passed in), so existing callers that
+    build a stats filename from it are unaffected.
+    """
+    for out in figure_paths(path, formats):
+        fig.savefig(out, dpi=dpi, bbox_inches=bbox, pad_inches=pad_inches)
     plt.close(fig)
     return path
 

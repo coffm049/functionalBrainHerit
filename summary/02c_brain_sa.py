@@ -6,7 +6,7 @@ per-network (not per-edge), so values are mapped directly via the Gordon
 networks dlabel — no pconn rebuild / node-summary needed.
 
 Produces:
-  - <out>/SA_{twin,AdjHE}_surface.png  (both hemispheres, 0–0.5)
+  - <out>/SA_{twin,AdjHE}_surface.png/.pdf  (left lateral + left medial, 0–0.5)
 
 Run on the HPC, where the dlabel and surfaces are available:
   conda activate MASH
@@ -34,6 +34,10 @@ import nilearn.plotting as niplot
 # Imaging Neuroscience requires Arial/Helvetica in figures; importing this
 # module applies it. See summary/figure_font.py.
 import figure_font  # noqa: F401
+
+# Writes every figure as PNG (for the report and figures.pptx) and PDF (the
+# vector file Imaging Neuroscience wants). See summary/plotstyle.py.
+from plotstyle import savefig_publication
 
 
 def _display_tag(tag: str) -> str:
@@ -173,10 +177,17 @@ def sa_values_to_textures(sa_h2: dict[int, float], dlabel: Path):
             continue
         lab_str = lab[0] if isinstance(lab, (tuple, list)) else getattr(lab, "label", str(lab))
         parcel_to_net[p] = _network_of(lab_str)
-    # invert: network short name -> list of parcel indices
+    # invert: network short name -> list of parcel indices, keyed case-
+    # insensitively. _network_of() returns short names from its own map
+    # ("Visual"->"Vis", "Salience"->"Sal", "SMhand"->"SMd", "SMmouth"->"SMl",
+    # "Auditory"->"Aud", ...), but NETWORKS above spells several of them in a
+    # different case ("VIS", "SAL", "SMD", "SML", "AUD"). The exact-match lookup
+    # that used to be here therefore painted nothing for those networks. Lower
+    # casing both sides makes the join spelling-agnostic.
     net_to_parcels = {}
     for p, net in parcel_to_net.items():
-        net_to_parcels.setdefault(net, []).append(p)
+        net_to_parcels.setdefault(str(net).lower(), []).append(p)
+    painted = set()
     for region, value in sa_h2.items():
         if not np.isfinite(value):
             continue
@@ -184,9 +195,14 @@ def sa_values_to_textures(sa_h2: dict[int, float], dlabel: Path):
         if net_name is None:
             # 4,6,17 are null per Gordon (no parcels) — skip to avoid shift
             continue
-        parcels = net_to_parcels.get(net_name, [])
+        parcels = net_to_parcels.get(str(net_name).lower(), [])
+        if parcels:
+            painted.add(str(net_name))
         for p in parcels:
             full[label_data == p] = value
+    missing = sorted({str(v) for k, v in NETWORKS.items() if k in sa_h2} - painted)
+    if missing:
+        print(f"  WARNING: SA networks with no parcels in this dlabel: {missing}")
     ax = img.header.get_axis(1)
     va = np.asarray(ax.vertex, dtype=int)
     tex_left = tex_right = None
@@ -209,29 +225,36 @@ def sa_values_to_textures(sa_h2: dict[int, float], dlabel: Path):
 
 def plot_sa_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     import matplotlib.pyplot as plt
-    sides = [("left", surf_l, val_left), ("right", surf_r, val_right)]
-    sides = [(h, s, v) for h, s, v in sides if v is not None]
+    # One lateral and one medial view rather than two opposing laterals. Both
+    # hemispheres are still computed and both still reach the stats CSV; only
+    # the drawing is single-hemisphere.
+    sides = [("left", surf_l, val_left, "lateral"), ("left", surf_l, val_left, "medial")]
+    sides = [(h, s, v, w) for h, s, v, w in sides if v is not None]
     png = outdir / f"{tag}_surface.png"
     fig = plt.figure(figsize=(5.8 * len(sides), 4.2))
-    for i, (hemi, surf, val) in enumerate(sides, start=1):
+    last = len(sides) - 1
+    for i, (hemi, surf, val, view) in enumerate(sides):
         ax = fig.add_subplot(1, len(sides), i, projection="3d")
+        # Colour bar on the last panel only, with a generous pad so it does not
+        # land on the cortex.
+        colorbar = (i == last)
         try:
-            cbar_kwargs = {"shrink": 0.6, "aspect": 12, "pad": 0.02} if hemi == "right" else None
-            niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
-                                       cmap="coolwarm", colorbar=(hemi == "right"), cbar_kwargs=cbar_kwargs,
+            cbar_kwargs = {"shrink": 0.6, "aspect": 12, "pad": 0.1} if colorbar else None
+            niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, view=view, axes=ax, figure=fig,
+                                       cmap="coolwarm", colorbar=colorbar, cbar_kwargs=cbar_kwargs,
                                        threshold=None, vmin=0.0, vmax=vmax, title="")
         except TypeError:
-            niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
-                                       cmap="coolwarm", colorbar=(hemi == "right"),
+            niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, view=view, axes=ax, figure=fig,
+                                       cmap="coolwarm", colorbar=colorbar,
                                        threshold=None, vmin=0.0, vmax=vmax, title="")
-    fig.subplots_adjust(right=0.88, wspace=0.15)
-    fig.tight_layout(pad=0.4, rect=[0, 0, 0.88, 1])
-    fig.savefig(png, dpi=300, bbox_inches="tight", pad_inches=0.05)
-    plt.close(fig)
+    fig.subplots_adjust(right=0.86, wspace=0.18)
+    fig.tight_layout(pad=0.4, rect=[0, 0, 0.86, 1])
+    savefig_publication(fig, png)
     stats_path = outdir / f"{tag}_surface_stats.csv"
     try:
-        assigned = sum(np.count_nonzero(~np.isnan(v)) for _, _, v in sides)
-        allv = np.concatenate([v[~np.isnan(v)] for _, _, v in sides]) if assigned>0 else np.array([np.nan])
+        both = [v for v in (val_left, val_right) if v is not None]
+        assigned = sum(np.count_nonzero(~np.isnan(v)) for v in both)
+        allv = np.concatenate([v[~np.isnan(v)] for v in both]) if assigned>0 else np.array([np.nan])
         pd.DataFrame([{"tag": tag, "assigned_vertices": int(assigned), "h2_min": float(np.nanmin(allv)), "h2_max": float(np.nanmax(allv)), "h2_mean": float(np.nanmean(allv))}]).to_csv(stats_path, index=False)
     except Exception:
         pass

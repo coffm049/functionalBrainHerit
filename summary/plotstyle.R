@@ -29,6 +29,42 @@ if (.has_ragg) {
   }
 }
 
+# PDF is the vector format the journal wants. cairo_pdf embeds the font (so the
+# Arial requirement survives submission); plain pdf() with useDingbats=FALSE is
+# the fallback where Cairo is unavailable. The signature mirrors agg_dev because
+# ggsave passes filename/width/height/units/res to any device given as a function.
+pdf_dev <- function(filename, width, height, units = "in", res = 300, ...) {
+  if (isTRUE(grDevices::capabilities("cairo"))) {
+    grDevices::cairo_pdf(filename = filename, width = width, height = height,
+                         family = BASE_FAMILY, bg = "white")
+  } else {
+    grDevices::pdf(file = filename, width = width, height = height,
+                   family = BASE_FAMILY, useDingbats = FALSE, bg = "white")
+  }
+}
+
+# Every figure is written in each of these formats. PNG keeps the Quarto
+# catalog and figures.pptx working; PDF is what gets submitted. Override for a
+# quick run with FBH_FIGURE_FORMATS="png" in the environment.
+FIGURE_FORMATS <- trimws(strsplit(Sys.getenv("FBH_FIGURE_FORMATS", "png,pdf"), ",")[[1]])
+FIGURE_FORMATS <- FIGURE_FORMATS[nzchar(FIGURE_FORMATS)]
+
+# save_fig() replaces a bare ggsave(): same arguments, but it writes the figure
+# once per FIGURE_FORMATS entry instead of only to the one filename passed.
+save_fig <- function(path, plot, width, height, dpi = 300) {
+  stem <- sub("\\.(png|pdf|tif|tiff|svg|eps)$", "", path, ignore.case = TRUE)
+  written <- character()
+  for (fmt in FIGURE_FORMATS) {
+    out <- paste0(stem, ".", fmt)
+    dev <- if (fmt == "pdf") pdf_dev else agg_dev
+    ggplot2::ggsave(filename = out, plot = plot, width = width, height = height,
+                    dpi = dpi, device = dev, bg = "white")
+    message("Wrote ", out)
+    written <- c(written, out)
+  }
+  invisible(written)
+}
+
 # Applied globally so bare theme_minimal() calls inherit the family too.
 suppressPackageStartupMessages(library(ggplot2))
 theme_set(theme_minimal(base_family = BASE_FAMILY))

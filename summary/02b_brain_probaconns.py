@@ -2,7 +2,7 @@
 """ProbaConns (80 parcels) brain-space visualization — simple, hardcoded.
 
 Produces for twin and AdjHE-RE (90th-percentile node summary, publication-ready, no titles, minimal whitespace):
-  - <out>/probaConns_{twin,AdjHERE}_surface.png  (both hemispheres, 0–0.5, colorbar not overlapping)
+  - <out>/probaConns_{twin,AdjHERE}_surface.png/.pdf  (left lateral + left medial, 0–0.5, colorbar not overlapping)
   - <out>/probaConns_networks_surface.png      (categorical, from label table, Sal↔SMl swapped, 14 nets)
   - <out>/probaConns_{twin,AdjHERE}_circular.png (h2 > 0.33, nodes grouped by network, publication-ready, 0.33-1.0 rescale)
 
@@ -23,6 +23,10 @@ import nilearn.plotting as niplot
 # Imaging Neuroscience requires Arial/Helvetica in figures; importing this
 # module applies it. See summary/figure_font.py.
 import figure_font  # noqa: F401
+
+# Writes every figure as PNG (for the report and figures.pptx) and PDF (the
+# vector file Imaging Neuroscience wants). See summary/plotstyle.py.
+from plotstyle import savefig_publication
 
 # --------------------------------------------------------------------------
 # Hardcoded paths / constants — edit here if needed, no fallbacks
@@ -342,29 +346,37 @@ def _display_tag(tag: str) -> str:
 
 def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     import matplotlib.pyplot as plt
-    sides = [("left", surf_l, val_left), ("right", surf_r, val_right)]
-    sides = [(n, s, v) for n, s, v in sides if v is not None]
+    # One lateral and one medial view rather than two opposing laterals. Both
+    # hemispheres are still computed and both still reach the stats CSV; only
+    # the drawing is single-hemisphere.
+    sides = [("left", surf_l, val_left, "lateral"), ("left", surf_l, val_left, "medial")]
+    sides = [(h, s, v, w) for h, s, v, w in sides if v is not None]
     png = outdir / f"{tag}_surface.png"
     fig = plt.figure(figsize=(5.8 * len(sides), 4.2))
-    for i, (hemi, surf, val) in enumerate(sides, start=1):
+    last = len(sides) - 1
+    for i, (hemi, surf, val, view) in enumerate(sides):
         ax = fig.add_subplot(1, len(sides), i, projection="3d")
+        # HPC nilearn <0.12 does not support cbar_kwargs; handle both. The
+        # colour bar rides on the last panel with a generous pad so it does
+        # not land on the cortex.
+        colorbar = (i == last)
         try:
-            cbar_kwargs = {"shrink": 0.6, "aspect": 12, "pad": 0.02} if hemi == "right" else None
-            niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
-                                       cmap="coolwarm", colorbar=(hemi == "right"), cbar_kwargs=cbar_kwargs,
+            cbar_kwargs = {"shrink": 0.6, "aspect": 12, "pad": 0.1} if colorbar else None
+            niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, view=view, axes=ax, figure=fig,
+                                       cmap="coolwarm", colorbar=colorbar, cbar_kwargs=cbar_kwargs,
                                        threshold=None, vmin=0.0, vmax=vmax, title="")
         except TypeError:
-            niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
-                                       cmap="coolwarm", colorbar=(hemi == "right"),
+            niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, view=view, axes=ax, figure=fig,
+                                       cmap="coolwarm", colorbar=colorbar,
                                        threshold=None, vmin=0.0, vmax=vmax, title="")
-    fig.subplots_adjust(right=0.88, wspace=0.15)
-    fig.tight_layout(pad=0.4, rect=[0, 0, 0.88, 1])
-    fig.savefig(png, dpi=300, bbox_inches="tight", pad_inches=0.05)
-    plt.close(fig)
+    fig.subplots_adjust(right=0.86, wspace=0.18)
+    fig.tight_layout(pad=0.4, rect=[0, 0, 0.86, 1])
+    savefig_publication(fig, png)
     stats_path = outdir / f"{tag}_surface_stats.csv"
     try:
-        assigned = sum(np.count_nonzero(~np.isnan(v)) for _, _, v in sides)
-        allv = np.concatenate([v[~np.isnan(v)] for _, _, v in sides]) if assigned>0 else np.array([np.nan])
+        both = [v for v in (val_left, val_right) if v is not None]
+        assigned = sum(np.count_nonzero(~np.isnan(v)) for v in both)
+        allv = np.concatenate([v[~np.isnan(v)] for v in both]) if assigned>0 else np.array([np.nan])
         pd.DataFrame([{"tag": tag, "assigned_vertices": int(assigned), "h2_min": float(np.nanmin(allv)), "h2_max": float(np.nanmax(allv)), "h2_mean": float(np.nanmean(allv))}]).to_csv(stats_path, index=False)
     except Exception:
         pass
@@ -404,8 +416,7 @@ def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.33):
     ax.axis("off")
     png = outdir / f"{tag}_circular.png"
     fig.tight_layout(pad=0.3)
-    fig.savefig(png, dpi=300, bbox_inches="tight", pad_inches=0.05)
-    plt.close(fig)
+    savefig_publication(fig, png)
     stats_path = outdir / f"{tag}_circular_stats.csv"
     try:
         pd.DataFrame([{"tag": tag, "h2_thr": float(h2_thr), "n_edges": int(n_edges), "n_networks": int(len(net_names))}]).to_csv(stats_path, index=False)
@@ -416,22 +427,22 @@ def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.33):
 
 def plot_surface_networks(net_left, net_right, net_names, surf_l, surf_r, outdir, tag):
     import matplotlib.pyplot as plt
-    sides = [("left", surf_l, net_left), ("right", surf_r, net_right)]
-    sides = [(n, s, v) for n, s, v in sides if v is not None]
+    # Lateral + medial of the left hemisphere, matching plot_surface above.
+    sides = [("left", surf_l, net_left, "lateral"), ("left", surf_l, net_left, "medial")]
+    sides = [(h, s, v, w) for h, s, v, w in sides if v is not None]
     K = len(net_names)
     cmap, color_of = _network_palette(net_names, DLABEL)
     png = outdir / f"{tag}_networks_surface.png"
     fig = plt.figure(figsize=(5.5 * len(sides), 4.2))
-    for i, (hemi, surf, val) in enumerate(sides, start=1):
+    for i, (hemi, surf, val, view) in enumerate(sides):
         ax = fig.add_subplot(1, len(sides), i, projection="3d")
-        niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, axes=ax, figure=fig,
+        niplot.plot_surf_stat_map(str(surf), val, hemi=hemi, view=view, axes=ax, figure=fig,
                                    cmap=cmap, colorbar=False, threshold=None,
                                    vmin=0.0, vmax=max(K - 1, 1), title="")
     handles = [plt.Line2D([0], [0], marker="o", linestyle="", color=color_of[net], label=net) for net in net_names]
     fig.legend(handles=handles, loc="lower center", ncol=4, fontsize=7, frameon=False)
     fig.tight_layout(pad=0.5)
-    fig.savefig(png, dpi=300, bbox_inches="tight", pad_inches=0.05)
-    plt.close(fig)
+    savefig_publication(fig, png)
     print(f"  wrote {png}")
 
 

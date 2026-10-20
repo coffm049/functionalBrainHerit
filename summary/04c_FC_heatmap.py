@@ -22,6 +22,9 @@ import nibabel as nib
 # Imaging Neuroscience requires Arial/Helvetica in figures; importing this
 # module applies it. See summary/figure_font.py.
 import figure_font  # noqa: F401
+# Writes each figure as PNG (report/figures.pptx) and PDF (journal vector
+# submission). See summary/plotstyle.py.
+from plotstyle import savefig_publication
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -185,8 +188,7 @@ for atlas,N in [("gordon",352),("probaConns",80)]:
         cbar.ax.tick_params(labelsize=7)
         fig.tight_layout(pad=0.5)
         out=PLOT_DIR / f"heatmap_{atlas}_{method.replace('-','')}.png"
-        fig.savefig(out, dpi=300, bbox_inches="tight", pad_inches=0.05)
-        plt.close(fig)
+        savefig_publication(fig, out)
         # Save stats
         try:
             pd.DataFrame([{"atlas": atlas, "method": method, "n": int(N), "h2_mean": float(np.nanmean(M)), "h2_max": float(np.nanmax(M))}]).to_csv(str(out).replace(".png","_stats.csv"), index=False)

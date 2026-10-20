@@ -161,8 +161,7 @@ plot_sa <- function(df, out_path, title_suffix) {
     )
   # Canvas grew with the text: +2pt on the axis labels and base_size is what the
   # 11pt network names and title were scaled from.
-  ggsave(out_path, p, width = 8, height = 6, dpi = 300, device = agg_dev)
-  message("Wrote ", out_path)
+  save_fig(out_path, p, width = 8, height = 6, dpi = 300)
   print(cor_df)
 }
 

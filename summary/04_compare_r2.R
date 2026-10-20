@@ -78,8 +78,7 @@ p1 <- melt %>%
   # r2_by_set.csv / r2_all.csv and quoted in the tables instead.
   theme_minimal()
 
-ggsave(file.path(PLOT_DIR, "r2_scatter_by_set.png"), p1, width = 9, height = 6, dpi = 300, device = agg_dev)
-message("Wrote ", file.path(PLOT_DIR, "r2_scatter_by_set.png"))
+save_fig(file.path(PLOT_DIR, "r2_scatter_by_set.png"), p1, width = 9, height = 6, dpi = 300)
 
 # -------------------------------------------------------------------------
 # 2. SA: w_total vs wo_total (total surface controlled vs not)
@@ -179,8 +178,7 @@ if (!is.null(sa_w_vs_wo) && nrow(sa_w_vs_wo) > 0) {
     # No summary statistics on the figure; see r2_sa_w_vs_wo_total.csv.
     theme_minimal()
 
-  ggsave(file.path(PLOT_DIR, "r2_sa_w_vs_wo.png"), p2, width = 7, height = 4, dpi = 300, device = agg_dev)
-  message("Wrote ", file.path(PLOT_DIR, "r2_sa_w_vs_wo.png"))
+  save_fig(file.path(PLOT_DIR, "r2_sa_w_vs_wo.png"), p2, width = 7, height = 4, dpi = 300)
 } else {
   message("SA w_total vs wo_total files not found — run the w_total SLURM jobs first (SA/SLURM_AdjHE_RE_with_total.sh and SA/twinEsts/SLURM_twin_with_total.sh) and rebuild mash_twin_wide.csv")
 }
