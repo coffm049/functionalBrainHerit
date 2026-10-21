@@ -6,7 +6,7 @@ per-network (not per-edge), so values are mapped directly via the Gordon
 networks dlabel — no pconn rebuild / node-summary needed.
 
 Produces:
-  - <out>/SA_{twin,AdjHE}_surface.png/.pdf  (left lateral + left medial, 0–0.5)
+  - <out>/SA_{twin,AdjHE}_surface.png/.pdf  (left+right lateral + medial, 0–0.5)
 
 Run on the HPC, where the dlabel and surfaces are available:
   conda activate MASH
@@ -225,10 +225,10 @@ def sa_values_to_textures(sa_h2: dict[int, float], dlabel: Path):
 
 def plot_sa_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     import matplotlib.pyplot as plt
-    # One lateral and one medial view rather than two opposing laterals. Both
-    # hemispheres are still computed and both still reach the stats CSV; only
-    # the drawing is single-hemisphere.
-    sides = [("left", surf_l, val_left, "lateral"), ("left", surf_l, val_left, "medial")]
+    # Four views: lateral and medial of each hemisphere. Both hemispheres are
+    # computed and both reach the stats CSV.
+    sides = [("left", surf_l, val_left, "lateral"), ("left", surf_l, val_left, "medial"),
+             ("right", surf_r, val_right, "lateral"), ("right", surf_r, val_right, "medial")]
     sides = [(h, s, v, w) for h, s, v, w in sides if v is not None]
     png = outdir / f"{tag}_surface.png"
     fig = plt.figure(figsize=(5.8 * len(sides), 4.2))

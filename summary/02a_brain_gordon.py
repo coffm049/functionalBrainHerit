@@ -2,7 +2,7 @@
 """Gordon (352 parcels) brain-space visualization — simple, hardcoded.
 
 Produces for twin and AdjHE-RE (90th-percentile node summary, publication-ready, no titles, minimal whitespace):
-- <out>/gordon_{twin,AdjHERE}_surface.png/.pdf  (left lateral + left medial, 0–0.5, colorbar not overlapping)
+- <out>/gordon_{twin,AdjHERE}_surface.png/.pdf  (left+right lateral + medial, 0–0.5, colorbar not overlapping)
   - <out>/gordon_networks_surface.png      (categorical network topography, 14 nets, subcortical NA hidden)
   - <out>/gordon_{twin,AdjHERE}_circular.png (h2 > 0.33, nodes grouped by network, publication-ready, 0.33-1.0 rescale)
 
@@ -404,11 +404,10 @@ def _display_tag(tag: str) -> str:
 
 def plot_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     import matplotlib.pyplot as plt
-    # One lateral and one medial view, rather than the two opposing lateral
-    # views this used to draw. Both hemispheres are still computed and both are
-    # still written to the stats CSV below -- only the drawing is now
-    # single-hemisphere.
-    sides = [("left", surf_l, val_left, "lateral"), ("left", surf_l, val_left, "medial")]
+    # Four views: lateral and medial of each hemisphere. Both hemispheres are
+    # computed and both are written to the stats CSV below.
+    sides = [("left", surf_l, val_left, "lateral"), ("left", surf_l, val_left, "medial"),
+             ("right", surf_r, val_right, "lateral"), ("right", surf_r, val_right, "medial")]
     sides = [(h, s, v, w) for h, s, v, w in sides if v is not None]
     png = outdir / f"{tag}_surface.png"
     # Publication-ready: minimal whitespace, no title. The colour bar rides on
@@ -489,8 +488,9 @@ def plot_circular(M, outdir, tag, networks, net_names, h2_thr=0.33):
 
 def plot_surface_networks(net_left, net_right, net_names, surf_l, surf_r, outdir, tag):
     import matplotlib.pyplot as plt
-    # Lateral + medial of the left hemisphere, matching plot_surface above.
-    sides = [("left", surf_l, net_left, "lateral"), ("left", surf_l, net_left, "medial")]
+    # Four views, matching plot_surface above.
+    sides = [("left", surf_l, net_left, "lateral"), ("left", surf_l, net_left, "medial"),
+             ("right", surf_r, net_right, "lateral"), ("right", surf_r, net_right, "medial")]
     sides = [(h, s, v, w) for h, s, v, w in sides if v is not None]
     K = len(net_names)
     cmap, color_of = _network_palette(net_names, DLABEL)

@@ -6,7 +6,7 @@ It maps the SA heritability estimates that *control for totalNetworkSurface*
 (qcovar includes totalNetworkSurface) onto the Gordon networks surface.
 
 Produces:
-  - <out>/SA_w_total_{twin,AdjHE}_surface.png/.pdf  (left lateral + left medial, 0–0.5)
+  - <out>/SA_w_total_{twin,AdjHE}_surface.png/.pdf  (left+right lateral + medial, 0–0.5)
 
 Source: results/summary/mash_twin_wide.csv. 01_compare_mash_twin.R reads
 herit_w_total.Rds for SA, so the main wide table's SA columns (Twin_h2 and
@@ -180,10 +180,10 @@ def sa_values_to_textures(sa_h2: dict[int, float], dlabel: Path):
 
 def plot_sa_surface(val_left, val_right, surf_l, surf_r, outdir, tag, vmax):
     import matplotlib.pyplot as plt
-    # One lateral and one medial view rather than two opposing laterals. Both
-    # hemispheres are still computed and both still reach the stats CSV; only
-    # the drawing is single-hemisphere.
-    sides = [("left", surf_l, val_left, "lateral"), ("left", surf_l, val_left, "medial")]
+    # Four views: lateral and medial of each hemisphere. Both hemispheres are
+    # computed and both reach the stats CSV.
+    sides = [("left", surf_l, val_left, "lateral"), ("left", surf_l, val_left, "medial"),
+             ("right", surf_r, val_right, "lateral"), ("right", surf_r, val_right, "medial")]
     sides = [(h, s, v, w) for h, s, v, w in sides if v is not None]
     png = outdir / f"{tag}_surface.png"
     fig = plt.figure(figsize=(5.8 * len(sides), 4.2))
