@@ -105,6 +105,9 @@ plot_sa <- function(df, out_path, title_suffix) {
     mutate(pheno_label = factor(pheno_label, levels = twin_order)) %>%
     ggplot(aes(y = pheno_label, x = h2, fill = Type)) +
     geom_col(position = position_dodge2(width = 0.8, preserve = "single"), width = 0.7) +
+    geom_errorbar(aes(xmin = pmax(0, pmin(1, h2 - se)), xmax = pmax(0, pmin(1, h2 + se))),
+                  position = position_dodge2(width = 0.8, preserve = "single"),
+                  width = 0.25, linewidth = 0.4, color = "grey20", na.rm = TRUE) +
     scale_x_continuous(limits = x_lim, breaks = seq(x_lim[1], x_lim[2], by = 0.1),
                        expand = expansion(mult = c(0, x_expand_right))) +
     # Data levels are "Twin" / "AdjHE_RE" (underscore -- that is what the
@@ -190,14 +193,11 @@ build_sa_panel <- function(twin_rds_path, adj_csv) {
     select(Pheno = pheno, AdjHE_RE = h2)
   full_join(twin_df, adj_df, by = "Pheno") %>%
     pivot_longer(cols = c(Twin, AdjHE_RE), names_to = "Type", values_to = "h2") %>%
-    mutate(pheno_num = parse_number(Pheno),
+    mutate(se = 0,
+           pheno_num = parse_number(Pheno),
            pheno_label = recode(as.character(pheno_num), !!!networks, .default = NA_character_),
-           # NA and negative estimates are drawn as 0 so the bar still renders, but
-           # they are flagged first: a missing AdjHE-RE estimate turned into a 0 is
-           # a plotting choice, not a measurement, and must not enter the
-           # Twin-vs-SNP correlation.
            imputed = is.na(h2) | h2 <= 0,
-           h2 = if_else(imputed, 0, h2)) %>%
+           h2 = pmax(0, pmin(1, if_else(imputed, 0, h2)))) %>%
     drop_na(pheno_label)
 }
 
@@ -214,15 +214,32 @@ if (nrow(wide) > 0) {
   if (length(w_twin_col) == 1 && length(w_adj_col) == 1) {
     df_w <- wide %>%
       filter(Set == "SA") %>%
-      select(Pheno, all_of(c(w_twin_col, w_adj_col))) %>%
+      select(Pheno, all_of(c(w_twin_col, w_adj_col)), any_of(c("Twin_h2_se", "var_h2_SA_AdjHE_RE"))) %>%
       rename(Twin_h2 = all_of(w_twin_col), h2_w = all_of(w_adj_col)) %>%
+      mutate(
+        Twin_se = if_exists("Twin_h2_se", .) else NA_real_,
+        Adj_se = if_exists("var_h2_SA_AdjHE_RE", .) else NA_real_
+      )
+    # Pivot longer keeping SE
+    # Simpler: pivot h2 and se separately or keep columns
+    df_w <- wide %>%
+      filter(Set == "SA") %>%
+      select(Pheno, all_of(c(w_twin_col, w_adj_col)), any_of(c("Twin_h2_se", "var_h2_SA_AdjHE_RE"))) %>%
+      rename(Twin_h2 = all_of(w_twin_col), h2_w = all_of(w_adj_col)) %>%
+      mutate(
+        Twin_se = if ("Twin_h2_se" %in% names(.)) Twin_h2_se else NA_real_,
+        Adj_se = if ("var_h2_SA_AdjHE_RE" %in% names(.)) sqrt(var_h2_SA_AdjHE_RE) else NA_real_
+      ) %>%
+      select(Pheno, Twin_h2, h2_w, Twin_se, Adj_se) %>%
       pivot_longer(cols = c(Twin_h2, h2_w), names_to = "Type", values_to = "h2") %>%
       mutate(
+        se = if_else(Type == "Twin_h2", Twin_se, Adj_se),
         Type = recode(Type, Twin_h2 = "Twin", h2_w = "AdjHE_RE"),
         pheno_num = parse_number(Pheno),
         pheno_label = recode(as.character(pheno_num), !!!networks, .default = NA_character_),
         imputed = is.na(h2) | h2 <= 0,
-        h2 = if_else(imputed, 0, h2)
+        h2 = pmax(0, pmin(1, if_else(imputed, 0, h2))),
+        se = if_else(imputed | is.na(se), 0, se)
       ) %>%
       drop_na(pheno_label)
     message("Using WIDE w_total columns: ", w_twin_col, " + ", w_adj_col)
