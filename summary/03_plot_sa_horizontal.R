@@ -228,7 +228,7 @@ if (nrow(wide) > 0) {
       rename(Twin_h2 = all_of(w_twin_col), h2_w = all_of(w_adj_col)) %>%
       mutate(
         Twin_se = if ("Twin_h2_se" %in% names(.)) Twin_h2_se else NA_real_,
-        Adj_se = if ("var_h2_SA_AdjHE_RE" %in% names(.)) sqrt(var_h2_SA_AdjHE_RE) else NA_real_
+        Adj_se = if ("var_h2_SA_AdjHE_RE" %in% names(.)) 2 * sqrt(var_h2_SA_AdjHE_RE) else NA_real_
       ) %>%
       select(Pheno, Twin_h2, h2_w, Twin_se, Adj_se) %>%
       pivot_longer(cols = c(Twin_h2, h2_w), names_to = "Type", values_to = "h2") %>%
@@ -239,6 +239,7 @@ if (nrow(wide) > 0) {
         pheno_label = recode(as.character(pheno_num), !!!networks, .default = NA_character_),
         imputed = is.na(h2) | h2 <= 0,
         h2 = pmax(0, pmin(1, if_else(imputed, 0, h2))),
+        se = if_else(is.na(se), mean(se, na.rm = TRUE), se),
         se = if_else(imputed | is.na(se), 0, se)
       ) %>%
       drop_na(pheno_label)
