@@ -80,11 +80,9 @@ def plot_manhattan(df, atlas, shared_order):
         ax.set_xlabel("Sys-Sys connection", fontsize=FS_AXIS_LABEL_X)
 
     ax.set_xlim(layout["xlim"])
-    ymax = max(0.05, float(np.nanmax(df["h2"])) * 1.05) if len(df) else 1.0
-    ax.set_ylim(0, ymax)
-    ax.set_yticks(np.linspace(0, ymax, 5))
-    ax.set_yticklabels([f"{v:.2f}" for v in np.linspace(0, ymax, 5)],
-                       size=FS_TICK)
+    ax.set_ylim([0, 1])
+    ax.set_yticks([0, 0.25, 0.5, 0.75, 1])
+    ax.set_yticklabels([0, 0.25, 0.5, 0.75, 1], size=FS_TICK)
     ax.set_ylabel(r"Common effect ($C$)", size=FS_AXIS_LABEL)
 
     fig.subplots_adjust(bottom=MANHATTAN_BOTTOM)
@@ -230,8 +228,7 @@ def plot_surface(val_left, val_right, surf_l, surf_r, out, tag):
              ("right", surf_r, val_right, "lateral"),
              ("right", surf_r, val_right, "medial")]
     sides = [(h, s, v, w) for h, s, v, w in sides if v is not None]
-    vals = np.concatenate([v[~np.isnan(v)] for _, _, v, _ in sides])
-    vmax = max(0.05, float(np.nanmax(vals))) if len(vals) else 0.1
+    vmax = 0.5
 
     fig = plt.figure(figsize=(5.8 * len(sides), 4.2))
     last = len(sides)
